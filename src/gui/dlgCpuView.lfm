@@ -1,0 +1,880 @@
+object frmCpuView: TfrmCpuView
+  Left = 693
+  Height = 1304
+  Top = 268
+  Width = 2096
+  Caption = 'Cpu-View'
+  ClientHeight = 1304
+  ClientWidth = 2096
+  DesignTimePPI = 144
+  LCLVersion = '3.99.0.0'
+  OnClose = FormClose
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  object pnDebug: TPanel
+    Left = 0
+    Height = 92
+    Top = 1212
+    Width = 2096
+    Align = alBottom
+    Caption = 'pnDebug'
+    ClientHeight = 92
+    ClientWidth = 2096
+    TabOrder = 0
+    object Button1: TButton
+      Left = 8
+      Height = 38
+      Top = 40
+      Width = 113
+      Action = acDbgStepIn
+      TabOrder = 0
+    end
+    object edCommands: TEdit
+      Left = 5
+      Height = 33
+      Top = 5
+      Width = 2086
+      Align = alTop
+      BorderSpacing.Around = 4
+      TabOrder = 1
+      TextHint = 'Enter query...'
+    end
+    object Button2: TButton
+      Left = 136
+      Height = 38
+      Top = 40
+      Width = 113
+      Action = acDbgStepOut
+      TabOrder = 2
+    end
+    object Button3: TButton
+      Left = 272
+      Height = 38
+      Top = 40
+      Width = 177
+      Action = acDbgToggleBp
+      TabOrder = 3
+    end
+    object Button4: TButton
+      Left = 464
+      Height = 38
+      Top = 40
+      Width = 113
+      Action = acDbgRun
+      TabOrder = 4
+    end
+    object Button5: TButton
+      Left = 592
+      Height = 38
+      Top = 40
+      Width = 113
+      Action = acDbgPause
+      TabOrder = 5
+    end
+    object Button6: TButton
+      Left = 720
+      Height = 38
+      Top = 40
+      Width = 153
+      Action = acDbgRunTilReturn
+      TabOrder = 6
+    end
+    object Button7: TButton
+      Left = 888
+      Height = 38
+      Top = 40
+      Width = 113
+      Action = acDbgRunTo
+      TabOrder = 7
+    end
+  end
+  object pnAsmReg: TPanel
+    Left = 0
+    Height = 673
+    Top = 39
+    Width = 2096
+    Align = alClient
+    Caption = 'pnAsmReg'
+    ClientHeight = 673
+    ClientWidth = 2096
+    TabOrder = 1
+    object AsmView: TAsmView
+      Left = 1
+      Height = 671
+      Top = 1
+      Width = 1374
+      Align = alClient
+      Header.Columns = [ctWorkSpace, ctJmpLine, ctAddress, ctOpcode, ctDescription, ctComment]
+      Header.Visible = False
+      ParentFont = False
+      PopupMenu = pmAsm
+      TabOrder = 0
+      TabStop = True
+      OnSelectionChange = AsmViewSelectionChange
+    end
+    object RegView: TRegView
+      Cursor = crDefault
+      Left = 1383
+      Height = 671
+      Top = 1
+      Width = 712
+      Align = alRight
+      ParentFont = False
+      TabOrder = 1
+      TabStop = True
+      OnSelectedContextPopup = RegViewSelectedContextPopup
+      OnSelectionChange = RegViewSelectionChange
+    end
+    object splitAsmReg: TSplitter
+      Left = 1375
+      Height = 671
+      Top = 1
+      Width = 8
+      Align = alRight
+      ResizeAnchor = akRight
+    end
+  end
+  object ToolBar1: TToolBar
+    Left = 0
+    Height = 39
+    Top = 0
+    Width = 2096
+    Caption = 'ToolBar1'
+    TabOrder = 2
+    object ToolButton1: TToolButton
+      Left = 1
+      Top = 2
+      Caption = 'ToolButton1'
+    end
+  end
+  object pnDumps: TPanel
+    Left = 0
+    Height = 492
+    Top = 720
+    Width = 2096
+    Align = alBottom
+    Caption = 'pnDumps'
+    ClientHeight = 492
+    ClientWidth = 2096
+    TabOrder = 3
+    object memHints: TMemo
+      Left = 1
+      Height = 63
+      Top = 1
+      Width = 2094
+      Align = alTop
+      Lines.Strings = (
+        'Hint text display here'
+      )
+      ReadOnly = True
+      ScrollBars = ssAutoVertical
+      TabOrder = 0
+    end
+    object pnDumpStack: TPanel
+      Left = 1
+      Height = 427
+      Top = 64
+      Width = 2094
+      Align = alClient
+      Caption = 'pnDumpStack'
+      ClientHeight = 427
+      ClientWidth = 2094
+      TabOrder = 1
+      object pcDumps: TPageControl
+        Left = 1
+        Height = 425
+        Top = 1
+        Width = 1071
+        ActivePage = tabDump0
+        Align = alClient
+        TabIndex = 0
+        TabOrder = 0
+        object tabDump0: TTabSheet
+          Caption = 'DUMP 0'
+          ClientHeight = 387
+          ClientWidth = 1063
+          object DumpView: TDumpView
+            Left = 0
+            Height = 387
+            Top = 0
+            Width = 1063
+            PopupMenu = pmDump
+            Align = alClient
+            BytesInGroup = 4
+            ParentFont = False
+            TabOrder = 0
+            TabStop = True
+            OnSelectionChange = DumpViewSelectionChange
+          end
+        end
+      end
+      object StackView: TStackView
+        Left = 1080
+        Height = 425
+        Top = 1
+        Width = 1013
+        PopupMenu = pmStack
+        Align = alRight
+        ParentFont = False
+        TabOrder = 1
+        TabStop = True
+        OnSelectionChange = StackViewSelectionChange
+      end
+      object splitDumpStack: TSplitter
+        Left = 1072
+        Height = 425
+        Top = 1
+        Width = 8
+        Align = alRight
+        ResizeAnchor = akRight
+      end
+    end
+  end
+  object splitAsmDumps: TSplitter
+    Cursor = crVSplit
+    Left = 0
+    Height = 8
+    Top = 712
+    Width = 2096
+    Align = alBottom
+    ResizeAnchor = akBottom
+  end
+  object pmRegSelected: TPopupMenu
+    OnPopup = pmRegSelectedPopup
+    Left = 1656
+    Top = 176
+    object miRegIncValue: TMenuItem
+      Action = acRegModifyInc
+    end
+    object miRegDecValue: TMenuItem
+      Action = acRegModifyDec
+    end
+    object miRegToggleFlag: TMenuItem
+      Action = acRegModifyToggle
+    end
+    object miRegZeroValue: TMenuItem
+      Action = acRegModifyZero
+    end
+    object miRegChangeValue: TMenuItem
+      Action = acRegModifyNewValue
+    end
+    object miRegSep1: TMenuItem
+      Caption = '-'
+    end
+    object miRegShowInAsm: TMenuItem
+      Action = acShowInAsm
+    end
+    object miRegShowInStack: TMenuItem
+      Action = acShowInStack
+    end
+    object miRegShowInDump: TMenuItem
+      Action = acShowInDump
+    end
+    object miRegSep2: TMenuItem
+      Caption = '-'
+    end
+    object miRegHighlight: TMenuItem
+      Action = acHighlightReg
+    end
+    object miRegSep3: TMenuItem
+      Caption = '-'
+    end
+    object miRegDisplayMode: TMenuItem
+      Caption = 'Display Mode'
+      object miRegDMHex: TMenuItem
+        Action = acVmHex
+      end
+      object miRegDMHexW: TMenuItem
+        Action = acVmHexW
+      end
+      object miRegDMHexD: TMenuItem
+        Action = acVmHexD
+      end
+      object miRegDMHexQ: TMenuItem
+        Action = acVmHexQ
+      end
+      object miRegDMSep1: TMenuItem
+        Caption = '-'
+      end
+      object miRegDMOctal: TMenuItem
+        Action = acVmOct
+      end
+      object miRegDMBin: TMenuItem
+        Action = acVmBin
+      end
+      object miRegDMSep2: TMenuItem
+        Caption = '-'
+      end
+      object miRegDMIntB: TMenuItem
+        Action = acVmIntB
+      end
+      object miRegDMIntW: TMenuItem
+        Action = acVmIntW
+      end
+      object miRegDMIntD: TMenuItem
+        Action = acVmIntD
+      end
+      object miRegDMIntQ: TMenuItem
+        Action = acVmIntQ
+      end
+      object miRegDMSep3: TMenuItem
+        Caption = '-'
+      end
+      object miRegDMUIntB: TMenuItem
+        Action = acVmUIntB
+      end
+      object miRegDMUIntW: TMenuItem
+        Action = acVmUIntW
+      end
+      object miRegDMUIntD: TMenuItem
+        Action = acVmUIntD
+      end
+      object miRegDMUIntQ: TMenuItem
+        Action = acVmUIntQ
+      end
+      object miRegDMSep4: TMenuItem
+        Caption = '-'
+      end
+      object miRegDMFloat32: TMenuItem
+        Action = acVmFloat32
+      end
+      object miRegDMFloat64: TMenuItem
+        Action = acVmFloat64
+      end
+      object miRegDMFloat80: TMenuItem
+        Action = acVmFloat80
+      end
+    end
+    object miRegSep4: TMenuItem
+      Caption = '-'
+    end
+    object miRegCopy: TMenuItem
+      Action = acCopy
+    end
+    object miRegCopyValue: TMenuItem
+      Action = acCopyBytes
+      Caption = 'Copy Register Value'
+    end
+    object miRegSep5: TMenuItem
+      Caption = '-'
+    end
+    object miRegFit: TMenuItem
+      Action = acViewFitColumnToBestSize
+    end
+  end
+  object ActionList: TActionList
+    Left = 296
+    Top = 96
+    object acVmHex: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+    end
+    object acVmHexW: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmHexW
+    end
+    object acVmHexD: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmHexD
+    end
+    object acVmHexQ: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmHexQ
+    end
+    object acVmOct: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmOct
+    end
+    object acVmBin: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmBin
+    end
+    object acVmIntB: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmIntB
+    end
+    object acVmUIntB: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmUIntB
+    end
+    object acVmIntW: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmIntW
+    end
+    object acVmIntD: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmIntD
+    end
+    object acVmIntQ: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmIntQ
+    end
+    object acVmUIntW: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmUIntW
+    end
+    object acVmUIntD: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmUIntD
+    end
+    object acVmUIntQ: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmUIntQ
+    end
+    object acVmFloat32: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmFloat32
+    end
+    object acVmFloat64: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmFloat64
+    end
+    object acVmFloat80: TCpuContextRegViewModeAction
+      Category = 'ViewMode'
+      RegViewMode = rvmFloat80
+    end
+    object acCopy: THexViewCopyAction
+      Category = 'Copy Actions'
+    end
+    object acCopyBytes: THexViewCopyAction
+      Category = 'Copy Actions'
+      CopyStyle = csBytes
+    end
+    object acCopyAddress: THexViewCopyAction
+      Category = 'Copy Actions'
+      CopyStyle = csAddress
+    end
+    object acCopyPas: THexViewCopyAction
+      Category = 'Copy Actions'
+      CopyStyle = csPascal
+    end
+    object acCopyAsm: THexViewCopyAction
+      Category = 'Copy Actions'
+      CopyStyle = csAsmOpcodes
+    end
+    object acShowInDump: TAction
+      Category = 'Goto Actions'
+      Caption = 'Follow in Dump'
+      OnExecute = acShowInDumpExecute
+      OnUpdate = acShowInDumpUpdate
+    end
+    object acShowInStack: TAction
+      Category = 'Goto Actions'
+      Caption = 'Follow in Stack'
+      OnExecute = acShowInStackExecute
+      OnUpdate = acShowInStackUpdate
+    end
+    object acShowInAsm: TAction
+      Category = 'Goto Actions'
+      Caption = 'Follow in Disassembler'
+      OnExecute = acShowInAsmExecute
+      OnUpdate = acShowInAsmUpdate
+    end
+    object acHighlightReg: TAction
+      Category = 'RegView Actions'
+      Caption = 'Highlight'
+      ShortCut = 16456
+      OnExecute = acHighlightRegExecute
+      OnUpdate = acHighlightRegUpdate
+    end
+    object acStackFollowRSP: TAction
+      Category = 'StackView Actions'
+      Caption = 'Follow StackPoint'
+      OnExecute = acStackFollowRSPExecute
+      OnUpdate = acShowInDumpUpdate
+    end
+    object acDMHex8: THexViewByteViewModeAction
+      Category = 'Display Mode'
+    end
+    object acDMHex16: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmHex16
+    end
+    object acDMHex32: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmHex32
+    end
+    object acDMHex64: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmHex64
+    end
+    object acDMInt8: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmInt8
+    end
+    object acDMInt16: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmInt16
+    end
+    object acDMInt32: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmInt32
+    end
+    object acDMInt64: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmInt64
+    end
+    object acDMUInt8: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmUInt8
+    end
+    object acDMUInt16: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmUInt16
+    end
+    object acDMUInt32: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmUInt32
+    end
+    object acDMUInt64: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmUInt64
+    end
+    object acDMFloat32: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmFloat32
+    end
+    object acDMFloat64: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmFloat64
+    end
+    object acDMFloat80: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmFloat80
+    end
+    object acDMAddress: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmAddress
+    end
+    object acDMText: THexViewByteViewModeAction
+      Category = 'Display Mode'
+      ByteViewMode = bvmText
+    end
+    object acTEAnsi: TAction
+      Tag = 1
+      Category = 'Text Encoding'
+      Caption = '1251 (ANSI - Cyrillic)'
+      OnExecute = acTEAnsiExecute
+      OnUpdate = acTEAnsiUpdate
+    end
+    object acTEAscii: TAction
+      Tag = 2
+      Category = 'Text Encoding'
+      Caption = '20127 (US-ASCII)'
+      OnExecute = acTEAnsiExecute
+      OnUpdate = acTEAnsiUpdate
+    end
+    object acTEUnicode: TAction
+      Tag = 3
+      Category = 'Text Encoding'
+      Caption = '1200 (Unicode)'
+      OnExecute = acTEAnsiExecute
+      OnUpdate = acTEAnsiUpdate
+    end
+    object acTEUnicodeBE: TAction
+      Tag = 4
+      Category = 'Text Encoding'
+      Caption = '1201 (Unicode - Big-Endian)'
+      OnExecute = acTEAnsiExecute
+      OnUpdate = acTEAnsiUpdate
+    end
+    object acTEUtf7: TAction
+      Tag = 5
+      Category = 'Text Encoding'
+      Caption = '65000 (UTF-7)'
+      OnExecute = acTEAnsiExecute
+      OnUpdate = acTEAnsiUpdate
+    end
+    object acTEUtf8: TAction
+      Tag = 6
+      Category = 'Text Encoding'
+      Caption = '65001 (UTF-8)'
+      OnExecute = acTEAnsiExecute
+      OnUpdate = acTEAnsiUpdate
+    end
+    object acDbgRun: TAction
+      Category = 'Debugger'
+      Caption = 'Run'
+      OnExecute = acDbgRunExecute
+      OnUpdate = acDbgRunUpdate
+    end
+    object acDbgPause: TAction
+      Category = 'Debugger'
+      Caption = 'Pause'
+      OnExecute = acDbgPauseExecute
+      OnUpdate = acDbgPauseUpdate
+    end
+    object acDbgStepIn: TAction
+      Category = 'Debugger'
+      Caption = 'Step In'
+      ShortCut = 118
+      OnExecute = acDbgStepInExecute
+      OnUpdate = acDbgRunUpdate
+    end
+    object acDbgStepOut: TAction
+      Category = 'Debugger'
+      Caption = 'Step Out'
+      ShortCut = 119
+      OnExecute = acDbgStepOutExecute
+      OnUpdate = acDbgRunUpdate
+    end
+    object acDbgRunTilReturn: TAction
+      Category = 'Debugger'
+      Caption = 'Run Till Return'
+      ShortCut = 16502
+      OnExecute = acDbgRunTilReturnExecute
+      OnUpdate = acDbgRunUpdate
+    end
+    object acDbgRunTo: TAction
+      Category = 'Debugger'
+      Caption = 'Run To'
+      ShortCut = 115
+      OnExecute = acDbgRunToExecute
+      OnUpdate = acDbgRunToUpdate
+    end
+    object acDbgToggleBp: TAction
+      Category = 'Debugger'
+      Caption = 'Toggle BreakPoint'
+      ShortCut = 113
+      OnExecute = acDbgToggleBpExecute
+      OnUpdate = acDbgRunToUpdate
+    end
+    object acRegModifyInc: TAction
+      Tag = 1
+      Category = 'RegView Actions'
+      Caption = 'Increment Value'
+      OnExecute = acRegModifyIncExecute
+      OnUpdate = ActionRegModifyUpdate
+    end
+    object acRegModifyDec: TAction
+      Tag = 1
+      Category = 'RegView Actions'
+      Caption = 'Decrement Value'
+      OnExecute = acRegModifyDecExecute
+      OnUpdate = ActionRegModifyUpdate
+    end
+    object acRegModifyToggle: TAction
+      Category = 'RegView Actions'
+      Caption = 'Toggle Flag'
+      OnExecute = acRegModifyToggleExecute
+      OnUpdate = ActionRegModifyUpdate
+    end
+    object acRegModifyZero: TAction
+      Tag = 2
+      Category = 'RegView Actions'
+      Caption = 'Zero Value'
+      OnExecute = acRegModifyZeroExecute
+      OnUpdate = ActionRegModifyUpdate
+    end
+    object acRegModifyNewValue: TAction
+      Tag = 3
+      Category = 'RegView Actions'
+      Caption = 'Change Value...'
+      OnExecute = acRegModifyNewValueExecute
+      OnUpdate = ActionRegModifyUpdate
+    end
+    object acViewFitColumnToBestSize: TAction
+      Category = 'View Actions'
+      Caption = 'Fit Columns To Best Size'
+      OnExecute = acViewFitColumnToBestSizeExecute
+    end
+    object acViewGoto: TAction
+      Category = 'View Actions'
+      Caption = 'Go to Address...'
+      OnExecute = acViewGotoExecute
+      OnUpdate = acViewGotoUpdate
+    end
+  end
+  object pmStack: TPopupMenu
+    Left = 1656
+    Top = 808
+    object miStackShowInAsm: TMenuItem
+      Action = acShowInAsm
+    end
+    object miStackShowInDump: TMenuItem
+      Action = acShowInDump
+    end
+    object miStackFollowRsp: TMenuItem
+      Action = acStackFollowRSP
+    end
+    object miStackGoto: TMenuItem
+      Action = acViewGoto
+    end
+    object miStackSep1: TMenuItem
+      Caption = '-'
+    end
+    object miStackCopy: TMenuItem
+      Action = acCopy
+    end
+    object miStackCopyAddr: TMenuItem
+      Action = acCopyAddress
+    end
+    object miStackCopyValue: TMenuItem
+      Action = acCopyBytes
+      Caption = 'Copy Value'
+    end
+    object miStackSep2: TMenuItem
+      Caption = '-'
+    end
+    object miStackFit: TMenuItem
+      Action = acViewFitColumnToBestSize
+    end
+  end
+  object pmDump: TPopupMenu
+    Left = 184
+    Top = 1040
+    object miDumpShowInAsm: TMenuItem
+      Action = acShowInAsm
+    end
+    object miDumpShowInStack: TMenuItem
+      Action = acShowInStack
+    end
+    object miDumpGoto: TMenuItem
+      Action = acViewGoto
+    end
+    object miDumpSep1: TMenuItem
+      Caption = '-'
+    end
+    object miDumpDisplayMode: TMenuItem
+      Caption = 'Display Mode'
+      object miDumpDMHex: TMenuItem
+        Action = acDMHex8
+      end
+      object miDumpDMHexW: TMenuItem
+        Action = acDMHex16
+      end
+      object miDumpDMHexD: TMenuItem
+        Action = acDMHex32
+      end
+      object miDumpDMHexQ: TMenuItem
+        Action = acDMHex64
+      end
+      object miDumpDMSep1: TMenuItem
+        Caption = '-'
+      end
+      object miDumpDMIntB: TMenuItem
+        Action = acDMInt8
+      end
+      object miDumpDMIntW: TMenuItem
+        Action = acDMInt16
+      end
+      object miDumpDMIntD: TMenuItem
+        Action = acDMInt32
+      end
+      object miDumpDMIntQ: TMenuItem
+        Action = acDMInt64
+      end
+      object miDumpDMSep2: TMenuItem
+        Caption = '-'
+      end
+      object miDumpDMUIntB: TMenuItem
+        Action = acDMUInt8
+      end
+      object miDumpDMUIntW: TMenuItem
+        Action = acDMUInt16
+      end
+      object miDumpDMUIntD: TMenuItem
+        Action = acDMUInt32
+      end
+      object miDumpDMUIntQ: TMenuItem
+        Action = acDMUInt64
+      end
+      object miDumpDMSep3: TMenuItem
+        Caption = '-'
+      end
+      object miDumpDMFloat32: TMenuItem
+        Action = acDMFloat32
+      end
+      object miDumpDMFloat64: TMenuItem
+        Action = acDMFloat64
+      end
+      object miDumpDMFloat80: TMenuItem
+        Action = acDMFloat80
+      end
+      object miDumpDMSep4: TMenuItem
+        Caption = '-'
+      end
+      object miDumpDMText: TMenuItem
+        Action = acDMText
+      end
+      object miDumpDMAddress: TMenuItem
+        Action = acDMAddress
+      end
+    end
+    object miDumpTextEncoding: TMenuItem
+      Caption = 'Text Encoding'
+      object miTEAnsi: TMenuItem
+        Action = acTEAnsi
+      end
+      object miTEAscii: TMenuItem
+        Action = acTEAscii
+      end
+      object miTEUnicode: TMenuItem
+        Action = acTEUnicode
+      end
+      object miTEUnicodeBE: TMenuItem
+        Action = acTEUnicodeBE
+      end
+      object miTEUtf7: TMenuItem
+        Action = acTEUtf7
+      end
+      object miTEUtf8: TMenuItem
+        Action = acTEUtf8
+      end
+    end
+    object miDumpSep2: TMenuItem
+      Caption = '-'
+    end
+    object miDumpCopy: TMenuItem
+      Action = acCopy
+    end
+    object miDumpCopyAddr: TMenuItem
+      Action = acCopyAddress
+    end
+    object miDumpCopyBytes: TMenuItem
+      Action = acCopyBytes
+    end
+    object miDumpSep3: TMenuItem
+      Caption = '-'
+    end
+    object miDumpCopyPas: TMenuItem
+      Action = acCopyPas
+    end
+    object miDumpCopyAsm: TMenuItem
+      Action = acCopyAsm
+    end
+    object miDumpSep4: TMenuItem
+      Caption = '-'
+    end
+    object miDumpFit: TMenuItem
+      Action = acViewFitColumnToBestSize
+    end
+  end
+  object pmAsm: TPopupMenu
+    Left = 448
+    Top = 96
+    object miAsmShowInDump: TMenuItem
+      Action = acShowInDump
+    end
+    object miAsmShowInStack: TMenuItem
+      Action = acShowInStack
+    end
+    object miAsmGoto: TMenuItem
+      Action = acViewGoto
+    end
+    object miAsmSep1: TMenuItem
+      Caption = '-'
+    end
+    object miAsmCopyAddr: TMenuItem
+      Action = acCopyAddress
+    end
+    object miAsmCopy: TMenuItem
+      Action = acCopy
+    end
+    object miAsmSep2: TMenuItem
+      Caption = '-'
+    end
+    object miAsmFit: TMenuItem
+      Action = acViewFitColumnToBestSize
+    end
+  end
+end

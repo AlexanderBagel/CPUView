@@ -1,0 +1,87 @@
+W:\lazarus\trunk\lazarus\components\ideintf\IDEWindowIntf.pas
+
+TOnActivateIDEFormEvent = procedure (Sender: TObject; var AHandled: Boolean) of object;
+
+
+property OnActivateIDEForm: TOnActivateIDEFormEvent read FOnActivate write FOnActivate;  
+
+procedure TIDEWindowCreatorList.ShowForm(AForm: TCustomForm; BringToFront: boolean;
+  AMoveToVisbleMode: TLayoutMoveToVisbleMode);
+var
+  Layout: TSimpleWindowLayout;
+  AHandled: Boolean;
+begin
+  if not IsValidIdent(AForm.Name) then
+    raise Exception.Create('TIDEWindowCreatorList.ShowForm invalid form name '+AForm.Name);
+
+  // auto create a layout storage for every shown form
+  Layout:=SimpleLayoutStorage.ItemByFormID(AForm.Name);
+  if Layout=nil then begin
+    if not IsFormDesign(AForm) then
+      SimpleLayoutStorage.CreateWindowLayout(AForm);
+  end
+  else
+    Layout.Form:=AForm;
+
+  // check to see if the form needs to be blocked from the outside?
+  if Assigned(FOnActivate) then
+  begin
+    AHandled := False;
+    FOnActivate(AForm, AHandled);
+    if AHandled then
+      Exit;
+  end;
+
+  if (IDEDockMaster<>nil) and (not IsFormDesign(AForm))
+  and (FindWithName(AForm.Name)<>nil) then
+    // show dockable if it has a creator and is not a designer form
+    IDEDockMaster.ShowForm(AForm,BringToFront)
+  else
+    if (IDETabMaster <> nil) and IsFormDesign(AForm) then
+      IDETabMaster.ShowForm(AForm)
+    else
+      SimpleLayoutStorage.ApplyAndShow(Self,AForm,BringToFront,AMoveToVisbleMode);
+end;
+
+W:\lazarus\trunk\lazarus\components\debuggerintf\DbgIntfDebuggerBase.pp
+
+  TDBGEvaluateResultCallback = procedure(Sender: TObject; ASuccess: Boolean; ResultText: String;
+    ResultDBGType: TDBGType) of object;
+
+  TDBGActivateSourceEditorEvent = procedure (Sender: TObject; var AHandled: Boolean) of object; 
+  
+  TDebuggerIntf = class
+  private     
+...
+    FReleaseLock: Integer;
+    FOnActivateSourceEditor: TDBGActivateSourceEditorEvent;
+    procedure DebuggerEnvironmentChanged(Sender: TObject);    
+...
+  public
+    property OnIdle: TNotifyEvent read FOnIdle write FOnIdle;                    // Called if all outstanding requests are processed (queue empty)
+
+    property OnActivateSourceEditor: TDBGActivateSourceEditorEvent read FOnActivateSourceEditor write FOnActivateSourceEditor;      
+
+W:\lazarus\trunk\lazarus\ide\DebugManager.pas 
+
+  { TDebugManager }
+
+  TDebugManager = class(TBaseDebugManager) 
+  ...
+  private
+    FAsmWindowShouldAutoClose: Boolean;    
+    function CanShowAsmDialog: Boolean;  
+
+function TDebugManager.CanShowAsmDialog: Boolean;
+begin
+  Result := FAsmStepping and (FDialogs[ddtAssembler] <> nil) and
+    FDialogs[ddtAssembler].IsVisible and FDialogs[ddtAssembler].Active;
+  // весьма спорно, по хорошему нужно вводить метод а не садиться на событие
+  if Assigned(FDebugger) and Assigned(FDebugger.OnActivateSourceEditor) then
+    FDebugger.OnActivateSourceEditor(Self, Result);
+end; 
+
+	
+
+
+

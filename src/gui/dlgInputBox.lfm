@@ -1,0 +1,69 @@
+object frmInputBox: TfrmInputBox
+  Left = 699
+  Height = 143
+  Top = 235
+  Width = 443
+  BorderStyle = bsDialog
+  Caption = 'frmInputBox'
+  ClientHeight = 143
+  ClientWidth = 443
+  DesignTimePPI = 144
+  Position = poScreenCenter
+  LCLVersion = '3.99.0.0'
+  object lblPromt: TLabel
+    Left = 16
+    Height = 25
+    Top = 8
+    Width = 68
+    Caption = 'lblPromt'
+  end
+  object edAddress: TEdit
+    Left = 16
+    Height = 33
+    Top = 40
+    Width = 408
+    TabOrder = 0
+    Text = '0x0'
+    OnChange = edAddressChange
+  end
+  object lblWrong: TLabel
+    Left = 16
+    Height = 25
+    Top = 80
+    Width = 119
+    Caption = 'Invalid address'
+    Font.Color = clRed
+    ParentFont = False
+    Visible = False
+  end
+  object btnCancel: TButton
+    Left = 311
+    Height = 38
+    Top = 96
+    Width = 113
+    Cancel = True
+    Caption = 'Cancel'
+    ModalResult = 2
+    TabOrder = 1
+  end
+  object btnOk: TButton
+    Left = 192
+    Height = 38
+    Top = 96
+    Width = 113
+    Caption = 'Ok'
+    Default = True
+    ModalResult = 1
+    TabOrder = 2
+  end
+  object cbList: TComboBox
+    Left = 16
+    Height = 33
+    Top = 40
+    Width = 406
+    ItemHeight = 25
+    Style = csDropDownList
+    TabOrder = 3
+    Visible = False
+  end
+end

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <PathDelim Value="\"/>
+    <Name Value="CPUView_D"/>
+    <Type Value="RunAndDesignTime"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <PathDelim Value="\"/>
+      <SearchPaths>
+        <IncludeFiles Value="gui;src;src\gui"/>
+        <OtherUnitFiles Value="gui;src;src\gui"/>
+        <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+    </CompilerOptions>
+    <Files Count="22">
+      <Item1>
+        <Filename Value="src\CpuView.Actions.pas"/>
+        <UnitName Value="CpuView.Actions"/>
+      </Item1>
+      <Item2>
+        <Filename Value="src\CpuView.Common.pas"/>
+        <UnitName Value="CpuView.Common"/>
+      </Item2>
+      <Item3>
+        <Filename Value="src\CpuView.Core.pas"/>
+        <UnitName Value="CpuView.Core"/>
+      </Item3>
+      <Item4>
+        <Filename Value="src\CpuView.CPUContext.pas"/>
+        <UnitName Value="CpuView.CPUContext"/>
+      </Item4>
+      <Item5>
+        <Filename Value="src\CpuView.DebugerGate.pas"/>
+        <UnitName Value="CpuView.DebugerGate"/>
+      </Item5>
+      <Item6>
+        <Filename Value="src\CpuView.FpDebug.pas"/>
+        <UnitName Value="CpuView.FpDebug"/>
+      </Item6>
+      <Item7>
+        <Filename Value="src\CpuView.IntelContext.pas"/>
+        <UnitName Value="CpuView.IntelContext"/>
+      </Item7>
+      <Item8>
+        <Filename Value="src\CpuView.IntelContext.Types.pas"/>
+        <UnitName Value="CpuView.IntelContext.Types"/>
+      </Item8>
+      <Item9>
+        <Filename Value="src\CpuView.Reg.LCL.pas"/>
+        <UnitName Value="CpuView.Reg.LCL"/>
+      </Item9>
+      <Item10>
+        <Filename Value="src\CpuView.Reg.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="CpuView.Reg"/>
+      </Item10>
+      <Item11>
+        <Filename Value="src\CpuView.Settings.pas"/>
+        <UnitName Value="CpuView.Settings"/>
+      </Item11>
+      <Item12>
+        <Filename Value="src\CpuView.Stream.pas"/>
+        <UnitName Value="CpuView.Stream"/>
+      </Item12>
+      <Item13>
+        <Filename Value="src\CpuView.Stream.Windows.pas"/>
+        <UnitName Value="CpuView.Stream.Windows"/>
+      </Item13>
+      <Item14>
+        <Filename Value="src\CpuView.Viewers.pas"/>
+        <UnitName Value="CpuView.Viewers"/>
+      </Item14>
+      <Item15>
+        <Filename Value="src\CpuView.Windows.pas"/>
+        <UnitName Value="CpuView.Windows"/>
+      </Item15>
+      <Item16>
+        <Filename Value="src\CpuViewCfg.inc"/>
+        <Type Value="Include"/>
+      </Item16>
+      <Item17>
+        <Filename Value="src\gui\dlgCpuView.lfm"/>
+        <Type Value="LFM"/>
+      </Item17>
+      <Item18>
+        <Filename Value="src\gui\dlgCpuView.pas"/>
+        <UnitName Value="dlgCpuView"/>
+      </Item18>
+      <Item19>
+        <Filename Value="src\gui\dlgcpuviewintel.lfm"/>
+        <Type Value="LFM"/>
+      </Item19>
+      <Item20>
+        <Filename Value="src\gui\dlgcpuviewintel.pas"/>
+        <UnitName Value="dlgCpuViewIntel"/>
+      </Item20>
+      <Item21>
+        <Filename Value="src\gui\dlgInputBox.lfm"/>
+        <Type Value="LFM"/>
+      </Item21>
+      <Item22>
+        <Filename Value="src\gui\dlgInputBox.pas"/>
+        <UnitName Value="dlgInputBox"/>
+      </Item22>
+    </Files>
+    <CompatibilityMode Value="True"/>
+    <RequiredPkgs Count="3">
+      <Item1>
+        <PackageName Value="IdeDebugger"/>
+      </Item1>
+      <Item2>
+        <PackageName Value="FWHexView_D.LCL"/>
+      </Item2>
+      <Item3>
+        <PackageName Value="FCL"/>
+      </Item3>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+      <UseFileFilters Value="True"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>

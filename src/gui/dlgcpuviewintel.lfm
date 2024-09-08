@@ -1,0 +1,194 @@
+inherited frmCpuViewIntel: TfrmCpuViewIntel
+  Left = 886
+  Top = 526
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  inherited pnAsmReg: TPanel
+    inherited RegView: TRegView
+      PopupMenu = pmIntelReg
+    end
+  end
+  inherited pnDumps: TPanel
+    inherited memHints: TMemo
+      Lines.Strings = (
+        'Hint text display here'
+      )
+    end
+  end
+  inherited pmRegSelected: TPopupMenu
+    Left = 1544
+    Top = 216
+  end
+  inherited ActionList: TActionList
+    object acFPU_MMX: TAction[22]
+      Category = 'RegView Settings'
+      Caption = 'Display MMX'
+      OnExecute = acFPU_MMXExecute
+      OnUpdate = acFPU_MMXUpdate
+    end
+    object acFPU_R: TAction[23]
+      Tag = 1
+      Category = 'RegView Settings'
+      Caption = 'Display x87 Rx'
+      OnExecute = acFPU_MMXExecute
+      OnUpdate = acFPU_MMXUpdate
+    end
+    object acFPU_ST: TAction[24]
+      Tag = 2
+      Category = 'RegView Settings'
+      Caption = 'Display ST(x)'
+      OnExecute = acFPU_MMXExecute
+      OnUpdate = acFPU_MMXUpdate
+    end
+    object acRegSimpleMode: TAction[25]
+      Category = 'RegView Settings'
+      Caption = 'ViewMode Simple'
+      OnExecute = acRegSimpleModeExecute
+      OnUpdate = acRegSimpleModeUpdate
+    end
+    object acRegShowDebug: TAction[26]
+      Category = 'RegView Settings'
+      Caption = 'Show Debug'
+      OnExecute = acRegShowDebugExecute
+      OnUpdate = acRegShowDebugUpdate
+    end
+    object acRegShowFPU: TAction[27]
+      Category = 'RegView Settings'
+      Caption = 'Show FPU'
+      OnExecute = acRegShowFPUExecute
+      OnUpdate = acRegShowFPUUpdate
+    end
+    object acRegShowXMM: TAction[28]
+      Category = 'RegView Settings'
+      Caption = 'Show XMM'
+      OnExecute = acRegShowXMMExecute
+      OnUpdate = acRegShowXMMUpdate
+    end
+    object acRegShowYMM: TAction[29]
+      Category = 'RegView Settings'
+      Caption = 'Show YMM'
+      OnExecute = acRegShowYMMExecute
+      OnUpdate = acRegShowYMMUpdate
+    end
+    inherited acShowInDump: TAction[30]
+    end
+    inherited acShowInStack: TAction[31]
+    end
+    inherited acShowInAsm: TAction[32]
+    end
+    inherited acHighlightReg: TAction[33]
+    end
+    inherited acDMHex8: THexViewByteViewModeAction[34]
+    end
+    inherited acStackFollowRSP: TAction[35]
+    end
+    inherited acDMHex16: THexViewByteViewModeAction[36]
+    end
+    inherited acDMHex32: THexViewByteViewModeAction[37]
+    end
+    inherited acDMHex64: THexViewByteViewModeAction[38]
+    end
+    inherited acDMInt8: THexViewByteViewModeAction[39]
+    end
+    inherited acDMInt16: THexViewByteViewModeAction[40]
+    end
+    inherited acDMInt32: THexViewByteViewModeAction[41]
+    end
+    inherited acDMInt64: THexViewByteViewModeAction[42]
+    end
+    inherited acDMUInt8: THexViewByteViewModeAction[43]
+    end
+    inherited acDMUInt16: THexViewByteViewModeAction[44]
+    end
+    inherited acDMUInt32: THexViewByteViewModeAction[45]
+    end
+    inherited acDMUInt64: THexViewByteViewModeAction[46]
+    end
+    inherited acDMFloat32: THexViewByteViewModeAction[47]
+    end
+    inherited acDMFloat64: THexViewByteViewModeAction[48]
+    end
+    inherited acDMFloat80: THexViewByteViewModeAction[49]
+    end
+    inherited acDMAddress: THexViewByteViewModeAction[50]
+    end
+    inherited acDMText: THexViewByteViewModeAction[51]
+    end
+    inherited acTEAnsi: TAction[52]
+    end
+    inherited acTEAscii: TAction[53]
+    end
+    inherited acTEUnicode: TAction[54]
+    end
+    inherited acTEUnicodeBE: TAction[55]
+    end
+    inherited acTEUtf7: TAction[56]
+    end
+    inherited acTEUtf8: TAction[57]
+    end
+    inherited acDbgRun: TAction[58]
+    end
+    inherited acDbgPause: TAction[59]
+    end
+    inherited acDbgStepIn: TAction[60]
+    end
+    inherited acDbgStepOut: TAction[61]
+    end
+    inherited acDbgRunTilReturn: TAction[62]
+    end
+    inherited acDbgRunTo: TAction[63]
+    end
+    inherited acDbgToggleBp: TAction[64]
+    end
+    inherited acRegModifyInc: TAction[65]
+    end
+    inherited acRegModifyDec: TAction[66]
+    end
+    inherited acRegModifyToggle: TAction[67]
+    end
+    inherited acRegModifyZero: TAction[68]
+    end
+    inherited acRegModifyNewValue: TAction[69]
+    end
+  end
+  object pmIntelReg: TPopupMenu[9]
+    Left = 1544
+    Top = 112
+    object miRegIntelViewMode: TMenuItem
+      Action = acRegSimpleMode
+    end
+    object miRegIntelFPU: TMenuItem
+      Caption = 'FPU Mode'
+      object miRegIntelFPUSt: TMenuItem
+        Action = acFPU_ST
+      end
+      object miRegIntelFPURx: TMenuItem
+        Action = acFPU_R
+      end
+      object miRegIntelFPUMmx: TMenuItem
+        Action = acFPU_MMX
+      end
+    end
+    object miRegIntelSep1: TMenuItem
+      Caption = '-'
+    end
+    object miRegIntelShowFPU: TMenuItem
+      Action = acRegShowFPU
+    end
+    object miRegIntelShowXMM: TMenuItem
+      Action = acRegShowXMM
+    end
+    object miRegIntelShowYMM: TMenuItem
+      Action = acRegShowYMM
+    end
+    object miRegIntelShowDebug: TMenuItem
+      Action = acRegShowDebug
+    end
+    object miRegIntelSep2: TMenuItem
+      Caption = '-'
+    end
+    object miRegIntelCopy: TMenuItem
+      Action = acCopy
+    end
+  end
+end
