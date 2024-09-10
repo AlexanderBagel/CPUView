@@ -247,6 +247,7 @@ type
     property OnEndDrag;
     property OnEnter;
     property OnExit;
+    property OnJmpTo;
     property OnKeyDown;
     property OnKeyPress;
     property OnKeyUp;
@@ -1223,11 +1224,10 @@ end;
 
 function TCustomAsmView.SelectedInstructionAddr: Int64;
 var
-  MinAddr, RowIndex: Int64;
+  RowIndex: Int64;
 begin
   Result := 0;
-  MinAddr := Min(SelStart, SelEnd);
-  RowIndex := RawData.AddressToRowIndex(MinAddr);
+  RowIndex := SelectedRowIndex;
   if RowIndex >= 0 then
     Result := RawData[RowIndex].Address;
 end;

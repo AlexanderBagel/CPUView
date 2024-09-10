@@ -6,10 +6,11 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
-  Menus, ComCtrls, ActnList,
+  Menus, ComCtrls, ActnList, Generics.Collections,
 
   FWHexView,
   FWHexView.Actions,
+  FWHexView.MappedView,
 
   CpuView.Core,
   CpuView.CPUContext,
@@ -245,6 +246,8 @@ type
     procedure acViewFitColumnToBestSizeExecute(Sender: TObject);
     procedure acViewGotoExecute(Sender: TObject);
     procedure acViewGotoUpdate(Sender: TObject);
+    procedure AsmViewJmpTo(Sender: TObject; const AJmpAddr: Int64;
+      AJmpState: TJmpState; var Handled: Boolean);
     procedure AsmViewSelectionChange(Sender: TObject);
     procedure DumpViewSelectionChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -265,6 +268,7 @@ type
     FContextRegName: string;
     FContextRegister: TRegister;
     FContextRegisterParam: TRegParam;
+    FJmpStack: TStack<Int64>;
     function ActiveViewerSelectedValue: UInt64;
   protected
     function ActiveDumpView: TDumpView;
@@ -298,6 +302,7 @@ begin
   FCore.RegView := RegView;
   FCore.DumpView := DumpView;
   FCore.StackView := StackView;
+  FJmpStack := TStack<Int64>.Create;
 end;
 
 procedure TfrmCpuView.FormDestroy(Sender: TObject);
@@ -305,6 +310,7 @@ begin
   FDbgGate.Context := nil;
   FCore.Free;
   FDbgGate.Free;
+  FJmpStack.Free;
 end;
 
 procedure TfrmCpuView.pmRegSelectedPopup(Sender: TObject);
@@ -412,15 +418,53 @@ begin
       end
     end) then
       case AViewIndex of
-        0: AsmView.FocusOnAddress(NewAddress, ccmSelectRow);
-        2: StackView.FocusOnAddress(NewAddress, ccmSelectRow);
-        3: ActiveDumpView.FocusOnAddress(NewAddress, ccmSetNewSelection);
+        0:
+        begin
+          FCore.ShowDisasmAtAddr(NewAddress);
+          AsmView.FocusOnAddress(NewAddress, ccmSelectRow);
+        end;
+        2:
+        begin
+          FCore.ShowStackAtAddr(NewAddress);
+          StackView.FocusOnAddress(NewAddress, ccmSelectRow);
+        end;
+        3:
+        begin
+          FCore.ShowDumpAtAddr(NewAddress);
+          ActiveDumpView.FocusOnAddress(NewAddress, ccmSetNewSelection);
+        end;
       end;
 end;
 
 procedure TfrmCpuView.acViewGotoUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
+end;
+
+procedure TfrmCpuView.AsmViewJmpTo(Sender: TObject; const AJmpAddr: Int64;
+  AJmpState: TJmpState; var Handled: Boolean);
+var
+  NewJmpAddr: Int64;
+begin
+  case AJmpState of
+    jsPushToUndo:
+    begin
+      Handled := Core.AddrInAsm(AJmpAddr);
+      if not Handled then Exit;
+      FJmpStack.Push(AsmView.SelectedInstructionAddr);
+      FJmpStack.Push(AsmView.RowToAddress(AsmView.CurrentVisibleRow, 0));
+      FCore.ShowDisasmAtAddr(AJmpAddr);
+    end;
+    jsPopFromUndo:
+    begin
+      Handled := True;
+      if FJmpStack.Count = 0 then Exit;
+      NewJmpAddr := FJmpStack.Pop;
+      FCore.ShowDisasmAtAddr(NewJmpAddr);
+      NewJmpAddr := FJmpStack.Pop;
+      AsmView.FocusOnAddress(NewJmpAddr, ccmSelectRow);
+    end;
+  end;
 end;
 
 procedure TfrmCpuView.FormClose(Sender: TObject; var CloseAction: TCloseAction);

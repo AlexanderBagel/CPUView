@@ -110,6 +110,7 @@ object frmCpuView: TfrmCpuView
       PopupMenu = pmAsm
       TabOrder = 0
       TabStop = True
+      OnJmpTo = AsmViewJmpTo
       OnSelectionChange = AsmViewSelectionChange
     end
     object RegView: TRegView

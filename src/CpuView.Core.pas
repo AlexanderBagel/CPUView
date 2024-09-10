@@ -10,10 +10,9 @@ interface
 {$message 'asm Подсветка адреса перехода заливкой бэкграунда'}
 {$message 'Калькулятор выражений. Пока два типа команд "? [eax+ebx]" и бряки "bp user32.MessageBoxW"'}
 {$message 'Хинты по выделеной инструкции (через калькулятор выражений)'}
-{$message 'asm У асм редактора если есть Jmp то дать возможность переходить на него (допустим по Enter+Esc)'}
-{$message 'asm call TApplication.Create вместо адреса!'}
 {$message 'asm добавить View Source'}
 {$message 'asm добавить NEW EIP/RIP'}
+{$message 'disasm не умеет обрабатывать RIP адресацию, поэтому теряется куча информации'}
 
 {
 Настройки:
@@ -45,12 +44,12 @@ uses
   CpuView.CPUContext;
 
 type
-  {$message 'Дублирует TInstruction'}
   TAsmLine = record
     AddrVA: Int64;
     DecodedStr, HintStr: string;
     Len: Integer;
     JmpTo: Int64;
+    CallInstruction: Boolean;
   end;
 
   { TCpuViewCore }
@@ -72,6 +71,7 @@ type
     FLockSelChange: Boolean;
     FLastCtx: TCommonCpuContext;
     FRegView: TRegView;
+    FShowCallFuncName: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
     FDumpView: TDumpView;
@@ -89,6 +89,7 @@ type
     procedure SetDebugger(const Value: TAbstractDebugger);
     procedure SetDumpView(const Value: TDumpView);
     procedure SetRegView(const Value: TRegView);
+    procedure SetShowCallFuncName(AValue: Boolean);
     procedure SetStackView(const Value: TStackView);
   protected
     procedure BuildAsmWindow(AAddress: Int64);
@@ -97,7 +98,7 @@ type
     procedure LoadFromCache(AIndex: Integer);
     procedure RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
       var AComment: string);
-    procedure RefreshView;
+    procedure RefreshView(Forced: Boolean = False);
     procedure ResetCache;
     procedure StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
       var AComment: string);
@@ -117,6 +118,8 @@ type
     property DumpView: TDumpView read FDumpView write SetDumpView;
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
+  public
+    property ShowCallFuncName: Boolean read FShowCallFuncName write SetShowCallFuncName;
   end;
 
 implementation
@@ -185,6 +188,7 @@ begin
   RemoteStream := TRemoteStream.Create;
   FDumpStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
+  FShowCallFuncName := True;
 end;
 
 destructor TCpuViewCore.Destroy;
@@ -233,6 +237,7 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
     List: TList<TInstruction>;
     Inst: TInstruction;
     AsmLine: TAsmLine;
+    SpaceIndex: Integer;
   begin
     List := Debugger.Disassembly(FromAddr, FromBuff, BufSize);
     try
@@ -245,6 +250,17 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
         AsmLine.HintStr := Inst.Hint;
         AsmLine.Len := Inst.Len;
         AsmLine.JmpTo := Inst.JmpTo;
+        AsmLine.CallInstruction := False;
+        if ShowCallFuncName and (AsmLine.JmpTo <> 0) then
+        begin
+          if AsmLine.DecodedStr.StartsWith('CALL') then
+          begin
+            SpaceIndex := Pos(' ', AsmLine.HintStr);
+            AsmLine.DecodedStr := 'CALL ' + Copy(AsmLine.HintStr, 1, SpaceIndex - 1);
+            AsmLine.HintStr := '';
+            AsmLine.CallInstruction := True;
+          end;
+        end;
         FAddrIndex.TryAdd(FromAddr, FCacheList.Count);
         FCacheList.Add(AsmLine);
         Inc(FromAddr, AsmLine.Len);
@@ -315,14 +331,20 @@ begin
     if Line.Len = 0 then
       FAsmView.DataMap.AddComment(Line.AddrVA, Line.DecodedStr)
     else
-      FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
+      if Line.CallInstruction then
+        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, '', Line.JmpTo, 5, Length(Line.DecodedStr) - 5)
+      else
+        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
     for I := 1 to Min(CacheVisibleRows, FCacheList.Count - AIndex - 1) do
     begin
       Line := FCacheList.List[I + AIndex];
       if Line.Len = 0 then
         FAsmView.DataMap.AddComment(Line.DecodedStr)
       else
-        FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
+        if Line.CallInstruction then
+          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, '', Line.JmpTo, 5, Length(Line.DecodedStr) - 5)
+        else
+          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
     end;
   finally
     FAsmView.EndUpdate;
@@ -438,7 +460,7 @@ begin
   end;
 end;
 
-procedure TCpuViewCore.RefreshView;
+procedure TCpuViewCore.RefreshView(Forced: Boolean);
 var
   StackLim: TStackLimit;
 begin
@@ -449,7 +471,7 @@ begin
     FAsmView.AddressMode := GetAddrMode;
     FAsmView.InstructionPoint := FDebugger.CurrentInstructionPoint;
     FAsmView.CurrentIPIsActiveJmp := FDebugger.IsActiveJmp;
-    if not FAsmView.IsAddrVisible(FAsmView.InstructionPoint) then
+    if Forced or not FAsmView.IsAddrVisible(FAsmView.InstructionPoint) then
       BuildAsmWindow(FAsmView.InstructionPoint);
     FAsmView.FocusOnAddress(FAsmView.InstructionPoint, ccmSelectRow);
   end;
@@ -552,6 +574,16 @@ begin
     if Value = nil then Exit;
     FRegView.OnQueryComment := RegViewQueryComment;
     RefreshView;
+  end;
+end;
+
+procedure TCpuViewCore.SetShowCallFuncName(AValue: Boolean);
+begin
+  if ShowCallFuncName <> AValue then
+  begin
+    FShowCallFuncName := AValue;
+    ResetCache;
+    RefreshView(True);
   end;
 end;
 
