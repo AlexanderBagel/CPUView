@@ -93,6 +93,7 @@ const
   xmlRIPBackgroundColor = 'asmRipBk';
   xmlRIPBackgroundFontColor = 'asmRipFont';
   xmlSourceLineColor = 'asmSourceLine';
+  xmlSizePfxColor = 'asmSizePfx';
   xmlSeparatorBackgroundColor = 'asmSeparatorBack';
   xmlSeparatorBorderColor = 'asmSeparatorBorder';
   xmlSeparatorTextColor = 'asmSeparatorText';
@@ -437,6 +438,7 @@ begin
     CmAsm.RIPMarkColor := GetNodeAttr(Root, xmlRIPMarkColor);
     CmAsm.RIPBackgroundColor := GetNodeAttr(Root, xmlRIPBackgroundColor);
     CmAsm.RIPBackgroundFontColor := GetNodeAttr(Root, xmlRIPBackgroundFontColor);
+    CmAsm.SizePfxColor := GetNodeAttr(Root, xmlSizePfxColor);
     CmAsm.SourceLineColor := GetNodeAttr(Root, xmlSourceLineColor);
   end;
 
@@ -629,6 +631,7 @@ begin
     SetNodeAttr(Root, xmlRIPMarkColor, CmAsm.RIPMarkColor);
     SetNodeAttr(Root, xmlRIPBackgroundColor, CmAsm.RIPBackgroundColor);
     SetNodeAttr(Root, xmlRIPBackgroundFontColor, CmAsm.RIPBackgroundFontColor);
+    SetNodeAttr(Root, xmlSizePfxColor, CmAsm.SizePfxColor);
     SetNodeAttr(Root, xmlSourceLineColor, CmAsm.SourceLineColor);
   end;
   // настройки цвета для регистров

@@ -40,7 +40,6 @@ type
     FShowYMM: Boolean;
     FShowFPU: Boolean;
     FSavedDetailed: array [0..3] of Boolean;
-    function GetRegValue(RegID: Integer; out ARegValue: UInt64): Boolean;
     procedure SetContext(const Value: TIntelThreadContext);
     procedure SetFPUMode(const Value: TFPUMode);
     procedure SetMapMode(const Value: TIntelCpuMapMode);
@@ -53,6 +52,7 @@ type
   protected
     procedure BuildMap; override;
     procedure DoChangeViewMode(RegID: Integer; const Value: TRegViewMode); override;
+    function GetRegValue(RegID: Integer; out ARegValue: UInt64): Boolean; override;
     procedure InitKnownRegs; override;
     procedure UpdateLastRegData(RegID: Integer); override;
   protected
@@ -80,6 +80,7 @@ type
     procedure InitDefault; override;
     function InstructonPoint: UInt64; override;
     function PointerSize: Integer; override;
+    function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; override;
     function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; override;
     function RegSetValueAtIndex(RegID, Index: Integer): string; override;
     function RegSetValueCount(RegID: Integer): Integer; override;
@@ -886,6 +887,85 @@ begin
   else
     Result := 0;
   end;
+end;
+
+function TIntelCpuContext.QueryRegValueByName(const RegName: string;
+  out RegValue: UInt64): Boolean;
+const
+  RegsBuff: array[0..69] of string = (
+    'RAX', 'EAX', 'AX', 'AH', 'AL',
+    'RBX', 'EBX', 'BX', 'BH', 'BL',
+    'RCX', 'ECX', 'CX', 'CH', 'CL',
+    'RDX', 'EDX', 'DX', 'DH', 'DL',
+    'RBP', 'EBP', 'BP', 'BPL',
+    'RSP', 'ESP', 'SP', 'SPL',
+    'RSI', 'ESI', 'SI', 'SIL',
+    'RDI', 'EDI', 'DI', 'DIL',
+    'RIP', 'EIP',
+    'R8', 'R8D', 'R8W', 'R8B',
+    'R9', 'R9D', 'R9W', 'R9B',
+    'R10', 'R10D', 'R10W', 'R10B',
+    'R11', 'R11D', 'R11W', 'R11B',
+    'R12', 'R12D', 'R12W', 'R12B',
+    'R13', 'R13D', 'R13W', 'R13B',
+    'R14', 'R14D', 'R14W', 'R14B',
+    'R15', 'R15D', 'R15W', 'R15B'
+  );
+  RegIndex: array[0..69] of Integer = (
+    0, 0, 0, 0, 0,
+    1, 1, 1, 1, 1,
+    2, 2, 2, 2, 2,
+    3, 3, 3, 3, 3,
+    4, 4, 4, 4,
+    5, 5, 5, 5,
+    6, 6, 6, 6,
+    7, 7, 7, 7,
+    8, 8,
+    9, 9, 9, 9,
+    10, 10, 10, 10,
+    11, 11, 11, 11,
+    12, 12, 12, 12,
+    13, 13, 13, 13,
+    14, 14, 14, 14,
+    15, 15, 15, 15,
+    16, 16, 16, 16
+  );
+  ValueType: array[0..69] of Integer = (
+    0, 1, 2, 3, 4,
+    0, 1, 2, 3, 4,
+    0, 1, 2, 3, 4,
+    0, 1, 2, 3, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4,
+    0, 1, 2, 4
+  );
+var
+  I: Integer;
+begin
+  for I := 0 to Length(RegsBuff) - 1 do
+    if AnsiSameText(RegName, RegsBuff[I]) then
+    begin
+      Result := GetRegValue(RegIndex[I], RegValue);
+      case ValueType[I] of
+        1: RegValue := Cardinal(RegValue);
+        2: RegValue := Word(RegValue);
+        3: RegValue := Byte(RegValue shr 8);
+        4: RegValue := Byte(RegValue);
+      end;
+      Exit;
+    end;
+  RegValue := 0;
+  Result := False;    
 end;
 
 function TIntelCpuContext.RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean;

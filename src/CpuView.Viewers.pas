@@ -72,6 +72,7 @@ type
     FRIPBackgroundFontColor: TColor;
     FRIPMarkColor: TColor;
     FSourceLineColor: TColor;
+    FSizePfxColor: TColor;
     procedure SetBreakPointActiveColor(AValue: TColor);
     procedure SetBreakPointActiveFontColor(AValue: TColor);
     procedure SetBreakPointColor(AValue: TColor);
@@ -91,6 +92,7 @@ type
     procedure SetRIPBackgroundFontColor(AValue: TColor);
     procedure SetRIPMarkColor(AValue: TColor);
     procedure SetSourceLineColor(AValue: TColor);
+    procedure SetSizePfxColor(const Value: TColor);
   protected
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
@@ -113,6 +115,7 @@ type
     property RIPBackgroundColor: TColor read FRIPBackgroundColor write SetRIPBackgroundColor;
     property RIPBackgroundFontColor: TColor read FRIPBackgroundFontColor write SetRIPBackgroundFontColor;
     property RIPMarkColor: TColor read FRIPMarkColor write SetRIPMarkColor;
+    property SizePfxColor: TColor read FSizePfxColor write SetSizePfxColor;
     property SourceLineColor: TColor read FSourceLineColor write SetSourceLineColor;
   end;
 
@@ -705,6 +708,7 @@ begin
   FRIPBackgroundColor := $009D116C;
   FRIPBackgroundFontColor := clWhite;
   FRIPMarkColor := clDkGray;
+  FSizePfxColor := clGreen;
   FSourceLineColor := clBlack;
 end;
 
@@ -730,7 +734,7 @@ procedure TAsmColorMap.SetBreakPointActiveColor(AValue: TColor);
 begin
   if BreakPointActiveColor <> AValue then
   begin
-    FBreakPointActiveColor:=AValue;
+    FBreakPointActiveColor := AValue;
     DoChange;
   end;
 end;
@@ -838,7 +842,7 @@ procedure TAsmColorMap.SetRegHighlightFontColor(AValue: TColor);
 begin
   if RegHighlightFontColor <> AValue then
   begin
-    FRegHighlightFontColor:=AValue;
+    FRegHighlightFontColor := AValue;
     DoChange;
   end;
 end;
@@ -870,11 +874,20 @@ begin
   end;
 end;
 
+procedure TAsmColorMap.SetSizePfxColor(const Value: TColor);
+begin
+  if SizePfxColor <> Value then
+  begin
+    FSizePfxColor := Value;
+    DoChange;
+  end;
+end;
+
 procedure TAsmColorMap.SetSourceLineColor(AValue: TColor);
 begin
   if SourceLineColor <> AValue then
   begin
-    FSourceLineColor:=AValue;
+    FSourceLineColor := AValue;
     DoChange;
   end;
 end;
@@ -1092,6 +1105,7 @@ begin
   case FTokenizer.GetToken(AToken, ATokenLen) of
     ttNumber: ACanvas.Font.Color := ColorMap.NumberColor;
     ttInstruction: ACanvas.Font.Color := ColorMap.InstructionColor;
+    ttSize: ACanvas.Font.Color := ColorMap.SizePfxColor;
     ttReg:
     begin
       ACanvas.Font.Color := ColorMap.RegColor;

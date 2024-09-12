@@ -148,6 +148,7 @@ type
     LastReg: TCustomRegData;
     procedure BuildMap; virtual; abstract;
     procedure DoChangeViewMode(RegID: Integer; const Value: TRegViewMode); virtual; abstract;
+    function GetRegValue(RegID: Integer; out ARegValue: UInt64): Boolean; virtual; abstract;
     function GetViewMode(RegID: Integer): TRegViewMode; override;
     procedure InitKnownRegs; virtual; abstract;
     procedure SetViewMode(RegID: Integer; const Value: TRegViewMode); override;
@@ -176,8 +177,7 @@ type
     function Count: Integer; override;
     function EmptyRow(RowIndex: Integer): Boolean; override;
     function InstructonPoint: UInt64; virtual; abstract;
-    function StackBase: UInt64; virtual; abstract;
-    function StackPoint: UInt64; virtual; abstract;
+    function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; virtual; abstract;
     function RegCount(RowIndex: Integer): Integer; override;
     function RegData(RowIndex, ColIndex: Integer;
       NameNeeded: Boolean): string; override;
@@ -185,6 +185,8 @@ type
     function RegParam(RegID: Integer; out Param: TRegParam): Boolean; override;
     function RegSetValueAtIndex(RegID, Index: Integer): string; virtual; abstract;
     function RegSetValueCount(RegID: Integer): Integer; virtual;
+    function StackBase: UInt64; virtual; abstract;
+    function StackPoint: UInt64; virtual; abstract;
     function Update(CurrentIP: UInt64 = 0): Boolean; virtual; abstract;
     function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean; virtual; abstract;
     property ThreadID: Cardinal read FThreadID write FThreadID;
