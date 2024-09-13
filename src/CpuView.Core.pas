@@ -256,6 +256,8 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
           if AsmLine.DecodedStr.StartsWith('CALL') then
           begin
             SpaceIndex := Pos(' ', AsmLine.HintStr);
+            if SpaceIndex = 0 then
+              SpaceIndex := Length(AsmLine.HintStr) + 1;
             AsmLine.DecodedStr := 'CALL ' + Copy(AsmLine.HintStr, 1, SpaceIndex - 1);
             AsmLine.HintStr := '';
             AsmLine.CallInstruction := True;

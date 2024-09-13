@@ -116,6 +116,8 @@ type
     procedure BreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
     procedure DoDebuggerDestroy(Sender: TObject);
+    function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
+        CodeSize: Integer): string;
     procedure OnActivateIDEForm(Sender: TObject; var AHandled: Boolean);
     procedure OnActivateSourceEditor(Sender: TObject; var AHandled: Boolean);
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
@@ -260,6 +262,118 @@ begin
   Reset;
 end;
 
+function TCpuViewDebugGate.FormatAsmCode(const Value: string;
+  var AnInfo: TDbgInstInfo; CodeSize: Integer): string;
+var
+  I, Len, Cursor: Integer;
+  NumberMode, SignRip, RipMode: Boolean;
+
+  function IsNumber: Boolean;
+  begin
+    Result := CharInSet(Value[I], ['1'..'9', 'a'..'f', 'A'..'F']);
+  end;
+
+  procedure AppendChar(var AResult: string);
+  begin
+    // upcase
+    if CharInSet(Value[I], ['a'..'z']) then
+      AResult[Cursor] := Char(Byte(Value[I]) - Byte('a') + Byte('A'))
+    else
+      AResult[Cursor] := Value[I];
+    Inc(Cursor);
+    Inc(I);
+  end;
+
+  procedure MoveNumber(var AResult: string);
+  var
+    Digit: Byte;
+  begin
+    if not IsNumber then
+    begin
+      AResult[Cursor] := '0';
+      Inc(Cursor);
+      Exit;
+    end;
+    while IsNumber do
+    begin
+      if RipMode then
+      begin
+        Digit := Byte(Value[I]);
+        if Byte(Digit - Byte('0')) <= 9 then
+          Dec(Digit, Byte('0'))
+        else if Byte(Digit - Byte('a')) < 6 then
+          Dec(Digit, Byte('a') - 10)
+        else if Byte(Digit - Byte('A')) < 6 then
+          Dec(Digit, Byte('A') - 10)
+        else
+          Digit := 0; // impossible situation, just for debugging
+        AnInfo.InstrTargetOffs := (AnInfo.InstrTargetOffs shl 4) or Digit;
+      end;
+      AppendChar(AResult);
+    end;
+    if RipMode then
+    begin
+      if SignRip then
+        AnInfo.InstrTargetOffs := -AnInfo.InstrTargetOffs;
+      Inc(AnInfo.InstrTargetOffs, CodeSize);
+    end;
+  end;
+
+
+begin
+  Len := Length(Value);
+  SetLength(Result, Len shl 1);
+  I := 1;
+  Cursor := 1;
+  NumberMode := False;
+  while I <= Len do
+  begin
+
+    // trim lead zeros
+    if NumberMode then
+    begin
+      if Value[I] = '0' then
+      begin
+        Inc(I);
+        Continue;
+      end;
+      NumberMode := False;
+      MoveNumber(Result);
+      Continue;
+    end;
+
+    // detect number start
+    if Value[I] = '$' then
+    begin
+      // detect RIP
+      if (AnInfo.InstrTargetOffs = 0) and (Cursor > 5) then
+      begin
+        RipMode :=
+          (Result[Cursor - 4] = 'R') and
+          (Result[Cursor - 3] = 'I') and
+          (Result[Cursor - 2] = 'P');
+        SignRip := Result[Cursor - 1] = '-';
+      end
+      else
+        RipMode := False;
+      Result[Cursor] := '0';
+      Inc(Cursor);
+      Result[Cursor] := 'x';
+      Inc(Cursor);
+      Inc(I);
+      NumberMode := True;
+      Continue;
+    end;
+
+    AppendChar(Result);
+  end;
+
+  if NumberMode then
+    MoveNumber(Result);
+
+  SetLength(Result, Cursor - 1);
+end;
+
 procedure TCpuViewDebugGate.OnActivateIDEForm(Sender: TObject;
   var AHandled: Boolean);
 var
@@ -306,6 +420,7 @@ begin
   end;
   FDbgController := nil;
   FProcess := nil;
+  FSupportStream.ProcessID := 0;
   //if Assigned(IDEWindowCreators) then
     //IDEWindowCreators.OnActivateIDEForm := nil;
   if Assigned(FBreakPoints) then
@@ -334,6 +449,7 @@ begin
         FBreakPoints.AddNotification(FBreakpointsNotification);
         BreakPointChanged(FBreakPoints, nil);
       end;
+      FSupportStream.ProcessID := ProcessID;
       if ADebugger.State = dsPause then
         UpdateContext;
       Exit;
@@ -364,8 +480,8 @@ destructor TCpuViewDebugGate.Destroy;
 begin
   if FRegisterInDebugBoss and Assigned(DebugBoss) then
     DebugBoss.UnregisterStateChangeHandler(OnState);
-  FSupportStream.Free;
   Reset;
+  FSupportStream.Free;
   FBreakpointsNotification.OnAdd := nil;
   FBreakpointsNotification.OnRemove := nil;
   FBreakpointsNotification.OnUpdate := nil;
@@ -428,8 +544,9 @@ var
   Instruction: TInstruction;
   I: Integer;
   PrevVA: Int64;
-  ACodeBytes, ACode: string;
+  ACodeBytes, ACode, RipSimbol: string;
   AnInfo: TDbgInstInfo;
+  ExternalAddr, RipAddr: Int64;
 begin
   Result := TList<TInstruction>.Create;
   if FDbgController = nil then Exit;
@@ -451,20 +568,38 @@ begin
     PrevVA := Int64(pBuff);
     Disasm.Disassemble(pBuff, ACodeBytes, ACode, AnInfo);
     Instruction.AddrVA := AddrVA;
-    Instruction.AsString := AnsiUpperCase(Trim(ACode));
-    Instruction.AsString := StringReplace(Instruction.AsString, '$', '0x', [rfReplaceAll]);
-    if AnInfo.InstrType = itJump then
+    Instruction.AsString := FormatAsmCode(ACode, AnInfo, Length(ACodeBytes) shr 1);
+    ExternalAddr := AddrVA + AnInfo.InstrTargetOffs;
+
+    if AnInfo.InstrTargetOffs <> 0 then
     begin
-      Instruction.JmpTo := AddrVA + AnInfo.InstrTargetOffs;
-      Instruction.Hint := QuerySymbolAtAddr(Instruction.JmpTo, qsName);
+      Instruction.Hint := QuerySymbolAtAddr(ExternalAddr, qsName);
       if Instruction.Hint = '' then
-        Instruction.Hint := '0x' + IntToHex(Instruction.JmpTo, 1);
+        Instruction.Hint := '0x' + IntToHex(ExternalAddr, 1);
     end
+    else
+      Instruction.Hint := '';
+
+    if AnInfo.InstrType = itJump then
+      Instruction.JmpTo := ExternalAddr
     else
     begin
       Instruction.JmpTo := 0;
-      Instruction.Hint := '';
+      if AnInfo.InstrTargetOffs <> 0 then
+      begin
+        FSupportStream.Position := ExternalAddr;
+        RipAddr := 0;
+        RipSimbol := '';
+        FSupportStream.Read(RipAddr, PointerSize);
+        if RipAddr <> 0 then
+          RipSimbol := QuerySymbolAtAddr(RipAddr, qsName);
+        if RipSimbol = '' then
+          Instruction.Hint := Format('RIP (0x%.1x) %s', [ExternalAddr, Instruction.Hint])
+        else
+          Instruction.Hint := Format('RIP (0x%.1x -> 0x%.1x) %s', [ExternalAddr, RipAddr, RipSimbol]);
+      end;
     end;
+
     Instruction.Len := Int64(pBuff) - PrevVA;
     Inc(AddrVA, Instruction.Len);
     Dec(nSize, Instruction.Len);

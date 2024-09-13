@@ -1,5 +1,9 @@
 ﻿unit CpuView.Actions;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 interface
 
 uses

@@ -117,7 +117,7 @@
       </Item3>
     </RequiredPkgs>
     <UsageOptions>
-      <UnitPath Value="$(PkgOutDir)"/>
+      <UnitPath Value=".;src;src\gui"/>
     </UsageOptions>
     <PublishOptions>
       <Version Value="2"/>
