@@ -69,6 +69,7 @@ type
     function PointerSize: Integer; virtual; abstract;
     function ProcessID: Cardinal; virtual; abstract;
     function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): string; virtual; abstract;
+    function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; virtual; abstract;
     procedure Run; virtual; abstract;
     procedure Stop; virtual; abstract;
     function ThreadID: Cardinal; virtual; abstract;
