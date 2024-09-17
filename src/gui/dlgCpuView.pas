@@ -530,13 +530,17 @@ end;
 procedure TfrmCpuView.AsmViewSelectionChange(Sender: TObject);
 begin
   FAsmViewSelectedAddr := AsmView.SelectedInstructionAddr;
+
 end;
 
 procedure TfrmCpuView.acShowInDumpExecute(Sender: TObject);
 begin
   Core.ShowDumpAtAddr(ActiveViewerSelectedValue);
   ActiveDumpView.SelStart := ActiveViewerSelectedValue;
-  ActiveDumpView.SelEnd := ActiveViewerSelectedValue + FDbgGate.PointerSize - 1;
+  if ActiveViewIndex = 0 then
+    ActiveDumpView.SelEnd := ActiveViewerSelectedValue + AsmView.SelectedRawLength - 1
+  else
+    ActiveDumpView.SelEnd := ActiveViewerSelectedValue + FDbgGate.PointerSize - 1;
   ActiveControl := ActiveDumpView;
 end;
 

@@ -108,7 +108,7 @@ type
     FDebugger: TDebuggerIntf;
     FDbgController: TDbgController;
     FProcess: TDbgProcess;
-    FRegisterInDebugBoss: Boolean;
+    FRegisterInDebugBoss, FRegisterDestroyNotification: Boolean;
     FSupportStream: TRemoteStream;
     FPreviosSrcLine: Integer;
     FPreviosSrcFuncName, FPreviosSrcFileName: string;
@@ -136,6 +136,7 @@ type
     function PointerSize: Integer; override;
     function ProcessID: Cardinal; override;
     function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): string; override;
+    function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; override;
     procedure Run; override;
     procedure Stop; override;
     procedure ToggleBreakPoint(AddrVA: UInt64); override;
@@ -416,6 +417,11 @@ begin
   if Assigned(FDebugger) then
   begin
     //FDebugger.OnActivateSourceEditor := nil;
+    if FRegisterDestroyNotification then
+    begin
+      FDebugger.RemoveNotifyEvent(dnrDestroy, DoDebuggerDestroy);
+      FRegisterDestroyNotification := False;
+    end;
     FDebugger := nil;
   end;
   FDbgController := nil;
@@ -440,6 +446,7 @@ begin
     if Assigned(FProcess) and not FProcess.GotExitProcess then
     begin
       FDebugger.AddNotifyEvent(dnrDestroy, DoDebuggerDestroy);
+      FRegisterDestroyNotification := True;
       //if Assigned(IDEWindowCreators) then
       //  IDEWindowCreators.OnActivateIDEForm := OnActivateIDEForm;
       //FDebugger.OnActivateSourceEditor := OnActivateSourceEditor;
@@ -704,6 +711,13 @@ begin
   finally
     Sym.ReleaseReference;
   end;
+end;
+
+function TCpuViewDebugGate.ReadMemory(AddrVA: Int64; var Buff; Size: Integer
+  ): Boolean;
+begin
+  FSupportStream.Position := AddrVA;
+  Result := FSupportStream.Read(Buff, Size) = Size;
 end;
 
 procedure TCpuViewDebugGate.Run;

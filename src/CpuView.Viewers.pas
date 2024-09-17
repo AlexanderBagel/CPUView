@@ -541,7 +541,7 @@ type
     function AddressToRowIndex(Value: Int64): Int64; override;
     function Count: Int64; override;
     function RawLength: Int64; override;
-    function RowToAddress(RowIndex: Int64; ValueOffset: Integer): Int64; override;
+    function RowToAddress(ARowIndex: Int64; ValueOffset: Integer): Int64; override;
     procedure Update; override;
   end;
 
@@ -599,7 +599,7 @@ type
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
     function GetRawDataClass: TRawDataClass; override;
     procedure InitDefault; override;
-    function InternalGetRowPainter(RowIndex: Int64): TAbstractPrimaryRowPainter; override;
+    function InternalGetRowPainter(ARowIndex: Int64): TAbstractPrimaryRowPainter; override;
     procedure Notification(AComponent: TComponent;
       Operation: TOperation); override;
     procedure UpdateCursor(const HitTest: TMouseHitInfo); override;
@@ -1940,14 +1940,14 @@ begin
     Result := FContext.RegCount(RowIndex);
 end;
 
-function TRegistersRawData.RowToAddress(RowIndex: Int64;
+function TRegistersRawData.RowToAddress(ARowIndex: Int64;
   ValueOffset: Integer): Int64;
 begin
-  if FContext.EmptyRow(RowIndex) then
+  if FContext.EmptyRow(ARowIndex) then
     Exit(0);
   if ValueOffset < 0 then
     Exit(0);
-  Result := FContext.RegInfo(RowIndex, ValueOffset).RegID;
+  Result := FContext.RegInfo(ARowIndex, ValueOffset).RegID;
 end;
 
 procedure TRegistersRawData.Update;
@@ -2192,9 +2192,9 @@ begin
 end;
 
 function TCustomRegView.InternalGetRowPainter(
-  RowIndex: Int64): TAbstractPrimaryRowPainter;
+  ARowIndex: Int64): TAbstractPrimaryRowPainter;
 begin
-  if RowIndex < 0 then
+  if ARowIndex < 0 then
     Result := nil
   else
     Result := DefaultPainter;

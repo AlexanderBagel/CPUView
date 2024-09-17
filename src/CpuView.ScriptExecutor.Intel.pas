@@ -1,5 +1,9 @@
 ﻿unit CpuView.ScriptExecutor.Intel;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 interface
 
 uses
@@ -67,17 +71,19 @@ var
   TokenLen, I: Integer;
   Token: TToken;
   WaitState: TWaitStates;
-  Sign, Multiply, Mem: Boolean;
+  Sign, Multiply, Mem, RegPresent: Boolean;
   MemSize: Integer;
 begin
   Result := False;
+  if (Context = nil) or (Debugger = nil) then Exit;
   Tokens := TList<TToken>.Create;
   try
     Sign := False;
     Multiply := False;
     Mem := False;
     WaitState := [wsInstruction, wsSizePfx, wsMem, wsRegImm];
-    MemSize := PointerSize;
+    MemSize := Debugger.PointerSize;
+    RegPresent := False;
     FillChar(AExpression, SizeOf(AExpression), 0);
     while nSize > 0 do
     begin
@@ -85,11 +91,10 @@ begin
       case FParser.GetToken(pData, TokenLen) of
         ttUnknown:
         begin
-          TokenStr := Trim(Copy(pData, 1, TokenLen));
-          if TokenStr = '],' then TokenStr := ']';
+          TokenLen := 1;
+          TokenStr := Copy(pData, 1, TokenLen);
           if pData^ <> ',' then
             AExpression.Data := AExpression.Data + TokenStr;
-          if Length(TokenStr) > 1 then Exit;
           case pData^ of
             '+':
             begin
@@ -177,7 +182,7 @@ begin
           begin
             TokenStr := Copy(pData, 1, TokenLen);
             AExpression.Data := AExpression.Data + TokenStr;
-            if TokenStr <> 'PTR' then
+            if Trim(TokenStr) <> 'PTR' then
               Exit;
           end;
         end;
@@ -188,10 +193,11 @@ begin
           if wsRegImm in WaitState then
           begin
             if (TokenStr = 'RIP') and Mem then
-              Token.Value := CurrentIP
+              Token.Value := CurrentRIPOffset
             else
               if not Context.QueryRegValueByName(TokenStr, Token.Value) then
                 Exit;
+            RegPresent := True;
             Token.Decrement := Sign;
             Sign := False;
             if Multiply then
@@ -209,7 +215,7 @@ begin
         ttPrefix, ttKernel, ttNop:;
         ttSize:
         begin
-          TokenStr := Copy(pData, 1, TokenLen);
+          TokenStr := Trim(Copy(pData, 1, TokenLen));
           AExpression.Data := AExpression.Data + TokenStr + ' ';
           if wsSizePfx in WaitState then
           begin
@@ -241,6 +247,7 @@ begin
       AExpression.MemPresent :=
         Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize);
 
+    AExpression.RegPresent := RegPresent;
     Result := True;
 
     while (nSize > 0) and (pData^ = ' ') do

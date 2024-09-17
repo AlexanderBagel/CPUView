@@ -1,5 +1,9 @@
 ﻿unit CpuView.ScriptExecutor;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 interface
 
 {$I CpuViewCfg.inc}
@@ -14,8 +18,7 @@ type
   TExpression = record
     Data: string;
     Value, MemValue: UInt64;
-    MemPresent: Boolean;
-    Hint: string;
+    MemPresent, RegPresent: Boolean;
   end;
 
   TExpressionList = class(TList<TExpression>);
@@ -24,9 +27,8 @@ type
   private
     FCalculatedList: TExpressionList;
     FContext: TCommonCpuContext;
-    FCurrentIP: UInt64;
+    FCurrentRIPOffset: UInt64;
     FDebugger: TAbstractDebugger;
-    FPointerSize: Integer;
   protected
     function DoExecute(const Script: string; out ExecuteResult: string): Boolean; virtual; abstract;
   public
@@ -35,9 +37,8 @@ type
     function Execute(const Script: string; out ExecuteResult: string): Boolean;
     property CalculatedList: TExpressionList read FCalculatedList;
     property Context: TCommonCpuContext read FContext write FContext;
-    property CurrentIP: UInt64 read FCurrentIP write FCurrentIP;
+    property CurrentRIPOffset: UInt64 read FCurrentRIPOffset write FCurrentRIPOffset;
     property Debugger: TAbstractDebugger read FDebugger write FDebugger;
-    property PointerSize: Integer read FPointerSize write FPointerSize;
   end;
 
 implementation

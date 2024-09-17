@@ -4,6 +4,9 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   inherited pnAsmReg: TPanel
+    inherited AsmView: TAsmView
+      OnSelectionChange = AsmViewSelectionChange
+    end
     inherited RegView: TRegView
       PopupMenu = pmIntelReg
     end
@@ -150,8 +153,12 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
     end
     inherited acRegModifyNewValue: TAction[69]
     end
+    inherited acViewFitColumnToBestSize: TAction[70]
+    end
+    inherited acViewGoto: TAction[71]
+    end
   end
-  object pmIntelReg: TPopupMenu[9]
+  object pmIntelReg: TPopupMenu[10]
     Left = 1544
     Top = 112
     object miRegIntelViewMode: TMenuItem
