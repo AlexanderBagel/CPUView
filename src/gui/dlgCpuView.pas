@@ -35,8 +35,6 @@ type
     acTEUnicodeBE: TAction;
     acTEUtf7: TAction;
     acTEUtf8: TAction;
-    acDbgRun: TAction;
-    acDbgPause: TAction;
     acDbgStepIn: TAction;
     acDbgStepOut: TAction;
     acDbgRunTilReturn: TAction;
@@ -51,7 +49,6 @@ type
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
     AsmView: TAsmView;
-    Button1: TButton;
     acVmHex: TCpuContextRegViewModeAction;
     acVmHexW: TCpuContextRegViewModeAction;
     acVmHexD: TCpuContextRegViewModeAction;
@@ -69,12 +66,6 @@ type
     acVmFloat32: TCpuContextRegViewModeAction;
     acVmFloat64: TCpuContextRegViewModeAction;
     acVmFloat80: TCpuContextRegViewModeAction;
-    Button2: TButton;
-    Button3: TButton;
-    Button4: TButton;
-    Button5: TButton;
-    Button6: TButton;
-    Button7: TButton;
     DumpView: TDumpView;
     edCommands: TEdit;
     acCopy: THexViewCopyAction;
@@ -206,6 +197,7 @@ type
     pnAsmReg: TPanel;
     pnDebug: TPanel;
     pmRegSelected: TPopupMenu;
+    pmHint: TPopupMenu;
     RegView: TRegView;
     miRegSep1: TMenuItem;
     miAsmSep2: TMenuItem;
@@ -213,12 +205,16 @@ type
     splitDumpStack: TSplitter;
     splitAsmReg: TSplitter;
     StackView: TStackView;
+    StatusBar: TStatusBar;
     tabDump0: TTabSheet;
-    ToolBar1: TToolBar;
-    ToolButton1: TToolButton;
-    procedure acDbgPauseExecute(Sender: TObject);
-    procedure acDbgPauseUpdate(Sender: TObject);
-    procedure acDbgRunExecute(Sender: TObject);
+    ToolBar: TToolBar;
+    tbStepIn: TToolButton;
+    tbStepOut: TToolButton;
+    tbSep1: TToolButton;
+    tbBreakPoint: TToolButton;
+    tbSep2: TToolButton;
+    tbRunTillRet: TToolButton;
+    tbRunTo: TToolButton;
     procedure acDbgRunTilReturnExecute(Sender: TObject);
     procedure acDbgRunToExecute(Sender: TObject);
     procedure acDbgRunToUpdate(Sender: TObject);
@@ -246,8 +242,6 @@ type
     procedure acViewFitColumnToBestSizeExecute(Sender: TObject);
     procedure acViewGotoExecute(Sender: TObject);
     procedure acViewGotoUpdate(Sender: TObject);
-    procedure AsmViewJmpTo(Sender: TObject; const AJmpAddr: Int64;
-      AJmpState: TJmpState; var Handled: Boolean);
     procedure AsmViewSelectionChange(Sender: TObject);
     procedure DumpViewSelectionChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -268,12 +262,13 @@ type
     FContextRegName: string;
     FContextRegister: TRegister;
     FContextRegisterParam: TRegParam;
-    FJmpStack: TStack<Int64>;
     function ActiveViewerSelectedValue: UInt64;
   protected
     function ActiveDumpView: TDumpView;
     function ActiveViewIndex: Integer;
-    procedure InitContext; virtual; abstract;
+    procedure DoCreate; virtual;
+    procedure DoDestroy; virtual;
+    function GetContext: TCommonCpuContext; virtual; abstract;
   public
     property Core: TCpuViewCore read FCore;
     property DbgGate: TCpuViewDebugGate read FDbgGate;
@@ -286,7 +281,8 @@ implementation
 
 uses
   Math,
-  dlgInputBox;
+  dlgInputBox,
+  IDEImagesIntf;
 
 {$R *.lfm}
 
@@ -296,21 +292,27 @@ procedure TfrmCpuView.FormCreate(Sender: TObject);
 begin
   FCore := TCpuViewCore.Create;
   FDbgGate := TCpuViewDebugGate.Create(Self);
-  InitContext;
+  FDbgGate.Context := GetContext;
   FCore.Debugger := FDbgGate;
   FCore.AsmView := AsmView;
   FCore.RegView := RegView;
   FCore.DumpView := DumpView;
   FCore.StackView := StackView;
-  FJmpStack := TStack<Int64>.Create;
+  ToolBar.Images := IDEImages.Images_16;
+  tbBreakPoint.ImageIndex := IDEImages.LoadImage('ActiveBreakPoint');
+  tbRunTo.ImageIndex := IDEImages.LoadImage('menu_run_cursor');
+  tbRunTillRet.ImageIndex := IDEImages.LoadImage('menu_stepout');
+  tbStepIn.ImageIndex := IDEImages.LoadImage('menu_stepinto');
+  tbStepOut.ImageIndex := IDEImages.LoadImage('menu_stepover');
+  DoCreate;
 end;
 
 procedure TfrmCpuView.FormDestroy(Sender: TObject);
 begin
+  DoDestroy;
   FDbgGate.Context := nil;
   FCore.Free;
   FDbgGate.Free;
-  FJmpStack.Free;
 end;
 
 procedure TfrmCpuView.pmRegSelectedPopup(Sender: TObject);
@@ -380,6 +382,16 @@ begin
     Exit(3);
 end;
 
+procedure TfrmCpuView.DoCreate;
+begin
+
+end;
+
+procedure TfrmCpuView.DoDestroy;
+begin
+
+end;
+
 procedure TfrmCpuView.ActionRegModifyUpdate(Sender: TObject);
 begin
   TAction(Sender).Visible :=
@@ -439,32 +451,6 @@ end;
 procedure TfrmCpuView.acViewGotoUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
-end;
-
-procedure TfrmCpuView.AsmViewJmpTo(Sender: TObject; const AJmpAddr: Int64;
-  AJmpState: TJmpState; var Handled: Boolean);
-var
-  NewJmpAddr: Int64;
-begin
-  case AJmpState of
-    jsPushToUndo:
-    begin
-      Handled := Core.AddrInAsm(AJmpAddr);
-      if not Handled then Exit;
-      FJmpStack.Push(AsmView.SelectedInstructionAddr);
-      FJmpStack.Push(AsmView.RowToAddress(AsmView.CurrentVisibleRow, 0));
-      FCore.ShowDisasmAtAddr(AJmpAddr);
-    end;
-    jsPopFromUndo:
-    begin
-      Handled := True;
-      if FJmpStack.Count = 0 then Exit;
-      NewJmpAddr := FJmpStack.Pop;
-      FCore.ShowDisasmAtAddr(NewJmpAddr);
-      NewJmpAddr := FJmpStack.Pop;
-      AsmView.FocusOnAddress(NewJmpAddr, ccmSelectRow);
-    end;
-  end;
 end;
 
 procedure TfrmCpuView.FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -627,11 +613,6 @@ begin
     AsmView.HighlightReg := FContextRegName;
 end;
 
-procedure TfrmCpuView.acDbgRunExecute(Sender: TObject);
-begin
-  DbgGate.Run;
-end;
-
 procedure TfrmCpuView.acDbgRunTilReturnExecute(Sender: TObject);
 begin
   DbgGate.TraceTilReturn;
@@ -648,19 +629,9 @@ begin
     Core.AddrInAsm(FAsmViewSelectedAddr);
 end;
 
-procedure TfrmCpuView.acDbgPauseUpdate(Sender: TObject);
-begin
-  TAction(Sender).Enabled := DbgGate.DebugState = adsRunning;
-end;
-
-procedure TfrmCpuView.acDbgPauseExecute(Sender: TObject);
-begin
-  DbgGate.Pause;
-end;
-
 procedure TfrmCpuView.acDbgRunUpdate(Sender: TObject);
 begin
-  TAction(Sender).Enabled := DbgGate.DebugState <> adsRunning;
+  TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
 end;
 
 procedure TfrmCpuView.acDbgStepInExecute(Sender: TObject);

@@ -13,94 +13,49 @@ object frmCpuView: TfrmCpuView
   OnDestroy = FormDestroy
   object pnDebug: TPanel
     Left = 0
-    Height = 92
-    Top = 1212
+    Height = 79
+    Top = 1225
     Width = 2096
     Align = alBottom
-    Caption = 'pnDebug'
-    ClientHeight = 92
+    AutoSize = True
+    ClientHeight = 79
     ClientWidth = 2096
     TabOrder = 0
-    object Button1: TButton
-      Left = 8
-      Height = 38
-      Top = 40
-      Width = 113
-      Action = acDbgStepIn
-      TabOrder = 0
-    end
     object edCommands: TEdit
       Left = 5
       Height = 33
       Top = 5
       Width = 2086
-      Align = alTop
+      Align = alBottom
       BorderSpacing.Around = 4
-      TabOrder = 1
+      TabOrder = 0
       TextHint = 'Enter query...'
     end
-    object Button2: TButton
-      Left = 136
-      Height = 38
-      Top = 40
-      Width = 113
-      Action = acDbgStepOut
-      TabOrder = 2
-    end
-    object Button3: TButton
-      Left = 272
-      Height = 38
-      Top = 40
-      Width = 177
-      Action = acDbgToggleBp
-      TabOrder = 3
-    end
-    object Button4: TButton
-      Left = 464
-      Height = 38
-      Top = 40
-      Width = 113
-      Action = acDbgRun
-      TabOrder = 4
-    end
-    object Button5: TButton
-      Left = 592
-      Height = 38
-      Top = 40
-      Width = 113
-      Action = acDbgPause
-      TabOrder = 5
-    end
-    object Button6: TButton
-      Left = 720
-      Height = 38
-      Top = 40
-      Width = 153
-      Action = acDbgRunTilReturn
-      TabOrder = 6
-    end
-    object Button7: TButton
-      Left = 888
-      Height = 38
-      Top = 40
-      Width = 113
-      Action = acDbgRunTo
-      TabOrder = 7
+    object StatusBar: TStatusBar
+      Left = 1
+      Height = 36
+      Top = 42
+      Width = 2094
+      Panels = <      
+        item
+          Width = 50
+        end>
+      SimplePanel = False
     end
   end
   object pnAsmReg: TPanel
     Left = 0
-    Height = 673
+    Height = 686
     Top = 39
     Width = 2096
     Align = alClient
     Caption = 'pnAsmReg'
-    ClientHeight = 673
+    ClientHeight = 686
     ClientWidth = 2096
     TabOrder = 1
     object AsmView: TAsmView
       Left = 1
-      Height = 671
+      Height = 684
       Top = 1
       Width = 1374
       Align = alClient
@@ -110,13 +65,12 @@ object frmCpuView: TfrmCpuView
       PopupMenu = pmAsm
       TabOrder = 0
       TabStop = True
-      OnJmpTo = AsmViewJmpTo
       OnSelectionChange = AsmViewSelectionChange
     end
     object RegView: TRegView
       Cursor = crDefault
       Left = 1383
-      Height = 671
+      Height = 684
       Top = 1
       Width = 712
       Align = alRight
@@ -128,30 +82,74 @@ object frmCpuView: TfrmCpuView
     end
     object splitAsmReg: TSplitter
       Left = 1375
-      Height = 671
+      Height = 684
       Top = 1
       Width = 8
       Align = alRight
       ResizeAnchor = akRight
     end
   end
-  object ToolBar1: TToolBar
+  object ToolBar: TToolBar
     Left = 0
     Height = 39
     Top = 0
     Width = 2096
-    Caption = 'ToolBar1'
+    Caption = 'ToolBar'
     TabOrder = 2
-    object ToolButton1: TToolButton
+    object tbStepIn: TToolButton
       Left = 1
       Top = 2
-      Caption = 'ToolButton1'
+      Action = acDbgStepIn
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object tbStepOut: TToolButton
+      Left = 36
+      Top = 2
+      Action = acDbgStepOut
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object tbSep1: TToolButton
+      Left = 106
+      Height = 33
+      Top = 2
+      Caption = 'tbSep1'
+      Style = tbsSeparator
+    end
+    object tbBreakPoint: TToolButton
+      Left = 114
+      Top = 2
+      Action = acDbgToggleBp
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object tbSep2: TToolButton
+      Left = 149
+      Height = 33
+      Top = 2
+      Caption = 'tbSep2'
+      Style = tbsSeparator
+    end
+    object tbRunTillRet: TToolButton
+      Left = 71
+      Top = 2
+      Action = acDbgRunTilReturn
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object tbRunTo: TToolButton
+      Left = 157
+      Top = 2
+      Action = acDbgRunTo
+      ParentShowHint = False
+      ShowHint = True
     end
   end
   object pnDumps: TPanel
     Left = 0
     Height = 492
-    Top = 720
+    Top = 733
     Width = 2096
     Align = alBottom
     Caption = 'pnDumps'
@@ -167,6 +165,7 @@ object frmCpuView: TfrmCpuView
       Lines.Strings = (
         'Hint text display here'
       )
+      PopupMenu = pmHint
       ReadOnly = True
       ScrollBars = ssAutoVertical
       TabOrder = 0
@@ -235,7 +234,7 @@ object frmCpuView: TfrmCpuView
     Cursor = crVSplit
     Left = 0
     Height = 8
-    Top = 712
+    Top = 725
     Width = 2096
     Align = alBottom
     ResizeAnchor = akBottom
@@ -592,21 +591,10 @@ object frmCpuView: TfrmCpuView
       OnExecute = acTEAnsiExecute
       OnUpdate = acTEAnsiUpdate
     end
-    object acDbgRun: TAction
-      Category = 'Debugger'
-      Caption = 'Run'
-      OnExecute = acDbgRunExecute
-      OnUpdate = acDbgRunUpdate
-    end
-    object acDbgPause: TAction
-      Category = 'Debugger'
-      Caption = 'Pause'
-      OnExecute = acDbgPauseExecute
-      OnUpdate = acDbgPauseUpdate
-    end
     object acDbgStepIn: TAction
       Category = 'Debugger'
       Caption = 'Step In'
+      Hint = 'Step Into'
       ShortCut = 118
       OnExecute = acDbgStepInExecute
       OnUpdate = acDbgRunUpdate
@@ -614,6 +602,7 @@ object frmCpuView: TfrmCpuView
     object acDbgStepOut: TAction
       Category = 'Debugger'
       Caption = 'Step Out'
+      Hint = 'Step Over'
       ShortCut = 119
       OnExecute = acDbgStepOutExecute
       OnUpdate = acDbgRunUpdate
@@ -621,6 +610,7 @@ object frmCpuView: TfrmCpuView
     object acDbgRunTilReturn: TAction
       Category = 'Debugger'
       Caption = 'Run Till Return'
+      Hint = 'Step Out'
       ShortCut = 16502
       OnExecute = acDbgRunTilReturnExecute
       OnUpdate = acDbgRunUpdate
@@ -628,6 +618,7 @@ object frmCpuView: TfrmCpuView
     object acDbgRunTo: TAction
       Category = 'Debugger'
       Caption = 'Run To'
+      Hint = 'Run to Cursor'
       ShortCut = 115
       OnExecute = acDbgRunToExecute
       OnUpdate = acDbgRunToUpdate
@@ -635,6 +626,7 @@ object frmCpuView: TfrmCpuView
     object acDbgToggleBp: TAction
       Category = 'Debugger'
       Caption = 'Toggle BreakPoint'
+      Hint = 'Toggle BreakPoint'
       ShortCut = 113
       OnExecute = acDbgToggleBpExecute
       OnUpdate = acDbgRunToUpdate
@@ -877,5 +869,9 @@ object frmCpuView: TfrmCpuView
     object miAsmFit: TMenuItem
       Action = acViewFitColumnToBestSize
     end
+  end
+  object pmHint: TPopupMenu
+    Left = 400
+    Top = 744
   end
 end

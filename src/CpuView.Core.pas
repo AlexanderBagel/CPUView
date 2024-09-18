@@ -31,6 +31,7 @@ uses
   Generics.Collections,
   FWHexView.Common,
   FWHexView,
+  FWHexView.MappedView,
   CpuView.Common,
   CpuView.Viewers,
   CpuView.Settings,
@@ -65,6 +66,7 @@ type
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
     FInvalidReg: TRegionData;
+    FJmpStack: TStack<Int64>;
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
     FLockSelChange: Boolean;
     FLastCtx: TCommonCpuContext;
@@ -78,6 +80,8 @@ type
     FOldAsmScroll: TOnVerticalScrollEvent;
     FOldAsmSelect: TNotifyEvent;
     function GetAddrMode: TAddressMode;
+    procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
+      AJmpState: TJmpState; var Handled: Boolean);
     procedure OnAsmScroll(Sender: TObject; AStep: TScrollStepDirection);
     procedure OnAsmSelectionChange(Sender: TObject);
     procedure OnBreakPointsChange(Sender: TObject);
@@ -187,6 +191,7 @@ begin
   FDumpStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
   FShowCallFuncName := True;
+  FJmpStack := TStack<Int64>.Create;
 end;
 
 destructor TCpuViewCore.Destroy;
@@ -198,6 +203,7 @@ begin
   FStackStream.Free;
   FDumpStream.Free;
   FKnownFunctionAddrVA.Free;
+  FJmpStack.Free;
   inherited;
 end;
 
@@ -368,6 +374,32 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
+  AJmpState: TJmpState; var Handled: Boolean);
+var
+  NewJmpAddr: Int64;
+begin
+  case AJmpState of
+    jsPushToUndo:
+    begin
+      Handled := AddrInAsm(AJmpAddr);
+      if not Handled then Exit;
+      FJmpStack.Push(AsmView.SelectedInstructionAddr);
+      FJmpStack.Push(AsmView.RowToAddress(AsmView.CurrentVisibleRow, 0));
+      ShowDisasmAtAddr(AJmpAddr);
+    end;
+    jsPopFromUndo:
+    begin
+      Handled := True;
+      if FJmpStack.Count = 0 then Exit;
+      NewJmpAddr := FJmpStack.Pop;
+      ShowDisasmAtAddr(NewJmpAddr);
+      NewJmpAddr := FJmpStack.Pop;
+      AsmView.FocusOnAddress(NewJmpAddr, ccmSelectRow);
+    end;
+  end;
+end;
+
 procedure TCpuViewCore.OnAsmScroll(Sender: TObject;
   AStep: TScrollStepDirection);
 var
@@ -524,6 +556,7 @@ begin
     FAsmView := Value;
     if Value = nil then Exit;
     FOldAsmSelect := FAsmView.OnSelectionChange;
+    FAsmView.OnJmpTo := OnAsmJmpTo;
     FAsmView.OnSelectionChange := OnAsmSelectionChange;
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;

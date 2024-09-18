@@ -1,17 +1,18 @@
 unit dlgCpuViewIntel;
 
-{$mode ObjFPC}{$H+}
+{$mode Delphi}
 
 interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, Menus, ActnList,
-  ExtCtrls,
+  ExtCtrls, Generics.Collections,
 
   dlgCpuView,
 
   FWHexView.Common,
   FWHexView.Actions,
+  CpuView.CPUContext,
   CpuView.IntelContext,
   CpuView.ScriptExecutor,
   CpuView.ScriptExecutor.Intel;
@@ -55,12 +56,22 @@ type
     procedure acRegSimpleModeExecute(Sender: TObject);
     procedure acRegSimpleModeUpdate(Sender: TObject);
     procedure AsmViewSelectionChange(Sender: TObject);
-    procedure FormDestroy(Sender: TObject);
+    procedure edCommandsKeyPress(Sender: TObject; var Key: char);
+    procedure pmHintPopup(Sender: TObject);
+  private type
+    THintMenuParam = record
+      Caption: string;
+      AddrVA: Int64;
+      IsMem: Boolean;
+    end;
   private
     FContext: TIntelCpuContext;
     FScript: TIntelScriptExecutor;
+    FHintMenuData: TList<THintMenuParam>;
   protected
-    procedure InitContext; override;
+    procedure DoCreate; override;
+    procedure DoDestroy; override;
+    function GetContext: TCommonCpuContext; override;
   public
 
   end;
@@ -134,11 +145,13 @@ var
   ExecuteResult: string;
   I: Integer;
   Expression: TExpression;
+  HintParam: THintMenuParam;
 begin
   inherited;
   memHints.Lines.BeginUpdate;
   try
     memHints.Lines.Clear;
+    FHintMenuData.Clear;
     FScript.CurrentRIPOffset := AsmView.SelectedInstructionAddr + AsmView.SelectedRawLength;
     if not FScript.Execute(
       AsmView.SelectedColumnAsString(ctDescription), ExecuteResult) then
@@ -147,8 +160,19 @@ begin
     begin
       Expression := FScript.CalculatedList[I];
       if not Expression.RegPresent then Continue;
+      HintParam.Caption := Expression.Data;
+      HintParam.AddrVA := Expression.Value;
+      HintParam.IsMem := False;
+      if Core.AddrInDump(HintParam.AddrVA) then
+        FHintMenuData.Add(HintParam);
       if Expression.MemPresent then
-        ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue])
+      begin
+        ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue]);
+        HintParam.AddrVA := Expression.MemValue;
+        HintParam.IsMem := True;
+        if Core.AddrInDump(HintParam.AddrVA) then
+          FHintMenuData.Add(HintParam);
+      end
       else
         ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
       memHints.Lines.Add(ExecuteResult);
@@ -158,25 +182,55 @@ begin
   end;
 end;
 
+procedure TfrmCpuViewIntel.edCommandsKeyPress(Sender: TObject; var Key: char);
+var
+  ExecuteResult: string;
+  Expression: TExpression;
+begin
+  if Key <> #13 then Exit;
+  if Trim(edCommands.Text) = '' then Exit;
+  FScript.CurrentRIPOffset := AsmView.SelectedInstructionAddr + AsmView.SelectedRawLength;
+  if FScript.Execute(edCommands.Text, ExecuteResult) then
+  begin
+    Expression := FScript.CalculatedList[0];
+    if Expression.MemPresent then
+      ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue])
+    else
+      ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
+  end;
+  StatusBar.Panels[0].Text := ExecuteResult;
+end;
+
+procedure TfrmCpuViewIntel.pmHintPopup(Sender: TObject);
+begin
+  pmHint.Items.Clear;
+end;
+
+procedure TfrmCpuViewIntel.DoCreate;
+begin
+  FScript := TIntelScriptExecutor.Create;
+  FScript.Context := FContext;
+  FScript.Debugger := DbgGate;
+  FHintMenuData := TList<THintMenuParam>.Create;
+end;
+
+procedure TfrmCpuViewIntel.DoDestroy;
+begin
+  FScript.Free;
+  FContext.Free;
+  FHintMenuData.Free;
+end;
+
 procedure TfrmCpuViewIntel.acFPU_MMXExecute(Sender: TObject);
 begin
   FContext.FPUMode := TFPUMode(TAction(Sender).Tag);
 end;
 
-procedure TfrmCpuViewIntel.FormDestroy(Sender: TObject);
+function TfrmCpuViewIntel.GetContext: TCommonCpuContext;
 begin
-  inherited;
-  FScript.Free;
-  FContext.Free;
-end;
-
-procedure TfrmCpuViewIntel.InitContext;
-begin
-  FContext := TIntelCpuContext.Create(Self);
-  DbgGate.Context := FContext;
-  FScript := TIntelScriptExecutor.Create;
-  FScript.Context := FContext;
-  FScript.Debugger := DbgGate;
+  if FContext = nil then
+    FContext := TIntelCpuContext.Create(Self);
+  Result := FContext;
 end;
 
 end.

@@ -3,6 +3,12 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
   Top = 526
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  inherited pnDebug: TPanel
+    inherited edCommands: TEdit
+      TabOrder = 1
+      OnKeyPress = edCommandsKeyPress
+    end
+  end
   inherited pnAsmReg: TPanel
     inherited AsmView: TAsmView
       OnSelectionChange = AsmViewSelectionChange
@@ -129,36 +135,35 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
     end
     inherited acTEUtf8: TAction[57]
     end
-    inherited acDbgRun: TAction[58]
+    inherited acDbgStepIn: TAction[58]
     end
-    inherited acDbgPause: TAction[59]
+    inherited acDbgStepOut: TAction[59]
     end
-    inherited acDbgStepIn: TAction[60]
+    inherited acDbgRunTilReturn: TAction[60]
     end
-    inherited acDbgStepOut: TAction[61]
+    inherited acDbgRunTo: TAction[61]
     end
-    inherited acDbgRunTilReturn: TAction[62]
+    inherited acDbgToggleBp: TAction[62]
     end
-    inherited acDbgRunTo: TAction[63]
+    inherited acRegModifyInc: TAction[63]
     end
-    inherited acDbgToggleBp: TAction[64]
+    inherited acRegModifyDec: TAction[64]
     end
-    inherited acRegModifyInc: TAction[65]
+    inherited acRegModifyToggle: TAction[65]
     end
-    inherited acRegModifyDec: TAction[66]
+    inherited acRegModifyZero: TAction[66]
     end
-    inherited acRegModifyToggle: TAction[67]
+    inherited acRegModifyNewValue: TAction[67]
     end
-    inherited acRegModifyZero: TAction[68]
+    inherited acViewFitColumnToBestSize: TAction[68]
     end
-    inherited acRegModifyNewValue: TAction[69]
-    end
-    inherited acViewFitColumnToBestSize: TAction[70]
-    end
-    inherited acViewGoto: TAction[71]
+    inherited acViewGoto: TAction[69]
     end
   end
-  object pmIntelReg: TPopupMenu[10]
+  inherited pmHint: TPopupMenu
+    OnPopup = pmHintPopup
+  end
+  object pmIntelReg: TPopupMenu[11]
     Left = 1544
     Top = 112
     object miRegIntelViewMode: TMenuItem
