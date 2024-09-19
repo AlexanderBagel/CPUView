@@ -18,7 +18,8 @@ type
   TExpression = record
     Data: string;
     Value, MemValue: UInt64;
-    MemPresent, RegPresent: Boolean;
+    MemSize: Integer;
+    RegPresent: Boolean;
   end;
 
   TExpressionList = class(TList<TExpression>);

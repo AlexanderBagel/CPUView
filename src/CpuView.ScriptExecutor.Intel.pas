@@ -243,9 +243,8 @@ begin
       else
         Inc(AExpression.Value, Tokens.List[I].Value);
 
-    if Mem then
-      AExpression.MemPresent :=
-        Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize);
+    if Mem and Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize) then
+      AExpression.MemSize := MemSize;
 
     AExpression.RegPresent := RegPresent;
     Result := True;

@@ -115,6 +115,7 @@ type
     FLockTimeOut: Int64;
     procedure BreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
+    function CurrentInstruction: TInstruction;
     procedure DoDebuggerDestroy(Sender: TObject);
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
@@ -256,6 +257,32 @@ begin
   end;
 
   DoBreakPointsChange;
+end;
+
+function TCpuViewDebugGate.CurrentInstruction: TInstruction;
+var
+  CurrentIP: Int64;
+  ALen, I: Integer;
+  InstructionOpcode: array of Byte;
+  List: TList<TInstruction>;
+begin
+  FillChar(Result, SizeOf(Result), 0);
+  CurrentIP := CurrentInstructionPoint;
+  SetLength(InstructionOpcode, 16);
+  FSupportStream.Position := CurrentIP;
+  ALen := FSupportStream.Read(InstructionOpcode[0], 16);
+  if ALen = 0 then Exit;
+  List := Disassembly(CurrentIP, @InstructionOpcode[0], 16);
+  try
+    for I := 0 to List.Count - 1 do
+      if List.List[I].Len > 0 then
+      begin
+        Result := List[I];
+        Break;
+      end;
+  finally
+    List.Free;
+  end;
 end;
 
 procedure TCpuViewDebugGate.DoDebuggerDestroy(Sender: TObject);
@@ -621,8 +648,13 @@ begin
 end;
 
 function TCpuViewDebugGate.IsActiveJmp: Boolean;
+var
+  Inst: TInstruction;
 begin
   Result := False;
+  Inst := CurrentInstruction;
+  if Inst.JmpTo = 0 then Exit;
+  Result := Context.IsActiveJump(Inst.AsString);
 end;
 
 procedure TCpuViewDebugGate.Pause;

@@ -10,6 +10,7 @@ object frmCpuView: TfrmCpuView
   LCLVersion = '3.99.0.0'
   OnClose = FormClose
   OnCreate = FormCreate
+  OnDeactivate = FormDeactivate
   OnDestroy = FormDestroy
   object pnDebug: TPanel
     Left = 0
@@ -873,5 +874,11 @@ object frmCpuView: TfrmCpuView
   object pmHint: TPopupMenu
     Left = 400
     Top = 744
+  end
+  object tmpZOrderLock: TTimer
+    Enabled = False
+    OnTimer = tmpZOrderLockTimer
+    Left = 656
+    Top = 104
   end
 end

@@ -59,18 +59,26 @@ type
     procedure edCommandsKeyPress(Sender: TObject; var Key: char);
     procedure pmHintPopup(Sender: TObject);
   private type
+    THintMenuType = (hmtAddrVA, hmtSeparator, hmtCopy, hmtSelectAll);
     THintMenuParam = record
       Caption: string;
       AddrVA: Int64;
-      IsMem: Boolean;
+      MemSize: Integer;
+      MenuType: THintMenuType;
     end;
+  private const
+    MNU_GOTOASM = -1;
+    MNU_GOTODMP = -2;
+    MNU_GOTOSTK = -3;
   private
     FContext: TIntelCpuContext;
     FScript: TIntelScriptExecutor;
     FHintMenuData: TList<THintMenuParam>;
+    procedure OnHintMenuClick(Sender: TObject);
+    procedure OnReset(Sender: TObject);
   protected
-    procedure DoCreate; override;
-    procedure DoDestroy; override;
+    procedure AfterDbgGateCreate; override;
+    procedure BeforeDbgGateDestroy; override;
     function GetContext: TCommonCpuContext; override;
   public
 
@@ -143,7 +151,7 @@ end;
 procedure TfrmCpuViewIntel.AsmViewSelectionChange(Sender: TObject);
 var
   ExecuteResult: string;
-  I: Integer;
+  I, Idx: Integer;
   Expression: TExpression;
   HintParam: THintMenuParam;
 begin
@@ -160,16 +168,28 @@ begin
     begin
       Expression := FScript.CalculatedList[I];
       if not Expression.RegPresent then Continue;
-      HintParam.Caption := Expression.Data;
+      HintParam.MenuType := hmtAddrVA;
+      HintParam.MemSize := Expression.MemSize;
+      if Expression.MemSize > 0 then
+      begin
+        Idx := Pos('[', Expression.Data);
+        HintParam.Caption := Copy(Expression.Data, Idx + 1, Length(Expression.Data));
+        HintParam.Caption := StringReplace(HintParam.Caption, ']', '', [rfReplaceAll]);
+      end
+      else
+      begin
+        HintParam.Caption := Expression.Data;
+        HintParam.MemSize := DbgGate.PointerSize;
+      end;
       HintParam.AddrVA := Expression.Value;
-      HintParam.IsMem := False;
       if Core.AddrInDump(HintParam.AddrVA) then
         FHintMenuData.Add(HintParam);
-      if Expression.MemPresent then
+      if Expression.MemSize > 0 then
       begin
         ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue]);
         HintParam.AddrVA := Expression.MemValue;
-        HintParam.IsMem := True;
+        HintParam.Caption := Expression.Data;
+        HintParam.MemSize := DbgGate.PointerSize;
         if Core.AddrInDump(HintParam.AddrVA) then
           FHintMenuData.Add(HintParam);
       end
@@ -177,6 +197,12 @@ begin
         ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
       memHints.Lines.Add(ExecuteResult);
     end;
+    HintParam.MenuType := hmtSeparator;
+    FHintMenuData.Add(HintParam);
+    HintParam.MenuType := hmtSelectAll;
+    FHintMenuData.Add(HintParam);
+    HintParam.MenuType := hmtCopy;
+    FHintMenuData.Add(HintParam);
   finally
     memHints.Lines.EndUpdate;
   end;
@@ -193,7 +219,7 @@ begin
   if FScript.Execute(edCommands.Text, ExecuteResult) then
   begin
     Expression := FScript.CalculatedList[0];
-    if Expression.MemPresent then
+    if Expression.MemSize > 0 then
       ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue])
     else
       ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
@@ -202,19 +228,105 @@ begin
 end;
 
 procedure TfrmCpuViewIntel.pmHintPopup(Sender: TObject);
+
+  function AddMenuItem(AParent: TMenuItem; const ACaption: string;
+    ATag: Integer): TMenuItem;
+  begin
+    Result := TMenuItem.Create(pmHint);
+    Result.Caption := ACaption;
+    Result.Tag := ATag;
+    Result.OnClick := OnHintMenuClick;
+    AParent.Add(Result);
+  end;
+
+var
+  AItem: TMenuItem;
+  AParam: THintMenuParam;
+  I: Integer;
 begin
   pmHint.Items.Clear;
+  for I := 0 to FHintMenuData.Count - 1 do
+  begin
+    AParam := FHintMenuData[I];
+    case AParam.MenuType of
+      hmtSeparator: AddMenuItem(pmHint.Items, '-', I);
+      hmtCopy: AddMenuItem(pmHint.Items, 'Copy', I);
+      hmtSelectAll: AddMenuItem(pmHint.Items, 'Select All', I);
+      hmtAddrVA:
+      begin
+        AItem := AddMenuItem(pmHint.Items, AParam.Caption +
+          ' = ' + IntToHex(AParam.AddrVA, 1), I);
+        if Core.AddrInAsm(AParam.AddrVA) then
+          AddMenuItem(AItem, 'Follow in Asm', MNU_GOTOASM);
+        if Core.AddrInDump(AParam.AddrVA) then
+          AddMenuItem(AItem, 'Follow in Dump', MNU_GOTODMP);
+        if Core.AddrInStack(AParam.AddrVA) then
+          AddMenuItem(AItem, 'Follow in Stack', MNU_GOTOSTK);
+      end;
+    end;
+  end;
 end;
 
-procedure TfrmCpuViewIntel.DoCreate;
+procedure TfrmCpuViewIntel.OnHintMenuClick(Sender: TObject);
+
+  function GetMnuParam: THintMenuParam;
+  begin
+    Result := FHintMenuData[TMenuItem(Sender).Parent.Tag];
+  end;
+
+var
+  AParam: THintMenuParam;
+begin
+  case TMenuItem(Sender).Tag of
+    MNU_GOTOSTK:
+    begin
+      AParam := GetMnuParam;
+      Core.ShowStackAtAddr(AParam.AddrVA);
+      ActiveControl := StackView;
+    end;
+    MNU_GOTODMP:
+    begin
+      AParam := GetMnuParam;
+      Core.ShowDumpAtAddr(AParam.AddrVA);
+      ActiveDumpView.SelStart := AParam.AddrVA;
+      ActiveDumpView.SelEnd := AParam.AddrVA + AParam.MemSize - 1;
+      ActiveControl := ActiveDumpView;
+    end;
+    MNU_GOTOASM:
+    begin
+      AParam := GetMnuParam;
+      Core.ShowDisasmAtAddr(AParam.AddrVA);
+      ActiveControl := AsmView;
+    end;
+  else
+    case FHintMenuData[TMenuItem(Sender).Tag].MenuType of
+      hmtCopy: memHints.CopyToClipboard;
+      hmtSelectAll:
+      begin
+        memHints.SelectAll;
+        ActiveControl := memHints;
+      end;
+    end;
+  end;
+end;
+
+procedure TfrmCpuViewIntel.OnReset(Sender: TObject);
+begin
+  FHintMenuData.Clear;
+  edCommands.Text := '';
+  memHints.Text := '';
+end;
+
+procedure TfrmCpuViewIntel.AfterDbgGateCreate;
 begin
   FScript := TIntelScriptExecutor.Create;
   FScript.Context := FContext;
   FScript.Debugger := DbgGate;
   FHintMenuData := TList<THintMenuParam>.Create;
+  Core.OnReset := OnReset;
 end;
 
-procedure TfrmCpuViewIntel.DoDestroy;
+procedure TfrmCpuViewIntel.BeforeDbgGateDestroy;
 begin
   FScript.Free;
   FContext.Free;

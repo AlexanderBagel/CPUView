@@ -1,6 +1,6 @@
 inherited frmCpuViewIntel: TfrmCpuViewIntel
-  Left = 886
-  Top = 526
+  Left = 1645
+  Top = 651
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   inherited pnDebug: TPanel
@@ -163,7 +163,7 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
   inherited pmHint: TPopupMenu
     OnPopup = pmHintPopup
   end
-  object pmIntelReg: TPopupMenu[11]
+  object pmIntelReg: TPopupMenu[12]
     Left = 1544
     Top = 112
     object miRegIntelViewMode: TMenuItem

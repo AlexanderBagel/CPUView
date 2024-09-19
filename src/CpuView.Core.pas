@@ -68,6 +68,7 @@ type
     FInvalidReg: TRegionData;
     FJmpStack: TStack<Int64>;
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
+    FLockPushToJmpStack: Boolean;
     FLockSelChange: Boolean;
     FLastCtx: TCommonCpuContext;
     FRegView: TRegView;
@@ -79,6 +80,9 @@ type
     FDumpLastAddrVA: Int64;
     FOldAsmScroll: TOnVerticalScrollEvent;
     FOldAsmSelect: TNotifyEvent;
+    FReset: TNotifyEvent;
+    function CanWork: Boolean;
+    procedure DoReset;
     function GetAddrMode: TAddressMode;
     procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
       AJmpState: TJmpState; var Handled: Boolean);
@@ -122,6 +126,7 @@ type
     property StackView: TStackView read FStackView write SetStackView;
   public
     property ShowCallFuncName: Boolean read FShowCallFuncName write SetShowCallFuncName;
+    property OnReset: TNotifyEvent read FReset write FReset;
   end;
 
 implementation
@@ -156,7 +161,7 @@ begin
       if CacheIndex >= 0 then
         AAddress := FCacheList[CacheIndex].AddrVA;
     end;
-    if Assigned(FDebugger) and (FDebugger.PointerSize = 4) then
+    if CanWork and (FDebugger.PointerSize = 4) then
       StreamSize := MM_HIGHEST_USER_ADDRESS32
     else
       StreamSize := MM_HIGHEST_USER_ADDRESS64;
@@ -363,6 +368,17 @@ begin
   AComment := GetKnownFunctionAtAddr(AddrVA);
 end;
 
+function TCpuViewCore.CanWork: Boolean;
+begin
+  Result := Assigned(FDebugger) and (FDebugger.DebugState = adsPaused);
+end;
+
+procedure TCpuViewCore.DoReset;
+begin
+  if Assigned(FReset) then
+    FReset(Self);;
+end;
+
 function TCpuViewCore.GetAddrMode: TAddressMode;
 begin
   case FDebugger.PointerSize of
@@ -384,8 +400,6 @@ begin
     begin
       Handled := AddrInAsm(AJmpAddr);
       if not Handled then Exit;
-      FJmpStack.Push(AsmView.SelectedInstructionAddr);
-      FJmpStack.Push(AsmView.RowToAddress(AsmView.CurrentVisibleRow, 0));
       ShowDisasmAtAddr(AJmpAddr);
     end;
     jsPopFromUndo:
@@ -393,7 +407,12 @@ begin
       Handled := True;
       if FJmpStack.Count = 0 then Exit;
       NewJmpAddr := FJmpStack.Pop;
-      ShowDisasmAtAddr(NewJmpAddr);
+      FLockPushToJmpStack := True;
+      try
+        ShowDisasmAtAddr(NewJmpAddr);
+      finally
+        FLockPushToJmpStack := False;
+      end;
       NewJmpAddr := FJmpStack.Pop;
       AsmView.FocusOnAddress(NewJmpAddr, ccmSelectRow);
     end;
@@ -477,6 +496,7 @@ begin
         FStackView.Frames.Clear;
         FStackView.Invalidate;
       end;
+      DoReset;
     end;
     adsFinished:
     begin
@@ -488,6 +508,7 @@ begin
         FDumpView.SetDataStream(nil, 0);
       if Assigned(FStackView) then
         FStackView.SetDataStream(nil, 0);
+      DoReset;
     end;
   end;
 end;
@@ -535,6 +556,7 @@ begin
   FAsmSelEnd := 0;
   FCacheListIndex := 0;
   FKnownFunctionAddrVA.Clear;
+  FJmpStack.Clear;
 end;
 
 procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
@@ -543,7 +565,7 @@ var
   AStackValue: Int64;
 begin
   AStackValue := 0;
-  if Debugger = nil then Exit;
+  if not CanWork then Exit;
   FStackStream.Stream.Position := AddrVA;
   FStackStream.Stream.ReadBuffer(AStackValue, Debugger.PointerSize);
   AComment := GetKnownFunctionAtAddr(AStackValue);
@@ -637,6 +659,11 @@ begin
   if Assigned(FAsmView) then
   begin
     try
+      if not FLockPushToJmpStack then
+      begin
+        FJmpStack.Push(FAsmView.SelectedInstructionAddr);
+        FJmpStack.Push(FAsmView.RowToAddress(FAsmView.CurrentVisibleRow, 0));
+      end;
       FAsmSelStart := 0;
       FAsmSelEnd := 0;
       if not FAsmView.IsAddrVisible(AddrVA) then
@@ -654,7 +681,7 @@ var
   RegData: TRegionData;
 begin
   if FDumpView = nil then Exit;
-  if (AddrVA = 0) and Assigned(FDebugger) then
+  if (AddrVA = 0) and CanWork then
     AddrVA := FDebugger.CurrentInstructionPoint;
   {$message 'чо бум делать если память не доступна?'}
   if not FDumpStream.Stream.QueryRegion(AddrVA, RegData) then Exit;
@@ -674,7 +701,7 @@ function TCpuViewCore.UpdateRegValue(RegID: Integer;
   ANewRegValue: UInt64): Boolean;
 begin
   Result := False;
-  if Assigned(FDebugger) and FDebugger.IsActive then
+  if CanWork then
   begin
     Result := FDebugger.UpdateRegValue(RegID, ANewRegValue);
     if Result and Assigned(FRegView) then

@@ -177,6 +177,7 @@ type
     function Count: Integer; override;
     function EmptyRow(RowIndex: Integer): Boolean; override;
     function InstructonPoint: UInt64; virtual; abstract;
+    function IsActiveJump(const Value: string): Boolean; virtual; abstract;
     function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; virtual; abstract;
     function RegCount(RowIndex: Integer): Integer; override;
     function RegData(RowIndex, ColIndex: Integer;

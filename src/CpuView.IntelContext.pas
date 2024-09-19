@@ -79,6 +79,7 @@ type
     constructor Create(AOwner: TComponent); override;
     procedure InitDefault; override;
     function InstructonPoint: UInt64; override;
+    function IsActiveJump(const Value: string): Boolean; override;
     function PointerSize: Integer; override;
     function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; override;
     function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; override;
@@ -877,6 +878,81 @@ end;
 function TIntelCpuContext.InstructonPoint: UInt64;
 begin
   Result := FContext.Rip;
+end;
+
+function TIntelCpuContext.IsActiveJump(const Value: string): Boolean;
+var
+  EFlags: Cardinal;
+  ZF, CF, SF, _OF: Boolean;
+begin
+  Result := False;
+
+  if Value.StartsWith('CALL') or Value.StartsWith('JMP') then
+    Exit(True);
+
+  EFlags := FContext.EFlags;
+  CF := EFlags and (1 shl 0) <> 0;
+  ZF := EFlags and (1 shl 6) <> 0;
+  SF := EFlags and (1 shl 7) <> 0;
+  _OF := EFlags and (1 shl 11) <> 0;
+
+  if ZF then
+  begin
+    if Value.StartsWith('JE') then Exit(True);
+    if Value.StartsWith('JZ') then Exit(True);
+  end
+  else
+  begin
+    if Value.StartsWith('JNE') then Exit(True);
+    if Value.StartsWith('JNZ') then Exit(True);
+  end;
+
+  if CF or ZF then
+  begin
+    if Value.StartsWith('JBE') then Exit(True);
+    if Value.StartsWith('JNA') then Exit(True);
+  end
+  else
+  begin
+    if Value.StartsWith('JA') then Exit(True);
+    if Value.StartsWith('JNBE') then Exit(True);
+  end;
+
+  if CF then
+  begin
+    if Value.StartsWith('JB') then Exit(True);
+    if Value.StartsWith('JNAE') then Exit(True);
+    if Value.StartsWith('JC') then Exit(True);
+  end
+  else
+  begin
+    if Value.StartsWith('JAE') then Exit(True);
+    if Value.StartsWith('JNB') then Exit(True);
+    if Value.StartsWith('JNC') then Exit(True);
+  end;
+
+  if not (SF or ZF) then
+  begin
+    if Value.StartsWith('JG') then Exit(True);
+    if Value.StartsWith('JNLE') then Exit(True);
+  end;
+
+  if SF = _OF then
+  begin
+    if Value.StartsWith('JGE') then Exit(True);
+    if Value.StartsWith('JNL') then Exit(True);
+  end
+  else
+  begin
+    if Value.StartsWith('JL') then Exit(True);
+    if Value.StartsWith('JNGE') then Exit(True);
+  end;
+
+  if (SF <> _OF) or ZF then
+  begin
+    if Value.StartsWith('JLE') then Exit(True);
+    if Value.StartsWith('JNG') then Exit(True);
+  end;
 end;
 
 function TIntelCpuContext.PointerSize: Integer;

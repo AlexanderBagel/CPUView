@@ -5,8 +5,8 @@ unit dlgCpuView;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
-  Menus, ComCtrls, ActnList, Generics.Collections,
+  LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
+  ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Generics.Collections,
 
   FWHexView,
   FWHexView.Actions,
@@ -207,6 +207,7 @@ type
     StackView: TStackView;
     StatusBar: TStatusBar;
     tabDump0: TTabSheet;
+    tmpZOrderLock: TTimer;
     ToolBar: TToolBar;
     tbStepIn: TToolButton;
     tbStepOut: TToolButton;
@@ -246,12 +247,14 @@ type
     procedure DumpViewSelectionChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormCreate(Sender: TObject);
+    procedure FormDeactivate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure pmRegSelectedPopup(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
       RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
     procedure RegViewSelectionChange(Sender: TObject);
     procedure StackViewSelectionChange(Sender: TObject);
+    procedure tmpZOrderLockTimer(Sender: TObject);
   private
     FCore: TCpuViewCore;
     FDbgGate: TCpuViewDebugGate;
@@ -266,9 +269,11 @@ type
   protected
     function ActiveDumpView: TDumpView;
     function ActiveViewIndex: Integer;
-    procedure DoCreate; virtual;
-    procedure DoDestroy; virtual;
+    procedure AfterDbgGateCreate; virtual; abstract;
+    procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
+    procedure LockZOrder;
+    procedure UnlockZOrder;
   public
     property Core: TCpuViewCore read FCore;
     property DbgGate: TCpuViewDebugGate read FDbgGate;
@@ -293,6 +298,7 @@ begin
   FCore := TCpuViewCore.Create;
   FDbgGate := TCpuViewDebugGate.Create(Self);
   FDbgGate.Context := GetContext;
+  AfterDbgGateCreate;
   FCore.Debugger := FDbgGate;
   FCore.AsmView := AsmView;
   FCore.RegView := RegView;
@@ -304,12 +310,20 @@ begin
   tbRunTillRet.ImageIndex := IDEImages.LoadImage('menu_stepout');
   tbStepIn.ImageIndex := IDEImages.LoadImage('menu_stepinto');
   tbStepOut.ImageIndex := IDEImages.LoadImage('menu_stepover');
-  DoCreate;
+end;
+
+procedure TfrmCpuView.FormDeactivate(Sender: TObject);
+begin
+  if tmpZOrderLock.Enabled then
+  begin
+    SetWindowPos(Handle, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE);
+    BringToFront;
+  end;
 end;
 
 procedure TfrmCpuView.FormDestroy(Sender: TObject);
 begin
-  DoDestroy;
+  BeforeDbgGateDestroy;
   FDbgGate.Context := nil;
   FCore.Free;
   FDbgGate.Free;
@@ -351,6 +365,11 @@ begin
   StackView.ReadDataAtSelStart(FStackSelectedValue, FDbgGate.PointerSize);
 end;
 
+procedure TfrmCpuView.tmpZOrderLockTimer(Sender: TObject);
+begin
+  UnlockZOrder;
+end;
+
 function TfrmCpuView.ActiveViewerSelectedValue: UInt64;
 begin
   Result := 0;
@@ -382,14 +401,17 @@ begin
     Exit(3);
 end;
 
-procedure TfrmCpuView.DoCreate;
+procedure TfrmCpuView.LockZOrder;
 begin
-
+  {$message 'Плохой вариант, всеже нужно делать патч, иначе окно так и будет закрываться другими IDE окнами'}
+  //FormStyle := fsStayOnTop;
+  tmpZOrderLock.Enabled := True;
 end;
 
-procedure TfrmCpuView.DoDestroy;
+procedure TfrmCpuView.UnlockZOrder;
 begin
-
+  tmpZOrderLock.Enabled := False;
+  //FormStyle := fsNormal;
 end;
 
 procedure TfrmCpuView.ActionRegModifyUpdate(Sender: TObject);
@@ -516,7 +538,6 @@ end;
 procedure TfrmCpuView.AsmViewSelectionChange(Sender: TObject);
 begin
   FAsmViewSelectedAddr := AsmView.SelectedInstructionAddr;
-
 end;
 
 procedure TfrmCpuView.acShowInDumpExecute(Sender: TObject);
@@ -615,11 +636,13 @@ end;
 
 procedure TfrmCpuView.acDbgRunTilReturnExecute(Sender: TObject);
 begin
+  LockZOrder;
   DbgGate.TraceTilReturn;
 end;
 
 procedure TfrmCpuView.acDbgRunToExecute(Sender: TObject);
 begin
+  LockZOrder;
   DbgGate.TraceTo(FAsmViewSelectedAddr);
 end;
 
@@ -636,11 +659,13 @@ end;
 
 procedure TfrmCpuView.acDbgStepInExecute(Sender: TObject);
 begin
+  LockZOrder;
   DbgGate.TraceIn;
 end;
 
 procedure TfrmCpuView.acDbgStepOutExecute(Sender: TObject);
 begin
+  LockZOrder;
   DbgGate.TraceOut;
 end;
 
