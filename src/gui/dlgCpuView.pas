@@ -45,6 +45,9 @@ type
     acRegModifyToggle: TAction;
     acRegModifyZero: TAction;
     acRegModifyNewValue: TAction;
+    acAsmReturnToIP: TAction;
+    acAsmSetNewIP: TAction;
+    acAsmShowSource: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -91,6 +94,9 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miAsmSource: TMenuItem;
+    miAsmCurrentIP: TMenuItem;
+    miAsmSetNewIP: TMenuItem;
     miStackFollowRsp: TMenuItem;
     miStackGoto: TMenuItem;
     miDumpGoto: TMenuItem;
@@ -166,7 +172,7 @@ type
     miDumpDMSep2: TMenuItem;
     miDumpDMSep1: TMenuItem;
     miDumpSep1: TMenuItem;
-    miAsmSep1: TMenuItem;
+    miAsmSep2: TMenuItem;
     pnDumpStack: TPanel;
     pmDump: TPopupMenu;
     pmAsm: TPopupMenu;
@@ -200,7 +206,8 @@ type
     pmHint: TPopupMenu;
     RegView: TRegView;
     miRegSep1: TMenuItem;
-    miAsmSep2: TMenuItem;
+    miAsmSep3: TMenuItem;
+    miAsmSep1: TMenuItem;
     splitAsmDumps: TSplitter;
     splitDumpStack: TSplitter;
     splitAsmReg: TSplitter;
@@ -216,10 +223,14 @@ type
     tbSep2: TToolButton;
     tbRunTillRet: TToolButton;
     tbRunTo: TToolButton;
+    procedure acAsmReturnToIPExecute(Sender: TObject);
+    procedure acAsmReturnToIPUpdate(Sender: TObject);
+    procedure acAsmSetNewIPExecute(Sender: TObject);
+    procedure acAsmShowSourceExecute(Sender: TObject);
+    procedure acAsmShowSourceUpdate(Sender: TObject);
     procedure acDbgRunTilReturnExecute(Sender: TObject);
     procedure acDbgRunToExecute(Sender: TObject);
     procedure acDbgRunToUpdate(Sender: TObject);
-    procedure acDbgRunUpdate(Sender: TObject);
     procedure acDbgStepInExecute(Sender: TObject);
     procedure acDbgStepOutExecute(Sender: TObject);
     procedure acDbgToggleBpExecute(Sender: TObject);
@@ -242,7 +253,6 @@ type
     procedure ActionRegModifyUpdate(Sender: TObject);
     procedure acViewFitColumnToBestSizeExecute(Sender: TObject);
     procedure acViewGotoExecute(Sender: TObject);
-    procedure acViewGotoUpdate(Sender: TObject);
     procedure AsmViewSelectionChange(Sender: TObject);
     procedure DumpViewSelectionChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -255,6 +265,7 @@ type
     procedure RegViewSelectionChange(Sender: TObject);
     procedure StackViewSelectionChange(Sender: TObject);
     procedure tmpZOrderLockTimer(Sender: TObject);
+    procedure DefaultActionUpdate(Sender: TObject);
   private
     FCore: TCpuViewCore;
     FDbgGate: TCpuViewDebugGate;
@@ -262,9 +273,10 @@ type
     FContextRegValue,
     FDumpSelectedValue,
     FStackSelectedValue: UInt64;
-    FContextRegName: string;
+    FContextRegName, FSourcePath: string;
     FContextRegister: TRegister;
     FContextRegisterParam: TRegParam;
+    FSourceLine: Integer;
     function ActiveViewerSelectedValue: UInt64;
   protected
     function ActiveDumpView: TDumpView;
@@ -287,7 +299,8 @@ implementation
 uses
   Math,
   dlgInputBox,
-  IDEImagesIntf;
+  IDEImagesIntf,
+  BaseDebugManager;
 
 {$R *.lfm}
 
@@ -368,6 +381,11 @@ end;
 procedure TfrmCpuView.tmpZOrderLockTimer(Sender: TObject);
 begin
   UnlockZOrder;
+end;
+
+procedure TfrmCpuView.DefaultActionUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
 end;
 
 function TfrmCpuView.ActiveViewerSelectedValue: UInt64;
@@ -468,11 +486,6 @@ begin
           ActiveDumpView.FocusOnAddress(NewAddress, ccmSetNewSelection);
         end;
       end;
-end;
-
-procedure TfrmCpuView.acViewGotoUpdate(Sender: TObject);
-begin
-  TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
 end;
 
 procedure TfrmCpuView.FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -640,6 +653,35 @@ begin
   DbgGate.TraceTilReturn;
 end;
 
+procedure TfrmCpuView.acAsmShowSourceUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled :=
+    (DbgGate.DebugState = adsPaused) and
+    DbgGate.GetSourceLine(FAsmViewSelectedAddr, FSourcePath, FSourceLine) and
+    (FSourceLine > 0);
+end;
+
+procedure TfrmCpuView.acAsmShowSourceExecute(Sender: TObject);
+begin
+  DebugBoss.JumpToUnitSource(FSourcePath, FSourceLine, False);
+end;
+
+procedure TfrmCpuView.acAsmReturnToIPExecute(Sender: TObject);
+begin
+  Core.ShowDisasmAtAddr(DbgGate.CurrentInstructionPoint);
+end;
+
+procedure TfrmCpuView.acAsmReturnToIPUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := (DbgGate.DebugState = adsPaused) and
+    (DbgGate.CurrentInstructionPoint <> FAsmViewSelectedAddr);
+end;
+
+procedure TfrmCpuView.acAsmSetNewIPExecute(Sender: TObject);
+begin
+  Core.UpdateRegValue(DbgGate.Context.InstructonPointID, FAsmViewSelectedAddr);
+end;
+
 procedure TfrmCpuView.acDbgRunToExecute(Sender: TObject);
 begin
   LockZOrder;
@@ -650,11 +692,6 @@ procedure TfrmCpuView.acDbgRunToUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled := (DbgGate.DebugState = adsPaused) and
     Core.AddrInAsm(FAsmViewSelectedAddr);
-end;
-
-procedure TfrmCpuView.acDbgRunUpdate(Sender: TObject);
-begin
-  TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
 end;
 
 procedure TfrmCpuView.acDbgStepInExecute(Sender: TObject);

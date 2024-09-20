@@ -6,13 +6,8 @@
 
 interface
 
-{$message 'asm Подсветка активных джампов'}
-{$message 'asm Подсветка адреса перехода заливкой бэкграунда'}
-{$message 'Добавить в скрипт поддержку "bp user32.MessageBoxW"'}
-{$message 'asm добавить View Source'}
-{$message 'asm добавить NEW EIP/RIP'}
-
-{
+{ TODO:
+Добавить в скрипт поддержку "bp user32.MessageBoxW"
 Настройки:
 отображать имена функций вместо адресов
 показывать опкоды инструкций
@@ -105,6 +100,7 @@ type
     procedure RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
       var AComment: string);
     procedure RefreshView(Forced: Boolean = False);
+    procedure RefreshAsmView(Forced: Boolean);
     procedure ResetCache;
     procedure StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
       var AComment: string);
@@ -519,15 +515,7 @@ var
 begin
   if (FDebugger = nil) or not FDebugger.IsActive then Exit;
   FLastCtx := FDebugger.Context;
-  if Assigned(FAsmView) then
-  begin
-    FAsmView.AddressMode := GetAddrMode;
-    FAsmView.InstructionPoint := FDebugger.CurrentInstructionPoint;
-    FAsmView.CurrentIPIsActiveJmp := FDebugger.IsActiveJmp;
-    if Forced or not FAsmView.IsAddrVisible(FAsmView.InstructionPoint) then
-      BuildAsmWindow(FAsmView.InstructionPoint);
-    FAsmView.FocusOnAddress(FAsmView.InstructionPoint, ccmSelectRow);
-  end;
+  RefreshAsmView(Forced);
   if Assigned(FRegView) then
     FRegView.Context := FLastCtx;
   if Assigned(FStackView) then
@@ -545,6 +533,19 @@ begin
   begin
     FDumpView.AddressMode := GetAddrMode;
     ShowDumpAtAddr(FDumpLastAddrVA);
+  end;
+end;
+
+procedure TCpuViewCore.RefreshAsmView(Forced: Boolean);
+begin
+  if Assigned(FAsmView) then
+  begin
+    FAsmView.AddressMode := GetAddrMode;
+    FAsmView.InstructionPoint := FDebugger.CurrentInstructionPoint;
+    FAsmView.CurrentIPIsActiveJmp := FDebugger.IsActiveJmp;
+    if Forced or not FAsmView.IsAddrVisible(FAsmView.InstructionPoint) then
+      BuildAsmWindow(FAsmView.InstructionPoint);
+    FAsmView.FocusOnAddress(FAsmView.InstructionPoint, ccmSelectRow);
   end;
 end;
 
@@ -706,6 +707,7 @@ begin
     Result := FDebugger.UpdateRegValue(RegID, ANewRegValue);
     if Result and Assigned(FRegView) then
       FRegView.RefreshSelected;
+    RefreshAsmView(False);
   end;
 end;
 

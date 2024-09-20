@@ -79,8 +79,10 @@ type
     constructor Create(AOwner: TComponent); override;
     procedure InitDefault; override;
     function InstructonPoint: UInt64; override;
+    function InstructonPointID: Integer; override;
     function IsActiveJump(const Value: string): Boolean; override;
     function PointerSize: Integer; override;
+    function QueryRegIndexByName(const RegName: string; out Index: Integer): Boolean; override;
     function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; override;
     function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; override;
     function RegSetValueAtIndex(RegID, Index: Integer): string; override;
@@ -880,6 +882,11 @@ begin
   Result := FContext.Rip;
 end;
 
+function TIntelCpuContext.InstructonPointID: Integer;
+begin
+  Result := 8;
+end;
+
 function TIntelCpuContext.IsActiveJump(const Value: string): Boolean;
 var
   EFlags: Cardinal;
@@ -965,8 +972,8 @@ begin
   end;
 end;
 
-function TIntelCpuContext.QueryRegValueByName(const RegName: string;
-  out RegValue: UInt64): Boolean;
+function TIntelCpuContext.QueryRegIndexByName(const RegName: string; out
+  Index: Integer): Boolean;
 const
   RegsBuff: array[0..69] of string = (
     'RAX', 'EAX', 'AX', 'AH', 'AL',
@@ -1006,6 +1013,23 @@ const
     15, 15, 15, 15,
     16, 16, 16, 16
   );
+var
+  I: Integer;
+begin
+  for I := 0 to Length(RegsBuff) - 1 do
+    if AnsiSameText(RegName, RegsBuff[I]) then
+    begin
+      Result := True;
+      Index := RegIndex[I];
+      Exit;
+    end;
+  Result := False;
+  Index := -1;
+end;
+
+function TIntelCpuContext.QueryRegValueByName(const RegName: string;
+  out RegValue: UInt64): Boolean;
+const
   ValueType: array[0..69] of Integer = (
     0, 1, 2, 3, 4,
     0, 1, 2, 3, 4,
@@ -1026,20 +1050,18 @@ const
     0, 1, 2, 4
   );
 var
-  I: Integer;
+  Index: Integer;
 begin
-  for I := 0 to Length(RegsBuff) - 1 do
-    if AnsiSameText(RegName, RegsBuff[I]) then
-    begin
-      Result := GetRegValue(RegIndex[I], RegValue);
-      case ValueType[I] of
-        1: RegValue := Cardinal(RegValue);
-        2: RegValue := Word(RegValue);
-        3: RegValue := Byte(RegValue shr 8);
-        4: RegValue := Byte(RegValue);
-      end;
-      Exit;
+  if QueryRegIndexByName(RegName, Index) and GetRegValue(Index, RegValue) then
+  begin
+    case ValueType[Index] of
+      1: RegValue := Cardinal(RegValue);
+      2: RegValue := Word(RegValue);
+      3: RegValue := Byte(RegValue shr 8);
+      4: RegValue := Byte(RegValue);
     end;
+    Exit;
+  end;
   RegValue := 0;
   Result := False;    
 end;

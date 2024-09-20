@@ -113,6 +113,7 @@ type
     FPreviosSrcLine: Integer;
     FPreviosSrcFuncName, FPreviosSrcFileName: string;
     FLockTimeOut: Int64;
+    FTemporaryIP: UInt64;
     procedure BreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
     function CurrentInstruction: TInstruction;
@@ -124,6 +125,8 @@ type
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
+  protected
+    procedure UpdateContext; override;
   public
     constructor Create(ACpuViewForm: TCustomForm); override;
     destructor Destroy; override;
@@ -133,6 +136,8 @@ type
     function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer): TList<TInstruction>; override;
     function IsActive: Boolean; override;
     function IsActiveJmp: Boolean; override;
+    function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
+      out ASourceLine: Integer): Boolean; override;
     procedure Pause; override;
     function PointerSize: Integer; override;
     function ProcessID: Cardinal; override;
@@ -140,6 +145,7 @@ type
     function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; override;
     procedure Run; override;
     procedure Stop; override;
+    procedure SetNewIP(AddrVA: UInt64); override;
     procedure ToggleBreakPoint(AddrVA: UInt64); override;
     function ThreadStackLimit: TStackLimit; override;
     function ThreadID: Cardinal; override;
@@ -441,6 +447,7 @@ end;
 
 procedure TCpuViewDebugGate.Reset;
 begin
+  FTemporaryIP := 0;
   if Assigned(FDebugger) then
   begin
     //FDebugger.OnActivateSourceEditor := nil;
@@ -490,6 +497,12 @@ begin
     end;
   end;
   Reset;
+end;
+
+procedure TCpuViewDebugGate.UpdateContext;
+begin
+  inherited UpdateContext;
+  FTemporaryIP := 0;
 end;
 
 constructor TCpuViewDebugGate.Create(ACpuViewForm: TCustomForm);
@@ -546,7 +559,12 @@ end;
 function TCpuViewDebugGate.CurrentInstructionPoint: UInt64;
 begin
   if Assigned(FDebugger) and (FDebugger.State = dsPause) then
-    Result := FDebugger.GetLocation.Address
+  begin
+    if FTemporaryIP <> 0 then
+      Result := FTemporaryIP
+    else
+      Result := FDebugger.GetLocation.Address
+  end
   else
     Result := 0;
 end;
@@ -657,6 +675,38 @@ begin
   Result := Context.IsActiveJump(Inst.AsString);
 end;
 
+function TCpuViewDebugGate.GetSourceLine(AddrVA: Int64; out
+  ASourcePath: string; out ASourceLine: Integer): Boolean;
+var
+  Sym: TFpSymbol;
+  PasSource: TCodeBuffer;
+  Editor: TSourceEditorInterface;
+begin
+  ASourcePath := '';
+  ASourceLine := 0;
+  if FDbgController = nil then Exit;
+  Sym := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
+  if Sym = nil then Exit;
+  try
+    ASourcePath := Sym.FileName;
+    ASourceLine := Sym.Line;
+  finally
+    Sym.ReleaseReference;
+  end;
+  if ASourceLine <= 0 then Exit;
+  if DebugBoss.GetFullFilename(ASourcePath, False) then
+  begin
+    PasSource := CodeToolBoss.LoadFile(ASourcePath, True, False);
+    if Assigned(PasSource) then
+    begin
+      Editor := SourceEditorManagerIntf.SourceEditorIntfWithFilename(ASourcePath);
+      if Editor <> nil then
+        ASourceLine := Editor.DebugToSourceLine(ASourceLine);
+      Result := ASourceLine > 0;
+    end;
+  end;
+end;
+
 procedure TCpuViewDebugGate.Pause;
 begin
   FDebugger.Pause;
@@ -760,6 +810,11 @@ end;
 procedure TCpuViewDebugGate.Stop;
 begin
   FDebugger.Stop;
+end;
+
+procedure TCpuViewDebugGate.SetNewIP(AddrVA: UInt64);
+begin
+  UpdateRegValue(Context.InstructonPointID, AddrVA);
 end;
 
 procedure TCpuViewDebugGate.ToggleBreakPoint(AddrVA: UInt64);
@@ -872,6 +927,8 @@ begin
     WorkQueue.WaitForItem(WorkItem, True);
     Result := WorkItem.ThreadResult;
     WorkItem.DecRef;
+    if Result and (RegID = Context.InstructonPointID) then
+      FTemporaryIP := ANewRegValue;
   end;
 end;
 

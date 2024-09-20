@@ -65,6 +65,8 @@ type
     procedure FillThreadStackFrames(ALimit: TStackLimit;
       AddrStack, AddrFrame: UInt64; AStream: TRemoteAbstractStream;
       AFrames: TList<TStackFrame>); virtual;
+    function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
+      out ASourceLine: Integer): Boolean; virtual; abstract;
     procedure Pause; virtual; abstract;
     function PointerSize: Integer; virtual; abstract;
     function ProcessID: Cardinal; virtual; abstract;
@@ -72,6 +74,7 @@ type
     function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; virtual; abstract;
     procedure Run; virtual; abstract;
     procedure Stop; virtual; abstract;
+    procedure SetNewIP(AddrVA: UInt64); virtual; abstract;
     function ThreadID: Cardinal; virtual; abstract;
     function ThreadStackLimit: TStackLimit; virtual; abstract;
     procedure ToggleBreakPoint(AddrVA: UInt64); virtual; abstract;

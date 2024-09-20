@@ -481,7 +481,7 @@ object frmCpuView: TfrmCpuView
       Category = 'StackView Actions'
       Caption = 'Follow StackPoint'
       OnExecute = acStackFollowRSPExecute
-      OnUpdate = acShowInDumpUpdate
+      OnUpdate = acShowInStackUpdate
     end
     object acDMHex8: THexViewByteViewModeAction
       Category = 'Display Mode'
@@ -598,7 +598,7 @@ object frmCpuView: TfrmCpuView
       Hint = 'Step Into'
       ShortCut = 118
       OnExecute = acDbgStepInExecute
-      OnUpdate = acDbgRunUpdate
+      OnUpdate = DefaultActionUpdate
     end
     object acDbgStepOut: TAction
       Category = 'Debugger'
@@ -606,7 +606,7 @@ object frmCpuView: TfrmCpuView
       Hint = 'Step Over'
       ShortCut = 119
       OnExecute = acDbgStepOutExecute
-      OnUpdate = acDbgRunUpdate
+      OnUpdate = DefaultActionUpdate
     end
     object acDbgRunTilReturn: TAction
       Category = 'Debugger'
@@ -614,7 +614,7 @@ object frmCpuView: TfrmCpuView
       Hint = 'Step Out'
       ShortCut = 16502
       OnExecute = acDbgRunTilReturnExecute
-      OnUpdate = acDbgRunUpdate
+      OnUpdate = DefaultActionUpdate
     end
     object acDbgRunTo: TAction
       Category = 'Debugger'
@@ -675,7 +675,25 @@ object frmCpuView: TfrmCpuView
       Category = 'View Actions'
       Caption = 'Go to Address...'
       OnExecute = acViewGotoExecute
-      OnUpdate = acViewGotoUpdate
+      OnUpdate = DefaultActionUpdate
+    end
+    object acAsmReturnToIP: TAction
+      Category = 'AsmView Actions'
+      Caption = 'Return to Current IP'
+      OnExecute = acAsmReturnToIPExecute
+      OnUpdate = acAsmReturnToIPUpdate
+    end
+    object acAsmSetNewIP: TAction
+      Category = 'AsmView Actions'
+      Caption = 'Set New IP'
+      OnExecute = acAsmSetNewIPExecute
+      OnUpdate = DefaultActionUpdate
+    end
+    object acAsmShowSource: TAction
+      Category = 'AsmView Actions'
+      Caption = 'View Source'
+      OnExecute = acAsmShowSourceExecute
+      OnUpdate = acAsmShowSourceUpdate
     end
   end
   object pmStack: TPopupMenu
@@ -852,10 +870,22 @@ object frmCpuView: TfrmCpuView
     object miAsmShowInStack: TMenuItem
       Action = acShowInStack
     end
+    object miAsmCurrentIP: TMenuItem
+      Action = acAsmReturnToIP
+    end
+    object miAsmSource: TMenuItem
+      Action = acAsmShowSource
+    end
     object miAsmGoto: TMenuItem
       Action = acViewGoto
     end
     object miAsmSep1: TMenuItem
+      Caption = '-'
+    end
+    object miAsmSetNewIP: TMenuItem
+      Action = acAsmSetNewIP
+    end
+    object miAsmSep2: TMenuItem
       Caption = '-'
     end
     object miAsmCopyAddr: TMenuItem
@@ -864,7 +894,7 @@ object frmCpuView: TfrmCpuView
     object miAsmCopy: TMenuItem
       Action = acCopy
     end
-    object miAsmSep2: TMenuItem
+    object miAsmSep3: TMenuItem
       Caption = '-'
     end
     object miAsmFit: TMenuItem
