@@ -75,6 +75,7 @@ const
   xmlSelectInactiveColor = 'selectInactive';
   xmlTextColor = 'text';
   xmlTextCommentColor = 'textComment';
+  xmlActiveJumpColor = 'asmActiveJmp';
   xmlArrowDownColor = 'asmArrowDown';
   xmlArrowDownSelectedColor = 'asmArrowDownSelected';
   xmlArrowUpColor = 'asmArrowUp';
@@ -104,9 +105,13 @@ const
   xmlJmpColor = 'asmJmp';
   xmlKernelColor = 'asmKernel';
   xmlNopColor = 'asmNop';
+  xmlAddrPCColor = 'stkAddrPC';
+  xmlAddrPCFontColor = 'stkAddrPCFont';
   xmlEmptyStackColor = 'stkEmpty';
   xmlFrameColor = 'stkFrame';
   xmlFrameActiveColor = 'stkFrameActive';
+  xmlStackPointColor = 'stkStackPoint';
+  xmlStackPointFontColor = 'stkStackPointFont';
   xmlHintColor = 'regHint';
   xmlRegColor = 'regReg';
   xmlValueColor = 'regValue';
@@ -411,6 +416,7 @@ begin
   // настройки цвета для дизассемблера
   if not VarIsNull(GetNodeAttr(Root, xmlArrowDownColor)) then
   begin
+    CmAsm.ActiveJmpColor := GetNodeAttr(Root, xmlActiveJumpColor);
     CmAsm.ArrowDownColor := GetNodeAttr(Root, xmlArrowDownColor);
     CmAsm.ArrowDownSelectedColor := GetNodeAttr(Root, xmlArrowDownSelectedColor);
     CmAsm.ArrowUpColor := GetNodeAttr(Root, xmlArrowUpColor);
@@ -454,9 +460,13 @@ begin
   // настройки цвета для стека
   if not VarIsNull(GetNodeAttr(Root, xmlFrameColor)) then
   begin
+    CmStack.AddrPCColor := GetNodeAttr(Root, xmlAddrPCColor);
+    CmStack.AddrPCFontColor := GetNodeAttr(Root, xmlAddrPCFontColor);
     CmStack.EmptyStackColor := GetNodeAttr(Root, xmlEmptyStackColor);
     CmStack.FrameColor := GetNodeAttr(Root, xmlFrameColor);
     CmStack.FrameActiveColor := GetNodeAttr(Root, xmlFrameActiveColor);
+    CmStack.StackPointColor := GetNodeAttr(Root, xmlStackPointColor);
+    CmStack.StackPointFontColor := GetNodeAttr(Root, xmlStackPointFontColor);
   end;
 end;
 
@@ -604,6 +614,7 @@ begin
   CmAsm := FAsmView.ColorMap;
   if CmAsm.ColorMode = cmCustom then
   begin
+    SetNodeAttr(Root, xmlActiveJumpColor, CmAsm.ActiveJmpColor);
     SetNodeAttr(Root, xmlArrowDownColor, CmAsm.ArrowDownColor);
     SetNodeAttr(Root, xmlArrowDownSelectedColor, CmAsm.ArrowDownSelectedColor);
     SetNodeAttr(Root, xmlArrowUpColor, CmAsm.ArrowUpColor);
@@ -647,9 +658,14 @@ begin
   CmStack := FStackView.ColorMap;
   if CmStack.ColorMode = cmCustom then
   begin
+    SetNodeAttr(Root, xmlAddrPCColor, CmStack.AddrPCColor);
+    SetNodeAttr(Root, xmlAddrPCFontColor, CmStack.AddrPCFontColor);
+    SetNodeAttr(Root, xmlEmptyStackColor, CmStack.EmptyStackColor);
     SetNodeAttr(Root, xmlEmptyStackColor, CmStack.EmptyStackColor);
     SetNodeAttr(Root, xmlFrameColor, CmStack.FrameColor);
     SetNodeAttr(Root, xmlFrameActiveColor, CmStack.FrameActiveColor);
+    SetNodeAttr(Root, xmlStackPointColor, CmStack.StackPointColor);
+    SetNodeAttr(Root, xmlStackPointFontColor, CmStack.StackPointFontColor);
   end;
 end;
 

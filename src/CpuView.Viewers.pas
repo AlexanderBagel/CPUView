@@ -53,6 +53,7 @@ type
 
   TAsmColorMap = class(TMapViewColors)
   private
+    FActiveJmpColor: TColor;
     FBreakPointActiveColor: TColor;
     FBreakPointActiveFontColor: TColor;
     FBreakPointColor: TColor;
@@ -73,6 +74,7 @@ type
     FRIPMarkColor: TColor;
     FSourceLineColor: TColor;
     FSizePfxColor: TColor;
+    procedure SetActiveJmpColor(const Value: TColor);
     procedure SetBreakPointActiveColor(AValue: TColor);
     procedure SetBreakPointActiveFontColor(AValue: TColor);
     procedure SetBreakPointColor(AValue: TColor);
@@ -97,26 +99,27 @@ type
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
   published
-    property BreakPointActiveColor: TColor read FBreakPointActiveColor write SetBreakPointActiveColor;
-    property BreakPointActiveFontColor: TColor read FBreakPointActiveFontColor write SetBreakPointActiveFontColor;
-    property BreakPointColor: TColor read FBreakPointColor write SetBreakPointColor;
-    property BreakPointDisabledColor: TColor read FBreakPointDisabledColor write SetBreakPointDisabledColor;
-    property BreakPointDisabledFontColor: TColor read FBreakPointDisabledFontColor write SetBreakPointDisabledFontColor;
-    property BreakPointFontColor: TColor read FBreakPointFontColor write SetBreakPointFontColor;
-    property InstructionColor: TColor read FInstructionColor write SetInstructionColor;
-    property JmpColor: TColor read FJmpColor write SetJmpColor;
-    property KernelColor: TColor read FKernelColor write SetKernelColor;
-    property NopColor: TColor read FNopColor write SetNopColor;
-    property NumberColor: TColor read FNumberColor write SetNumberColor;
-    property PrefixColor: TColor read FPrefixColor write SetPrefixColor;
-    property RegColor: TColor read FRegColor write SetRegColor;
-    property RegHighlightBackColor: TColor read FRegHighlightBackColor write SetRegHighlightBackColor;
-    property RegHighlightFontColor: TColor read FRegHighlightFontColor write SetRegHighlightFontColor;
-    property RIPBackgroundColor: TColor read FRIPBackgroundColor write SetRIPBackgroundColor;
-    property RIPBackgroundFontColor: TColor read FRIPBackgroundFontColor write SetRIPBackgroundFontColor;
-    property RIPMarkColor: TColor read FRIPMarkColor write SetRIPMarkColor;
-    property SizePfxColor: TColor read FSizePfxColor write SetSizePfxColor;
-    property SourceLineColor: TColor read FSourceLineColor write SetSourceLineColor;
+    property ActiveJmpColor: TColor read FActiveJmpColor write SetActiveJmpColor;
+    property BreakPointActiveColor: TColor read FBreakPointActiveColor write SetBreakPointActiveColor stored IsColorStored;
+    property BreakPointActiveFontColor: TColor read FBreakPointActiveFontColor write SetBreakPointActiveFontColor stored IsColorStored;
+    property BreakPointColor: TColor read FBreakPointColor write SetBreakPointColor stored IsColorStored;
+    property BreakPointDisabledColor: TColor read FBreakPointDisabledColor write SetBreakPointDisabledColor stored IsColorStored;
+    property BreakPointDisabledFontColor: TColor read FBreakPointDisabledFontColor write SetBreakPointDisabledFontColor stored IsColorStored;
+    property BreakPointFontColor: TColor read FBreakPointFontColor write SetBreakPointFontColor stored IsColorStored;
+    property InstructionColor: TColor read FInstructionColor write SetInstructionColor stored IsColorStored;
+    property JmpColor: TColor read FJmpColor write SetJmpColor stored IsColorStored;
+    property KernelColor: TColor read FKernelColor write SetKernelColor stored IsColorStored;
+    property NopColor: TColor read FNopColor write SetNopColor stored IsColorStored;
+    property NumberColor: TColor read FNumberColor write SetNumberColor stored IsColorStored;
+    property PrefixColor: TColor read FPrefixColor write SetPrefixColor stored IsColorStored;
+    property RegColor: TColor read FRegColor write SetRegColor stored IsColorStored;
+    property RegHighlightBackColor: TColor read FRegHighlightBackColor write SetRegHighlightBackColor stored IsColorStored;
+    property RegHighlightFontColor: TColor read FRegHighlightFontColor write SetRegHighlightFontColor stored IsColorStored;
+    property RIPBackgroundColor: TColor read FRIPBackgroundColor write SetRIPBackgroundColor stored IsColorStored;
+    property RIPBackgroundFontColor: TColor read FRIPBackgroundFontColor write SetRIPBackgroundFontColor stored IsColorStored;
+    property RIPMarkColor: TColor read FRIPMarkColor write SetRIPMarkColor stored IsColorStored;
+    property SizePfxColor: TColor read FSizePfxColor write SetSizePfxColor stored IsColorStored;
+    property SourceLineColor: TColor read FSourceLineColor write SetSourceLineColor stored IsColorStored;
   end;
 
   TAsmTextMertics = class(TFixedHexByteTextMetric)
@@ -372,19 +375,31 @@ type
 
   TStackColorMap = class(THexViewColorMap)
   private
+    FAddrPCColor: TColor;
+    FAddrPCFontColor: TColor;
+    FEmptyStackColor: TColor;
     FFrameColor: TColor;
     FFrameActiveColor: TColor;
-    FEmptyStackColor: TColor;
+    FStackPointFontColor: TColor;
+    FStackPointColor: TColor;
+    procedure SetAddrPCColor(const Value: TColor);
+    procedure SetAddrPCFontColor(const Value: TColor);
+    procedure SetEmptyStackColor(const Value: TColor);
     procedure SetFrameColor(const Value: TColor);
     procedure SetFrameActiveColor(const Value: TColor);
-    procedure SetEmptyStackColor(const Value: TColor);
+    procedure SetStackPointColor(const Value: TColor);
+    procedure SetStackPointFontColor(const Value: TColor);
   protected
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
   published
-    property EmptyStackColor: TColor read FEmptyStackColor write SetEmptyStackColor;
-    property FrameColor: TColor read FFrameColor write SetFrameColor;
-    property FrameActiveColor: TColor read FFrameActiveColor write SetFrameActiveColor;
+    property AddrPCColor: TColor read FAddrPCColor write SetAddrPCColor stored IsColorStored;
+    property AddrPCFontColor: TColor read FAddrPCFontColor write SetAddrPCFontColor stored IsColorStored;
+    property EmptyStackColor: TColor read FEmptyStackColor write SetEmptyStackColor stored IsColorStored;
+    property FrameColor: TColor read FFrameColor write SetFrameColor stored IsColorStored;
+    property FrameActiveColor: TColor read FFrameActiveColor write SetFrameActiveColor stored IsColorStored;
+    property StackPointColor: TColor read FStackPointColor write SetStackPointColor stored IsColorStored;
+    property StackPointFontColor: TColor read FStackPointFontColor write SetStackPointFontColor stored IsColorStored;
   end;
 
   TCustomStackView = class;
@@ -561,10 +576,10 @@ type
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
   published
-    property HintColor: TColor read FHintColor write SetHintColor;
-    property RegColor: TColor read FRegColor write SetRegColor;
-    property ValueColor: TColor read FValueColor write SetValueColor;
-    property ValueModifiedColor: TColor read FValueModifiedColor write SetValueModifiedColor;
+    property HintColor: TColor read FHintColor write SetHintColor stored IsColorStored;
+    property RegColor: TColor read FRegColor write SetRegColor stored IsColorStored;
+    property ValueColor: TColor read FValueColor write SetValueColor stored IsColorStored;
+    property ValueModifiedColor: TColor read FValueModifiedColor write SetValueModifiedColor stored IsColorStored;
   end;
 
   TOnSelectedContextPopupEvent = procedure(Sender: TObject;
@@ -684,12 +699,33 @@ implementation
 procedure TAsmColorMap.InitDarkMode;
 begin
   inherited;
-
+  FActiveJmpColor := $7884F8;
+  FBreakPointActiveColor := $AA;
+  FBreakPointActiveFontColor := clWhite;
+  FBreakPointColor := $ADB0FF;
+  FBreakPointDisabledColor := $A3FCFF;
+  FBreakPointDisabledFontColor := 0;
+  FBreakPointFontColor := 0;
+  FInstructionColor := $F6A289;
+  FJmpColor := $7884F8;
+  FKernelColor := $6658FF;
+  FNopColor := $A8A8A8;
+  FNumberColor := $7884F8;
+  FPrefixColor := $F1F1F1;
+  FRegColor := $F694B7;
+  FRegHighlightBackColor := $AA;
+  FRegHighlightFontColor := clWhite;
+  FRIPBackgroundColor := $009D116C;
+  FRIPBackgroundFontColor := clWhite;
+  FRIPMarkColor := clWhite;
+  FSizePfxColor := $C9FFE8;
+  FSourceLineColor := $A0A0A0;
 end;
 
 procedure TAsmColorMap.InitLightMode;
 begin
   inherited;
+  FActiveJmpColor := clRed;
   FBreakPointActiveColor := clRed;
   FBreakPointActiveFontColor := clWhite;
   FBreakPointColor := $ADB0FF;
@@ -726,6 +762,15 @@ begin
   if BreakPointColor <> AValue then
   begin
     FBreakPointColor := AValue;
+    DoChange;
+  end;
+end;
+
+procedure TAsmColorMap.SetActiveJmpColor(const Value: TColor);
+begin
+  if ActiveJmpColor <> Value then
+  begin
+    FActiveJmpColor := Value;
     DoChange;
   end;
 end;
@@ -1020,7 +1065,7 @@ begin
     Param.LineIndent := TCustomAsmView(Owner).ToDpi(4);
     Param.LineVerticalMargin := DblSize(SplitMargin);
     Param.LineWidth := 1;
-    Param.LineColor := clRed;
+    Param.LineColor := TAsmColorMap(ColorMap).ActiveJmpColor;
     Param.Offset := Offset;
     if ctAddress in Columns then
       Inc(Param.Offset.X, ColumnWidth[ctAddress]);
@@ -1041,7 +1086,7 @@ begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font.Color := AsmView.ColorMap.RIPMarkColor;
   OffsetRect(R, 0, -1 + (R.Height - RowHeight) div 2);
-  DrawText(ACanvas.Handle, PChar('EIP'), -1, R, 0);
+  DrawText(ACanvas.Handle, PChar('IP'), -1, R, 0);
 end;
 
 { TCustomAsmView }
@@ -1419,15 +1464,43 @@ end;
 procedure TStackColorMap.InitDarkMode;
 begin
   inherited;
-
+  FAddrPCColor := $009BF18D;
+  FAddrPCFontColor := clBlack;
+  FEmptyStackColor := $999999;
+  FFrameColor := $FF94A0;
+  FFrameActiveColor := $7884F8;
+  FStackPointColor := $009D116C;
+  FStackPointFontColor := clWhite;
 end;
 
 procedure TStackColorMap.InitLightMode;
 begin
   inherited;
+  FAddrPCColor := $009BF18D;
+  FAddrPCFontColor := clBlack;
   FEmptyStackColor := clGrayText;
   FFrameColor := clBlue;
   FFrameActiveColor := clRed;
+  FStackPointColor := $009D116C;
+  FStackPointFontColor := clWhite;
+end;
+
+procedure TStackColorMap.SetAddrPCColor(const Value: TColor);
+begin
+  if FAddrPCColor <> Value then
+  begin
+    FAddrPCColor := Value;
+    DoChange;
+  end;
+end;
+
+procedure TStackColorMap.SetAddrPCFontColor(const Value: TColor);
+begin
+  if FAddrPCFontColor <> Value then
+  begin
+    FAddrPCFontColor := Value;
+    DoChange;
+  end;
 end;
 
 procedure TStackColorMap.SetEmptyStackColor(const Value: TColor);
@@ -1453,6 +1526,24 @@ begin
   if FFrameColor <> Value then
   begin
     FFrameColor := Value;
+    DoChange;
+  end;
+end;
+
+procedure TStackColorMap.SetStackPointColor(const Value: TColor);
+begin
+  if FStackPointColor <> Value then
+  begin
+    FStackPointColor := Value;
+    DoChange;
+  end;
+end;
+
+procedure TStackColorMap.SetStackPointFontColor(const Value: TColor);
+begin
+  if FStackPointFontColor <> Value then
+  begin
+    FStackPointFontColor := Value;
     DoChange;
   end;
 end;
@@ -1524,8 +1615,9 @@ var
   TopOfStackIndex: Int64;
   AddrPcVA: UInt64;
 begin
-  if StackView.IsAddrPCRow(RowIndex, AddrPcVA) then
+  if StackView.IsAddrPCRow(RowIndex, AddrPcVA) and (AColumn = ctAddress) then
   begin
+    ACanvas.Font.Color := StackView.ColorMap.AddrPCFontColor;
     ACanvas.Brush.Style := bsClear;
   end
   else
@@ -1533,7 +1625,7 @@ begin
       ACanvas.Font.Color := StackView.ColorMap.EmptyStackColor;
   if (RowIndex = TopOfStackIndex) and (AColumn = ctAddress) then
   begin
-    ACanvas.Font.Color := clWhite;
+    ACanvas.Font.Color := StackView.ColorMap.StackPointFontColor;
     ACanvas.Brush.Style := bsClear;
   end;
   inherited;
@@ -1547,8 +1639,7 @@ var
 begin
   if StackView.IsAddrPCRow(RowIndex, AddrPcVA) then
   begin
-    {$message 'color!'}
-    ACanvas.Brush.Color := $009BF18D;
+    ACanvas.Brush.Color := StackView.ColorMap.AddrPCColor;
     BackR := ARect;
     InflateRect(BackR, TextMargin - ToDpi(2), 0);
     ACanvas.FillRect(BackR);
@@ -1556,8 +1647,7 @@ begin
   else
     if GetTopOfStackRowIndex(TopOfStackIndex) and (TopOfStackIndex = RowIndex) then
     begin
-      {$message 'color!'}
-      ACanvas.Brush.Color := $009D116C;
+      ACanvas.Brush.Color := StackView.ColorMap.StackPointColor;
       BackR := ARect;
       InflateRect(BackR, TextMargin - ToDpi(2), 0);
       ACanvas.FillRect(BackR);
@@ -1960,7 +2050,10 @@ end;
 procedure TRegistersColorMap.InitDarkMode;
 begin
   inherited;
-
+  FHintColor := $999999;
+  FRegColor := $F694B7;
+  FValueColor := $E0E0E0;
+  FValueModifiedColor := $7884F8;
 end;
 
 procedure TRegistersColorMap.InitLightMode;
