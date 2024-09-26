@@ -2,6 +2,8 @@
 
 {$IFDEF FPC}
   {$MODE Delphi}
+  {$WARN 5024 off : Parameter "$1" not used}
+  {$WARN 6060 off : Case statement does not handle all possible cases}
 {$ENDIF}
 
 interface
@@ -33,6 +35,9 @@ uses
   CpuView.Stream,
   {$IFDEF MSWINDOWS}
   CpuView.Stream.Windows,
+  {$ENDIF}
+  {$IFDEF LINUX}
+  CpuView.Stream.Linux,
   {$ENDIF}
   CpuView.DebugerGate,
   CpuView.CPUContext;

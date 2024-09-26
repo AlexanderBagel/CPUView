@@ -1,4 +1,4 @@
-unit CpuView.Common;
+п»їunit CpuView.Common;
 
 {$IFDEF FPC}
   {$MODE Delphi}
@@ -7,7 +7,7 @@ unit CpuView.Common;
 interface
 
 type
-  // режимы отображения регистров
+  // СЂРµР¶РёРјС‹ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ СЂРµРіРёСЃС‚СЂРѕРІ
   TRegViewMode = (
     rvmHex, rvmHexW, rvmHexD, rvmHexQ,
     rvmOct, rvmBin, rvmIntB, rvmUIntB,

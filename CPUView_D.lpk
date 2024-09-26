@@ -15,93 +15,93 @@
     </CompilerOptions>
     <Files Count="22">
       <Item1>
-        <Filename Value="src\CpuView.Actions.pas"/>
-        <UnitName Value="CpuView.Actions"/>
+        <Filename Value="src\gui\dlgCpuView.lfm"/>
+        <Type Value="LFM"/>
       </Item1>
       <Item2>
-        <Filename Value="src\CpuView.Common.pas"/>
-        <UnitName Value="CpuView.Common"/>
+        <Filename Value="src\gui\dlgCpuView.pas"/>
+        <UnitName Value="dlgCpuView"/>
       </Item2>
       <Item3>
-        <Filename Value="src\CpuView.Core.pas"/>
-        <UnitName Value="CpuView.Core"/>
+        <Filename Value="src\gui\dlgcpuviewintel.lfm"/>
+        <Type Value="LFM"/>
       </Item3>
       <Item4>
-        <Filename Value="src\CpuView.CPUContext.pas"/>
-        <UnitName Value="CpuView.CPUContext"/>
+        <Filename Value="src\gui\dlgcpuviewintel.pas"/>
+        <UnitName Value="dlgCpuViewIntel"/>
       </Item4>
       <Item5>
-        <Filename Value="src\CpuView.DebugerGate.pas"/>
-        <UnitName Value="CpuView.DebugerGate"/>
+        <Filename Value="src\gui\dlgInputBox.lfm"/>
+        <Type Value="LFM"/>
       </Item5>
       <Item6>
-        <Filename Value="src\CpuView.FpDebug.pas"/>
-        <UnitName Value="CpuView.FpDebug"/>
+        <Filename Value="src\gui\dlgInputBox.pas"/>
+        <UnitName Value="dlgInputBox"/>
       </Item6>
       <Item7>
-        <Filename Value="src\CpuView.IntelContext.pas"/>
-        <UnitName Value="CpuView.IntelContext"/>
+        <Filename Value="src\CpuView.Actions.pas"/>
+        <UnitName Value="CpuView.Actions"/>
       </Item7>
       <Item8>
-        <Filename Value="src\CpuView.IntelContext.Types.pas"/>
-        <UnitName Value="CpuView.IntelContext.Types"/>
+        <Filename Value="src\CpuView.Common.pas"/>
+        <UnitName Value="CpuView.Common"/>
       </Item8>
       <Item9>
-        <Filename Value="src\CpuView.Reg.LCL.pas"/>
-        <UnitName Value="CpuView.Reg.LCL"/>
+        <Filename Value="src\CpuView.Core.pas"/>
+        <UnitName Value="CpuView.Core"/>
       </Item9>
       <Item10>
+        <Filename Value="src\CpuView.CPUContext.pas"/>
+        <UnitName Value="CpuView.CPUContext"/>
+      </Item10>
+      <Item11>
+        <Filename Value="src\CpuView.DebugerGate.pas"/>
+        <UnitName Value="CpuView.DebugerGate"/>
+      </Item11>
+      <Item12>
+        <Filename Value="src\CpuView.FpDebug.pas"/>
+        <UnitName Value="CpuView.FpDebug"/>
+      </Item12>
+      <Item13>
+        <Filename Value="src\CpuView.IntelContext.pas"/>
+        <UnitName Value="CpuView.IntelContext"/>
+      </Item13>
+      <Item14>
+        <Filename Value="src\CpuView.IntelContext.Types.pas"/>
+        <UnitName Value="CpuView.IntelContext.Types"/>
+      </Item14>
+      <Item15>
+        <Filename Value="src\CpuView.Reg.LCL.pas"/>
+        <UnitName Value="CpuView.Reg.LCL"/>
+      </Item15>
+      <Item16>
         <Filename Value="src\CpuView.Reg.pas"/>
         <HasRegisterProc Value="True"/>
         <UnitName Value="CpuView.Reg"/>
-      </Item10>
-      <Item11>
-        <Filename Value="src\CpuView.Settings.pas"/>
-        <UnitName Value="CpuView.Settings"/>
-      </Item11>
-      <Item12>
-        <Filename Value="src\CpuView.Stream.pas"/>
-        <UnitName Value="CpuView.Stream"/>
-      </Item12>
-      <Item13>
-        <Filename Value="src\CpuView.Stream.Windows.pas"/>
-        <UnitName Value="CpuView.Stream.Windows"/>
-      </Item13>
-      <Item14>
-        <Filename Value="src\CpuView.Viewers.pas"/>
-        <UnitName Value="CpuView.Viewers"/>
-      </Item14>
-      <Item15>
-        <Filename Value="src\CpuView.Windows.pas"/>
-        <UnitName Value="CpuView.Windows"/>
-      </Item15>
-      <Item16>
-        <Filename Value="src\CpuViewCfg.inc"/>
-        <Type Value="Include"/>
       </Item16>
       <Item17>
-        <Filename Value="src\gui\dlgCpuView.lfm"/>
-        <Type Value="LFM"/>
+        <Filename Value="src\CpuView.ScriptExecutor.Intel.pas"/>
+        <UnitName Value="CpuView.ScriptExecutor.Intel"/>
       </Item17>
       <Item18>
-        <Filename Value="src\gui\dlgCpuView.pas"/>
-        <UnitName Value="dlgCpuView"/>
+        <Filename Value="src\CpuView.ScriptExecutor.pas"/>
+        <UnitName Value="CpuView.ScriptExecutor"/>
       </Item18>
       <Item19>
-        <Filename Value="src\gui\dlgcpuviewintel.lfm"/>
-        <Type Value="LFM"/>
+        <Filename Value="src\CpuView.Settings.pas"/>
+        <UnitName Value="CpuView.Settings"/>
       </Item19>
       <Item20>
-        <Filename Value="src\gui\dlgcpuviewintel.pas"/>
-        <UnitName Value="dlgCpuViewIntel"/>
+        <Filename Value="src\CpuView.Stream.pas"/>
+        <UnitName Value="CpuView.Stream"/>
       </Item20>
       <Item21>
-        <Filename Value="src\gui\dlgInputBox.lfm"/>
-        <Type Value="LFM"/>
+        <Filename Value="src\CpuView.Viewers.pas"/>
+        <UnitName Value="CpuView.Viewers"/>
       </Item21>
       <Item22>
-        <Filename Value="src\gui\dlgInputBox.pas"/>
-        <UnitName Value="dlgInputBox"/>
+        <Filename Value="src\CpuViewCfg.inc"/>
+        <Type Value="Include"/>
       </Item22>
     </Files>
     <CompatibilityMode Value="True"/>

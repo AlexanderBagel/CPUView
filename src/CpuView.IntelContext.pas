@@ -1,4 +1,4 @@
-unit CpuView.IntelContext;
+п»їunit CpuView.IntelContext;
 
 {$IFDEF FPC}
   {$MODE Delphi}
@@ -19,6 +19,9 @@ uses
   CpuView.CPUContext,
 {$IFDEF MSWINDOWS}
   CpuView.Windows,
+{$ENDIF}
+{$IFDEF LINUX}
+  CpuView.Linux,
 {$ENDIF}
   CpuView.IntelContext.Types;
 
@@ -1773,7 +1776,7 @@ begin
     97: SetBitValue(FContext.EFlags, 9, ANewRegValue);        // IF
     98: SetBitValue(FContext.EFlags, 10, ANewRegValue);       // DF
     99: SetBitValue(FContext.EFlags, 11, ANewRegValue);       // OF
-    {$message 'Эти два флага пока не работают'}
+    {$message 'Р­С‚Рё РґРІР° С„Р»Р°РіР° РїРѕРєР° РЅРµ СЂР°Р±РѕС‚Р°СЋС‚'}
     100: FContext.LastError := ANewRegValue;
     101: FContext.LastStatus := ANewRegValue;
     102..109: SetTagWordSetValue(RegID - 102, ANewRegValue);

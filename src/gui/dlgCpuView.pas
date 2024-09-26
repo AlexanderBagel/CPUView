@@ -1,12 +1,13 @@
 unit dlgCpuView;
 
 {$mode Delphi}
+{$WARN 5024 off : Parameter "$1" not used}
 
 interface
 
 uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
-  ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Generics.Collections,
+  ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList,
 
   FWHexView,
   FWHexView.Actions,
@@ -297,7 +298,6 @@ var
 implementation
 
 uses
-  Math,
   dlgInputBox,
   IDEImagesIntf,
   BaseDebugManager;
@@ -456,7 +456,7 @@ var
   NewAddress: UInt64;
 begin
   AViewIndex := ActiveViewIndex;
-  if AViewIndex in [-1, 1] then Exit;
+  if (AViewIndex < 0) or (AViewIndex = 1) then Exit;
   NewAddress := 0;
   if QueryAddress('Go to Address', 'Address:', NewAddress,
     function({%H-}ANewAddrVA: UInt64): Boolean

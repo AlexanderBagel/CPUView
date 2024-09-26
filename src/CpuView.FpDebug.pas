@@ -62,6 +62,11 @@ uses
   CpuView.Stream.Windows,
   {$ENDIF}
 
+  {$IFDEF LINUX}
+  CpuView.Linux,
+  CpuView.Stream.Linux,
+  {$ENDIF}
+
   CpuView.Common,
   CpuView.CPUContext,
   CpuView.DebugerGate;
