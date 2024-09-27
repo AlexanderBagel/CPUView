@@ -1063,6 +1063,7 @@ begin
       3: RegValue := Byte(RegValue shr 8);
       4: RegValue := Byte(RegValue);
     end;
+    Result := True;
     Exit;
   end;
   RegValue := 0;

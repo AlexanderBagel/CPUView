@@ -19,7 +19,7 @@ type
     Data: string;
     Value, MemValue: UInt64;
     MemSize: Integer;
-    RegPresent: Boolean;
+    Calculated: Boolean;
   end;
 
   TExpressionList = class(TList<TExpression>);

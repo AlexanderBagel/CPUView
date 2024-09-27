@@ -84,7 +84,7 @@ begin
     WaitState := [wsInstruction, wsSizePfx, wsMem, wsRegImm];
     MemSize := Debugger.PointerSize;
     RegPresent := False;
-    FillChar(AExpression, SizeOf(AExpression), 0);
+    AExpression := Default(TExpression);
     while nSize > 0 do
     begin
       TokenLen := nSize;
@@ -246,7 +246,7 @@ begin
     if Mem and Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize) then
       AExpression.MemSize := MemSize;
 
-    AExpression.RegPresent := RegPresent;
+    AExpression.Calculated := RegPresent or (Mem and (AExpression.MemSize > 0));
     Result := True;
 
     while (nSize > 0) and (pData^ = ' ') do

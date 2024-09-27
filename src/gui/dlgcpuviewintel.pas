@@ -168,7 +168,7 @@ begin
     for I := 0 to FScript.CalculatedList.Count - 1 do
     begin
       Expression := FScript.CalculatedList[I];
-      if not Expression.RegPresent then Continue;
+      if not Expression.Calculated then Continue;
       HintParam.MenuType := hmtAddrVA;
       HintParam.MemSize := Expression.MemSize;
       if Expression.MemSize > 0 then

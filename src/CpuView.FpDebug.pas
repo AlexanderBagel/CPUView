@@ -118,20 +118,23 @@ type
     FPreviosSrcLine: Integer;
     FPreviosSrcFuncName, FPreviosSrcFileName: string;
     FLockTimeOut: Int64;
-    FTemporaryIP: UInt64;
+    FSnapshotManager:  TSnapshotManager;
+    FTemporaryIP: TDictionary<Integer, UInt64>;
+    FThreadsMonitor: TIdeThreadsMonitor;
+    FThreadsNotification: TThreadsNotification;
     procedure BreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
+    procedure CallStackCtxChanged(Sender: TObject);
     function CurrentInstruction: TInstruction;
     procedure DoDebuggerDestroy(Sender: TObject);
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
+    function IsMainThreadId: Boolean;
     procedure OnActivateIDEForm(Sender: TObject; var AHandled: Boolean);
     procedure OnActivateSourceEditor(Sender: TObject; var AHandled: Boolean);
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
-  protected
-    procedure UpdateContext; override;
   public
     constructor Create(ACpuViewForm: TCustomForm); override;
     destructor Destroy; override;
@@ -268,6 +271,12 @@ begin
   end;
 
   DoBreakPointsChange;
+end;
+
+procedure TCpuViewDebugGate.CallStackCtxChanged(Sender: TObject);
+begin
+  UpdateContext;
+  DoStateChange;
 end;
 
 function TCpuViewDebugGate.CurrentInstruction: TInstruction;
@@ -413,6 +422,14 @@ begin
   SetLength(Result, Cursor - 1);
 end;
 
+function TCpuViewDebugGate.IsMainThreadId: Boolean;
+begin
+  if Assigned(FDbgController) then
+    Result := ThreadID = FDbgController.CurrentProcess.ThreadID
+  else
+    Result := True;
+end;
+
 procedure TCpuViewDebugGate.OnActivateIDEForm(Sender: TObject;
   var AHandled: Boolean);
 var
@@ -442,6 +459,7 @@ begin
     Reset
   else
   begin
+    FTemporaryIP.Clear;
     if FDebugger <> ADebugger then
       UpdateDebugger(ADebugger)
     else
@@ -452,7 +470,7 @@ end;
 
 procedure TCpuViewDebugGate.Reset;
 begin
-  FTemporaryIP := 0;
+  FTemporaryIP.Clear;
   if Assigned(FDebugger) then
   begin
     //FDebugger.OnActivateSourceEditor := nil;
@@ -470,9 +488,15 @@ begin
     //IDEWindowCreators.OnActivateIDEForm := nil;
   if Assigned(FBreakPoints) then
   begin
-    DebugBoss.BreakPoints.RemoveNotification(FBreakpointsNotification);
+    FBreakPoints.RemoveNotification(FBreakpointsNotification);
     FBreakPoints := nil;
   end;
+  if Assigned(FThreadsMonitor) then
+  begin
+    FThreadsMonitor.RemoveNotification(FThreadsNotification);
+    FThreadsMonitor := nil;
+  end;
+  FSnapshotManager := nil;
 end;
 
 procedure TCpuViewDebugGate.UpdateDebugger(ADebugger: TDebuggerIntf);
@@ -489,11 +513,21 @@ begin
       //if Assigned(IDEWindowCreators) then
       //  IDEWindowCreators.OnActivateIDEForm := OnActivateIDEForm;
       //FDebugger.OnActivateSourceEditor := OnActivateSourceEditor;
-      if Assigned(DebugBoss) and Assigned(DebugBoss.BreakPoints) then
+      if Assigned(DebugBoss) then
       begin
-        FBreakPoints := DebugBoss.BreakPoints;
-        FBreakPoints.AddNotification(FBreakpointsNotification);
-        BreakPointChanged(FBreakPoints, nil);
+        if Assigned(DebugBoss.BreakPoints) then
+        begin
+          FBreakPoints := DebugBoss.BreakPoints;
+          FBreakPoints.AddNotification(FBreakpointsNotification);
+          BreakPointChanged(FBreakPoints, nil);
+        end;
+        if Assigned(DebugBoss.Threads) then
+        begin
+          FThreadsMonitor := DebugBoss.Threads;
+          FThreadsMonitor.AddNotification(FThreadsNotification);
+        end;
+        if Assigned(DebugBoss.Snapshots) then
+          FSnapshotManager := DebugBoss.Snapshots;
       end;
       FSupportStream.ProcessID := ProcessID;
       if ADebugger.State = dsPause then
@@ -504,15 +538,10 @@ begin
   Reset;
 end;
 
-procedure TCpuViewDebugGate.UpdateContext;
-begin
-  inherited UpdateContext;
-  FTemporaryIP := 0;
-end;
-
 constructor TCpuViewDebugGate.Create(ACpuViewForm: TCustomForm);
 begin
   inherited;
+  FTemporaryIP := TDictionary<Integer, UInt64>.Create;
   FSupportStream := TRemoteStream.Create;
   FSupportStream.OnUpdated := UpdateRemoteStream;
   FBreakpointsNotification := TIDEBreakPointsNotification.Create;
@@ -520,6 +549,9 @@ begin
   FBreakpointsNotification.OnAdd := BreakPointChanged;
   FBreakpointsNotification.OnUpdate := BreakPointChanged;
   FBreakpointsNotification.OnRemove := BreakPointChanged;
+  FThreadsNotification := TThreadsNotification.Create;
+  FThreadsNotification.AddReference;
+  FThreadsNotification.OnChange := CallStackCtxChanged;
   if Assigned(DebugBoss) then
   begin
     DebugBoss.RegisterStateChangeHandler(OnState);
@@ -538,6 +570,9 @@ begin
   FBreakpointsNotification.OnRemove := nil;
   FBreakpointsNotification.OnUpdate := nil;
   ReleaseRefAndNil(FBreakpointsNotification);
+  FThreadsNotification.OnChange := nil;
+  ReleaseRefAndNil(FThreadsNotification);
+  FTemporaryIP.Free;
   inherited Destroy;
 end;
 
@@ -562,16 +597,25 @@ begin
 end;
 
 function TCpuViewDebugGate.CurrentInstructionPoint: UInt64;
+var
+  AEntry: TThreadEntry;
 begin
+  Result := 0;
   if Assigned(FDebugger) and (FDebugger.State = dsPause) then
   begin
-    if FTemporaryIP <> 0 then
-      Result := FTemporaryIP
-    else
-      Result := FDebugger.GetLocation.Address
-  end
-  else
-    Result := 0;
+    if not FTemporaryIP.TryGetValue(ThreadID, Result) then
+    begin
+      if IsMainThreadId then
+        Result := FDebugger.GetLocation.Address
+      else
+        if Assigned(FThreadsMonitor) then
+        begin
+          AEntry := FThreadsMonitor.Threads.EntryById[ThreadID];
+          if Assigned(AEntry) then
+            Result := AEntry.TopFrame.Address;
+        end;
+    end;
+  end;
 end;
 
 function TCpuViewDebugGate.DebugState: TAbstractDebugState;
@@ -886,9 +930,25 @@ begin
 end;
 
 function TCpuViewDebugGate.ThreadID: Cardinal;
+var
+  Snapshot: TSnapshot;
 begin
   if Assigned(FDbgController) then
-    Result := FDbgController.CurrentProcess.ThreadID
+  begin
+    if Assigned(FSnapshotManager) then
+      Snapshot := FSnapshotManager.SelectedEntry
+    else
+      Snapshot := nil;
+    if Assigned(FThreadsMonitor) then
+    begin
+      if Assigned(Snapshot) then
+        Result := FThreadsMonitor.Snapshots[Snapshot].CurrentThreadId
+      else
+        Result := FThreadsMonitor.CurrentThreads.CurrentThreadId;
+    end
+    else
+      Result := FDbgController.CurrentProcess.ThreadID
+  end
   else
     Result := 0;
 end;
@@ -933,7 +993,7 @@ begin
     Result := WorkItem.ThreadResult;
     WorkItem.DecRef;
     if Result and (RegID = Context.InstructonPointID) then
-      FTemporaryIP := ANewRegValue;
+      FTemporaryIP.AddOrSetValue(ThreadID, ANewRegValue);
   end;
 end;
 
