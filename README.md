@@ -1,4 +1,4 @@
-Advanced ASM debugger project.
+Advanced CPU-View for Lazarus.
 ================
 
 Attention - BETA, version!!!
