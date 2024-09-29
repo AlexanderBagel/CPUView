@@ -46,31 +46,31 @@ Dump supports:
 ### Appearance:
 
 Light theme:
-![1](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/light.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/light.png)
 
 Dark theme:
-![2](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/dark.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/dark.png)
 
 Active jump, breakpoints, smart hints for selected instructions and their menus:
-![3](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/light2.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/light2.png)
 
 Register hightlight:
-![4](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/highlight.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/highlight.png)
 
 Full regview mode:
-![5](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg1.png =x300)
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg1.png" height="300"/>
 
 Short regview mode with FPU-STx regs (Rx and Mx available):
-![6](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png)
 
 Short regview mode with XMM regs (ymm and debug available):
-![7](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg3.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg3.png)
 
 Various options for displaying registers:
-![8](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg4.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg4.png)
 
 Stack:
-![9](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack.png)
 
 Stack with offsets:
-![10](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack2.png)
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack2.png)
