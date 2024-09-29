@@ -58,7 +58,7 @@ Register hightlight:
 ![4](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/highlight.png)
 
 Full regview mode:
-![5](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg1.png)
+![5](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg1.png =x300)
 
 Short regview mode with FPU-STx regs (Rx and Mx available):
 ![6](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png)
