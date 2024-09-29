@@ -279,7 +279,6 @@ begin
     Move(Ctx.FltSave.FloatRegisters[0], Result.FloatRegisters[0], SIZE_OF_80387_REGISTERS);
     {$ENDIF}
 
-
     Result.EFlags := Ctx.EFlags;
     Result.SegGs := Ctx.SegGs;
     Result.SegFs := Ctx.SegFs;

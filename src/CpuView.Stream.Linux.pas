@@ -17,12 +17,6 @@ uses
 {$DEFINE HAVE_PROCESS_VM}
 
 {$IFDEF HAVE_PROCESS_VM}
-type
-  piovec = ^iovec;
-  iovec = record
-    iov_base: Pointer;
-    iov_len: size_t;
-  end;
 
   function process_vm_readv(pid: pid_t; const local_iov: piovec;
     liovcnt: NativeUInt; const remote_iov: piovec; riovcnt: NativeUInt;
