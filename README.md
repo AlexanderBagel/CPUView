@@ -62,16 +62,21 @@ Full regview mode:
 <img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg1.png" height="500"/>
 
 Short regview mode with FPU-STx regs (Rx and Mx available):
-![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png)
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png)" height="500"/>
 
 Short regview mode with XMM regs (ymm and debug available):
-![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg3.png)
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg3.png" height="500"/>
 
 Various options for displaying registers:
-![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg4.png)
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg4.png" height="500"/>
 
 Stack:
-![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack.png)
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack.png" height="500"/>
 
 Stack with offsets:
-![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack2.png)
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack2.png" height="500"/>
