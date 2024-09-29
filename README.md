@@ -63,7 +63,7 @@ Full regview mode:
 
 Short regview mode with FPU-STx regs (Rx and Mx available):
 
-<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png)" height="500"/>
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png" height="500"/>
 
 Short regview mode with XMM regs (ymm and debug available):
 
