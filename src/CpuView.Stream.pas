@@ -8,37 +8,32 @@ interface
 
 uses
   Classes,
-  SysUtils;
+  SysUtils,
+  CpuView.Common;
 
 type
-  TRegionData = record
-    AllocationBase,
-    BaseAddr,
-    RegionSize: Int64;
-  end;
-
   TOnCacheUpdated = procedure(pBuff: PByte; AAddrVA: UInt64; ASize: Int64) of object;
 
-  TRemoteAbstractStream = class(TStream)
+  TRemoteStream = class(TStream)
   private
-    FProcessID: Cardinal;
-    FSize: Int64;
+    FPosition, FSize: Int64;
+    FUtils: TCommonAbstractUtils;
     FUpdated: TOnCacheUpdated;
   protected
     procedure DoUpdated(pBuff: PByte; AAddrVA, ASize: Int64);
     function GetSize: Int64; override;
-    procedure SetProcessID(const Value: Cardinal); virtual;
     procedure SetSize(const Value: Int64); override;
   public
-    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; virtual; abstract;
+    constructor Create(AUtils: TCommonAbstractUtils);
+    function Read(var Buffer; Count: Longint): Longint; override;
+    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
     function Write(const Buffer; Count: Longint): Longint; override;
-    property ProcessID: Cardinal read FProcessID write SetProcessID;
     property OnUpdated: TOnCacheUpdated read FUpdated write FUpdated;
   end;
 
   TBufferedROStream = class(TStream)
   private
-    FStream: TRemoteAbstractStream;
+    FStream: TRemoteStream;
     FOwnership: TStreamOwnership;
     FPosition, FWindowOffset: Int64;
     FBuff: array of Byte;
@@ -54,7 +49,7 @@ type
     function Buffer_Update: Boolean;
     function Buffer_Contains(APosition: Int64): Boolean;
   public
-    constructor Create(AStream: TRemoteAbstractStream;
+    constructor Create(AStream: TRemoteStream;
       AOwnership: TStreamOwnership = soReference);
     destructor Destroy; override;
     function Read(var Buffer; Count: Longint): Longint; override;
@@ -67,35 +62,53 @@ type
     /// </summary>
     procedure SetAddrWindow(AStartAddrVA, AEndAddrVA: Int64);
     property BufferSize: Integer read FBuffSize write SetBufferSize;
-    property Stream: TRemoteAbstractStream read FStream;
+    property Stream: TRemoteStream read FStream;
   end;
 
 implementation
 
-{ TRemoteAbstractStream }
+{ TRemoteStream }
 
-procedure TRemoteAbstractStream.DoUpdated(pBuff: PByte; AAddrVA, ASize: Int64);
+constructor TRemoteStream.Create(AUtils: TCommonAbstractUtils);
+begin
+  FUtils := AUtils;
+end;
+
+procedure TRemoteStream.DoUpdated(pBuff: PByte; AAddrVA, ASize: Int64);
 begin
   if Assigned(FUpdated) then
     FUpdated(pBuff, AAddrVA, ASize);
 end;
 
-function TRemoteAbstractStream.GetSize: Int64;
+function TRemoteStream.GetSize: Int64;
 begin
   Result := FSize;
 end;
 
-procedure TRemoteAbstractStream.SetProcessID(const Value: Cardinal);
+function TRemoteStream.Read(var Buffer; Count: Longint): Longint;
 begin
-  FProcessID := Value;
+  Result := FUtils.ReadData(Pointer(FPosition), Buffer, Count);
+  if (Result > 0) and FUtils.NeedUpdateReadData then
+    DoUpdated(@Buffer, FPosition, Result);
 end;
 
-procedure TRemoteAbstractStream.SetSize(const Value: Int64);
+function TRemoteStream.Seek(const Offset: Int64;
+  Origin: TSeekOrigin): Int64;
+begin
+  case Origin of
+    soBeginning: FPosition := Offset;
+    soCurrent: Inc(FPosition, Offset);
+    soEnd: FPosition := GetSize + Offset;
+  end;
+  Result := FPosition
+end;
+
+procedure TRemoteStream.SetSize(const Value: Int64);
 begin
   FSize := Value;
 end;
 
-function TRemoteAbstractStream.Write(const Buffer; Count: Longint): Longint;
+function TRemoteStream.Write(const Buffer; Count: Longint): Longint;
 begin
   raise EStreamError.Create('Stream is read-only');
 end;
@@ -129,7 +142,7 @@ begin
   Result := Length(FBuff) > 0;
 end;
 
-constructor TBufferedROStream.Create(AStream: TRemoteAbstractStream;
+constructor TBufferedROStream.Create(AStream: TRemoteStream;
   AOwnership: TStreamOwnership);
 begin
   FStream := AStream;

@@ -59,15 +59,13 @@ uses
 
   {$IFDEF MSWINDOWS}
   CpuView.Windows,
-  CpuView.Stream.Windows,
   {$ENDIF}
-
   {$IFDEF LINUX}
   CpuView.Linux,
-  CpuView.Stream.Linux,
   {$ENDIF}
 
   CpuView.Common,
+  CpuView.Stream,
   CpuView.CPUContext,
   CpuView.DebugerGate;
 
@@ -122,6 +120,7 @@ type
     FTemporaryIP: TDictionary<Integer, UInt64>;
     FThreadsMonitor: TIdeThreadsMonitor;
     FThreadsNotification: TThreadsNotification;
+    FUtils: TCommonUtils;
     procedure BreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
     procedure CallStackCtxChanged(Sender: TObject);
@@ -481,9 +480,10 @@ begin
     end;
     FDebugger := nil;
   end;
+  LinuxDebugger := nil;
   FDbgController := nil;
   FProcess := nil;
-  FSupportStream.ProcessID := 0;
+  FUtils.ProcessID := 0;
   //if Assigned(IDEWindowCreators) then
     //IDEWindowCreators.OnActivateIDEForm := nil;
   if Assigned(FBreakPoints) then
@@ -504,6 +504,7 @@ begin
   FDebugger := ADebugger;
   if Assigned(FDebugger) and (FDebugger is TFpDebugDebugger) then
   begin
+    LinuxDebugger := TFpDebugDebugger(FDebugger);
     FDbgController := TFpDebugDebugger(FDebugger).DbgController;
     FProcess := FDbgController.CurrentProcess;
     if Assigned(FProcess) and not FProcess.GotExitProcess then
@@ -529,7 +530,7 @@ begin
         if Assigned(DebugBoss.Snapshots) then
           FSnapshotManager := DebugBoss.Snapshots;
       end;
-      FSupportStream.ProcessID := ProcessID;
+      FUtils.ProcessID := ProcessID;
       if ADebugger.State = dsPause then
         UpdateContext;
       Exit;
@@ -542,7 +543,8 @@ constructor TCpuViewDebugGate.Create(ACpuViewForm: TCustomForm);
 begin
   inherited;
   FTemporaryIP := TDictionary<Integer, UInt64>.Create;
-  FSupportStream := TRemoteStream.Create;
+  FUtils := TCommonUtils.Create;
+  FSupportStream := TRemoteStream.Create(FUtils);
   FSupportStream.OnUpdated := UpdateRemoteStream;
   FBreakpointsNotification := TIDEBreakPointsNotification.Create;
   FBreakpointsNotification.AddReference;
@@ -566,6 +568,7 @@ begin
     DebugBoss.UnregisterStateChangeHandler(OnState);
   Reset;
   FSupportStream.Free;
+  FUtils.Free;
   FBreakpointsNotification.OnAdd := nil;
   FBreakpointsNotification.OnRemove := nil;
   FBreakpointsNotification.OnUpdate := nil;
@@ -921,12 +924,7 @@ end;
 
 function TCpuViewDebugGate.ThreadStackLimit: TStackLimit;
 begin
-  {$IFDEF CPUX64}
-  if PointerSize = 4 then
-    Result := GetThreadWow64StackLimit(ProcessID, ThreadId)
-  else
-  {$ENDIF}
-    Result := GetThreadStackLimit(ProcessID, ThreadId);
+  Result := FUtils.GetThreadStackLimit(ThreadId, PointerSize = 4);
 end;
 
 function TCpuViewDebugGate.ThreadID: Cardinal;

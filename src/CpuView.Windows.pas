@@ -137,6 +137,19 @@ type
     ExtendedRegisters: array[0..MAXIMUM_SUPPORTED_EXTENSION-1] of Byte;
   end;
 
+  TCommonUtils = class(TCommonAbstractUtils)
+  private
+    FProcessHandle: THandle;
+  protected
+    procedure SetProcessID(const Value: Integer); override;
+  public
+    destructor Destroy; override;
+    function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
+    function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
+    procedure Update; override;
+  end;
+
   function OpenThread(dwDesiredAccess: DWORD; bInheritHandle: BOOL;
     dwThreadId: DWORD): THandle; stdcall; external kernel32;
   function GetThreadContext(hThread: THandle; Context: PContext): BOOL;
@@ -163,8 +176,6 @@ type
   function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
   function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
   function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-  function GetThreadStackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
-  function GetThreadWow64StackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
 
 implementation
 
@@ -437,9 +448,7 @@ var
   hThread: THandle;
   Ctx: PWow64Context;
   ContextBuff: array of Byte;
-  ContextFlags: DWORD;
   FeatureMask: Int64;
-  ContextSize, FeatureLength: DWORD;
   SimdReg: PXMMRegister;
   I: Integer;
   ExtentedDisabled: Boolean;
@@ -564,74 +573,174 @@ begin
   end;
 end;
 
-function GetThreadStackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
+function GetThreadNativeStackLimit(ProcessHandle: THandle; ThreadID: DWORD): TStackLimit;
 const
   ThreadBasicInformation = 0;
 var
-  hThread, hProcess: THandle;
+  hThread: THandle;
   TBI: TThreadBasicInformation;
   TIB: NT_TIB;
   lpNumberOfBytesRead: SIZE_T;
 begin
+  Result := Default(TStackLimit);
   FillChar(Result, SizeOf(Result), 0);
-  hProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, False, ProcessID);
-  if hProcess = 0 then Exit;
+  hThread := OpenThread(THREAD_GET_CONTEXT or
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+  if hThread = 0 then Exit;
   try
-    hThread := OpenThread(THREAD_GET_CONTEXT or
-      THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
-    if hThread = 0 then Exit;
-    try
-      if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
-        SizeOf(TBI), nil) <> 0 then
-        Exit;
-      if not ReadProcessMemory(hProcess,
-        TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
-        lpNumberOfBytesRead) then Exit;
-      Result.Base := Int64(TIB.StackBase);
-      Result.Limit := Int64(TIB.StackLimit);
-    finally
-      CloseHandle(hThread);
-    end;
+    if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
+      SizeOf(TBI), nil) <> 0 then
+      Exit;
+    if not ReadProcessMemory(ProcessHandle,
+      TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
+      lpNumberOfBytesRead) then Exit;
+    Result.Base := Int64(TIB.StackBase);
+    Result.Limit := Int64(TIB.StackLimit);
   finally
-    CloseHandle(hProcess);
+    CloseHandle(hThread);
   end;
 end;
 
-function GetThreadWow64StackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
+function GetThreadWow64StackLimit(ProcessHandle: THandle; ThreadID: DWORD): TStackLimit;
 const
   ThreadBasicInformation = 0;
 var
-  hThread, hProcess: THandle;
+  hThread: THandle;
   TBI: TThreadBasicInformation;
   TIB: NT_TIB;
   lpNumberOfBytesRead: SIZE_T;
   WOW64_NT_TIB: TWOW64_NT_TIB;
 begin
-  FillChar(Result, SizeOf(Result), 0);
-  hProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, False, ProcessID);
-  if hProcess = 0 then Exit;
+  Result := Default(TStackLimit);
+  hThread := OpenThread(THREAD_GET_CONTEXT or
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+  if hThread = 0 then Exit;
   try
-    hThread := OpenThread(THREAD_GET_CONTEXT or
-      THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
-    if hThread = 0 then Exit;
-    try
-      if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
-        SizeOf(TBI), nil) <> 0 then
-        Exit;
-      if not ReadProcessMemory(hProcess,
-        TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
-        lpNumberOfBytesRead) then Exit;
-      if not ReadProcessMemory(hProcess,
-        TIB.ExceptionList, @WOW64_NT_TIB, SizeOf(TWOW64_NT_TIB),
-        lpNumberOfBytesRead) then Exit;
-      Result.Base := Int64(WOW64_NT_TIB.StackBase);
-      Result.Limit := Int64(WOW64_NT_TIB.StackLimit);
-    finally
-      CloseHandle(hThread);
-    end;
+    if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
+      SizeOf(TBI), nil) <> 0 then
+      Exit;
+    if not ReadProcessMemory(ProcessHandle,
+      TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
+      lpNumberOfBytesRead) then Exit;
+    if not ReadProcessMemory(ProcessHandle,
+      TIB.ExceptionList, @WOW64_NT_TIB, SizeOf(TWOW64_NT_TIB),
+      lpNumberOfBytesRead) then Exit;
+    Result.Base := Int64(WOW64_NT_TIB.StackBase);
+    Result.Limit := Int64(WOW64_NT_TIB.StackLimit);
   finally
-    CloseHandle(hProcess);
+    CloseHandle(hThread);
   end;
+end;
+
+{ TCommonUtils }
+
+destructor TCommonUtils.Destroy;
+begin
+  ProcessID := 0;
+  inherited;
+end;
+
+function TCommonUtils.GetThreadStackLimit(ThreadID: Integer;
+  ThreadIs32: Boolean): TStackLimit;
+begin
+  if FProcessHandle = 0 then Exit(Default(TStackLimit));
+  {$IFDEF CPUX86}
+  Result := GetThreadNativeStackLimit(FProcessHandle, ThreadID);
+  {$ENDIF}
+  {$IFDEF CPUX64}
+  if ThreadIs32 then
+    Result := GetThreadWow64StackLimit(FProcessHandle, ThreadID)
+  else
+    Result := GetThreadNativeStackLimit(FProcessHandle, ThreadID);
+  {$ENDIF}
+end;
+
+function TCommonUtils.QueryRegion(AddrVA: Int64;
+  out RegionData: TRegionData): Boolean;
+var
+  MBI: TMemoryBasicInformation;
+  dwLength: Cardinal;
+begin
+  if FProcessHandle = 0 then Exit(False);
+  dwLength := SizeOf(TMemoryBasicInformation);
+  Result := VirtualQueryEx(FProcessHandle, Pointer(AddrVA), MBI, dwLength) = dwLength;
+  if Result then
+  begin
+    RegionData.AllocationBase := Int64(MBI.AllocationBase);
+    RegionData.BaseAddr := Int64(MBI.BaseAddress);
+    RegionData.RegionSize := Int64(MBI.RegionSize);
+  end;
+end;
+
+function TCommonUtils.ReadData(AddrVA: Pointer; var Buff;
+  ASize: Longint): Longint;
+
+  function CanRead(MBI: TMemoryBasicInformation): Boolean;
+  begin
+    Result := MBI.State = MEM_COMMIT;
+    if Result then
+      Result := MBI.Protect and (
+        PAGE_EXECUTE_READ or
+        PAGE_EXECUTE_READWRITE or
+        PAGE_READONLY or
+        PAGE_READWRITE) <> 0;
+    if Result then
+      Result := (MBI.Protect and PAGE_GUARD) = 0;
+  end;
+
+var
+  MBI: TMemoryBasicInformation;
+  dwLength: Cardinal;
+  RegionSize: NativeInt;
+  ReadCount: NativeUInt;
+begin
+  Result := 0;
+  if FProcessHandle = 0 then Exit;
+  dwLength := SizeOf(TMemoryBasicInformation);
+  if VirtualQueryEx(FProcessHandle,
+    AddrVA, MBI, dwLength) <> dwLength then Exit;
+
+  if NativeInt(MBI.BaseAddress) > 0 then
+  begin
+    RegionSize := NativeInt(MBI.RegionSize) -
+      (NativeInt(AddrVA) - NativeInt(MBI.BaseAddress));
+    if ASize > RegionSize then
+      ASize := RegionSize;
+  end
+  else
+    // принудительно отключаем все что не можем прочитать
+    MBI.Protect := MBI.Protect or PAGE_GUARD;
+
+  // не будем вмешиваться в память удаленного процесса
+  // меняя атрибуты страницы, поэтому если стоит запрет на чтение
+  // то просто возвращаем нулевой буфер заданного размера
+  if not CanRead(MBI) then
+  begin
+    FillChar(Buff, ASize, 0);
+    Exit(ASize);
+  end;
+
+  if ReadProcessMemory(FProcessHandle, AddrVA, @Buff, ASize, ReadCount) then
+    Result := Longint(ReadCount);
+end;
+
+procedure TCommonUtils.SetProcessID(const Value: Integer);
+begin
+  if ProcessID = Value then Exit;
+  if FProcessHandle <> 0 then
+  begin
+    CloseHandle(FProcessHandle);
+    FProcessHandle := 0;
+  end;
+  inherited;
+  if ProcessID <> 0 then
+    FProcessHandle := OpenProcess(
+      PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, False, ProcessID);
+end;
+
+procedure TCommonUtils.Update;
+begin
+  // do nothing...
 end;
 
 end.

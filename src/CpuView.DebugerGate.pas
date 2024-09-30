@@ -63,7 +63,7 @@ type
     function IsActive: Boolean; virtual; abstract;
     function IsActiveJmp: Boolean; virtual; abstract;
     procedure FillThreadStackFrames(ALimit: TStackLimit;
-      AddrStack, AddrFrame: UInt64; AStream: TRemoteAbstractStream;
+      AddrStack, AddrFrame: UInt64; AStream: TRemoteStream;
       AFrames: TList<TStackFrame>); virtual;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;
@@ -135,7 +135,7 @@ begin
 end;
 
 procedure TAbstractDebugger.FillThreadStackFrames(ALimit: TStackLimit;
-  AddrStack, AddrFrame: UInt64; AStream: TRemoteAbstractStream;
+  AddrStack, AddrFrame: UInt64; AStream: TRemoteStream;
   AFrames: TList<TStackFrame>);
 
   function InStack(AddrVA: Uint64): Boolean;

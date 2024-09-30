@@ -2,10 +2,8 @@
 
 interface
 
-{$IFDEF FPC}
 const
   WOW64_SIZE_OF_80387_REGISTERS = 80;
-{$ENDIF}
 
 type
   PXMMRegister = ^TXMMRegister;
@@ -20,6 +18,7 @@ type
     High: TXMMRegister;
   end;
 
+  PIntelThreadContext = ^TIntelThreadContext;
   TIntelThreadContext = record
     x86Context: Boolean;
     Rax, Rbx, Rcx, Rdx, Rsp, Rbp, Rsi, Rdi, Rip: UInt64;

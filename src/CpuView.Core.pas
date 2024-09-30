@@ -34,10 +34,10 @@ uses
   CpuView.Settings,
   CpuView.Stream,
   {$IFDEF MSWINDOWS}
-  CpuView.Stream.Windows,
+  CpuView.Windows,
   {$ENDIF}
   {$IFDEF LINUX}
-  CpuView.Stream.Linux,
+  CpuView.Linux,
   {$ENDIF}
   CpuView.DebugerGate,
   CpuView.CPUContext;
@@ -80,6 +80,7 @@ type
     FDumpLastAddrVA: Int64;
     FOldAsmScroll: TOnVerticalScrollEvent;
     FOldAsmSelect: TNotifyEvent;
+    FUtils: TCommonUtils;
     FReset: TNotifyEvent;
     function CanWork: Boolean;
     procedure DoReset;
@@ -185,15 +186,16 @@ var
 begin
   FCacheList := TList<TAsmLine>.Create;
   FAddrIndex := TDictionary<Int64, Integer>.Create;
-  RemoteStream := TRemoteStream.Create;
+  FUtils := TCommonUtils.Create;
+  RemoteStream := TRemoteStream.Create(FUtils);
   FAsmStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FAsmStream.BufferSize := DisasmBuffSize;
-  RemoteStream := TRemoteStream.Create;
+  RemoteStream := TRemoteStream.Create(FUtils);
   FDisassemblyStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FDisassemblyStream.BufferSize := DisasmBuffSize;
-  RemoteStream := TRemoteStream.Create;
+  RemoteStream := TRemoteStream.Create(FUtils);
   FStackStream := TBufferedROStream.Create(RemoteStream, soOwned);
-  RemoteStream := TRemoteStream.Create;
+  RemoteStream := TRemoteStream.Create(FUtils);
   FDumpStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
   FShowCallFuncName := True;
@@ -210,6 +212,7 @@ begin
   FDumpStream.Free;
   FKnownFunctionAddrVA.Free;
   FJmpStack.Free;
+  FUtils.Free;
   inherited;
 end;
 
@@ -228,12 +231,12 @@ var
   RegData: TRegionData;
 begin
   if FInvalidReg.RegionSize = 0 then
-    FDumpStream.Stream.QueryRegion(AddrVA, FInvalidReg);
+    FUtils.QueryRegion(AddrVA, FInvalidReg);
   if AddrVA < FInvalidReg.RegionSize then
     Result := False
   else
   begin
-    Result := FDumpStream.Stream.QueryRegion(AddrVA, RegData);
+    Result := FUtils.QueryRegion(AddrVA, RegData);
     if Result then
       Result := (AddrVA > 0) and (AddrVA >= RegData.AllocationBase);
   end;
@@ -301,7 +304,7 @@ begin
   Result := -1;
   if FDisassemblyStream = nil then Exit;
   ResetCache;
-  FDisassemblyStream.Stream.QueryRegion(AAddress, RegData);
+  FUtils.QueryRegion(AAddress, RegData);
   WindowAddr := Max(AAddress - 1024, RegData.AllocationBase);
   TopCacheSize := AAddress - WindowAddr;
 
@@ -474,6 +477,7 @@ end;
 
 procedure TCpuViewCore.OnDebugerChage(Sender: TObject);
 begin
+  FUtils.Update;
   RefreshView;
 end;
 
@@ -482,7 +486,11 @@ begin
   case FDebugger.DebugState of
     adsStoped, adsStart:
       UpdateStreamsProcessID;
-    adsPaused: RefreshView;
+    adsPaused:
+    begin
+      FUtils.Update;
+      RefreshView;
+    end;
     adsRunning:
     begin
       {$message 'наверное нужно снимать стримы по аналогу с adsFinished'}
@@ -690,7 +698,7 @@ begin
   if (AddrVA = 0) and CanWork then
     AddrVA := FDebugger.CurrentInstructionPoint;
   {$message 'чо бум делать если память не доступна?'}
-  if not FDumpStream.Stream.QueryRegion(AddrVA, RegData) then Exit;
+  if not FUtils.QueryRegion(AddrVA, RegData) then Exit;
   FDumpStream.SetAddrWindow(RegData.BaseAddr, RegData.RegionSize);
   FDumpView.SetDataStream(FDumpStream, RegData.BaseAddr);
   FDumpView.FocusOnAddress(AddrVA, ccmSelectRow);
@@ -719,18 +727,10 @@ end;
 procedure TCpuViewCore.UpdateStreamsProcessID;
 begin
   if Assigned(FDebugger) and FDebugger.IsActive then
-  begin
-    FAsmStream.Stream.ProcessID := FDebugger.ProcessID;
-    FDisassemblyStream.Stream.ProcessID := FDebugger.ProcessID;
-    FDumpStream.Stream.ProcessID := FDebugger.ProcessID;
-    FStackStream.Stream.ProcessID := FDebugger.ProcessID;
-  end
+    FUtils.ProcessID := FDebugger.ProcessID
   else
   begin
-    FAsmStream.Stream.ProcessID := 0;
-    FDisassemblyStream.Stream.ProcessID := 0;
-    FDumpStream.Stream.ProcessID := 0;
-    FStackStream.Stream.ProcessID := 0;
+    FUtils.ProcessID := 0;
     ResetCache;
   end;
 end;

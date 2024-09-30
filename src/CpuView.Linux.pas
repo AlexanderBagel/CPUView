@@ -12,9 +12,18 @@ uses
   LCLIntf,
   Classes,
   SysUtils,
+  Math,
   Generics.Collections,
+  Generics.Defaults,
+
   FpDbgLinuxClasses,
   FpDbgLinuxExtra,
+  FpDebugDebuggerWorkThreads,
+  FpDebugDebuggerUtils,
+  FpDebugDebuggerBase,
+  FpDebugDebugger,
+  LazDebuggerIntfBaseTypes,
+
   CpuView.Common,
   CpuView.IntelContext.Types;
 
@@ -27,15 +36,50 @@ type
 
   TMemoryBasicInformationList = class(TList<TMemoryBasicInformation>);
 
-  function LoadVirtualMemoryInformation(AProcessID: Integer; AQueryAddr: UInt64 = 0): TMemoryBasicInformationList;
-  function VirtualQueryMBI(AProcessID: Integer; AQueryAddr: UInt64; out MBI: TMemoryBasicInformation): Boolean;
+  { TCommonUtils }
+
+  TCommonUtils = class(TCommonAbstractUtils)
+  private
+    FProcessHandle: THandle;
+    FMemList: TMemoryBasicInformationList;
+    function GetMemList: TMemoryBasicInformationList;
+  protected
+    function VirtualQueryMBI(AQueryAddr: UInt64; out
+      MBI: TMemoryBasicInformation): Boolean;
+    procedure SetProcessID(const Value: Integer); override;
+  public
+    destructor Destroy; override;
+    function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function NeedUpdateReadData: Boolean; override;
+    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
+    function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
+    procedure Update; override;
+  end;
+
+  { TThreadWorkerFpTrace }
+
+  TThreadWorkerFpTrace = class(TFpDbgDebggerThreadWorkerItem)
+  private
+    Fptrace_request: cint;
+    Fpid: TPid;
+    Faddr: Pointer;
+    Fdata: pointer;
+    FResult: PtrInt;
+  protected
+    procedure DoExecute; override;
+  public
+    constructor Create(ADebugger: TFpDebugDebuggerBase;
+      ptrace_request: cint; pid: TPid; addr: Pointer; data: pointer);
+    property ThreadResult: PtrInt read FResult;
+  end;
 
   function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
   function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
   function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
   function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-  function GetThreadStackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
-  function GetThreadWow64StackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
+
+var
+  LinuxDebugger: TFpDebugDebuggerBase;
 
 implementation
 
@@ -159,7 +203,7 @@ begin
   Shared := LowerCase(AccessChar) = 's';
 end;
 
-function LoadVirtualMemoryInformation(AProcessID: Integer; AQueryAddr: UInt64): TMemoryBasicInformationList;
+function LoadVirtualMemoryInformation(AProcessID: Integer): TMemoryBasicInformationList;
 var
   MapsPath, Line: string;
   VMData: TStringList;
@@ -171,7 +215,17 @@ var
   buff: PByte;
   Delimiter: Char;
 begin
-  Result := TMemoryBasicInformationList.Create;
+  Result := TMemoryBasicInformationList.Create(TComparer<TMemoryBasicInformation>.Construct(
+    function (const A, B: TMemoryBasicInformation): Integer
+    begin
+      if A.BaseAddress < B.BaseAddress then
+        Result := -1
+      else
+        if A.BaseAddress = B.BaseAddress then
+          Result := 0
+        else
+          Result := 1;
+    end));
   MapsPath := '/proc/' + IntToStr(AProcessID) + '/maps';
   if not FileExists(MapsPath) then Exit;
 
@@ -185,7 +239,7 @@ begin
       M.Free;
     end;
 
-    FillChar(MBI, SizeOf(MBI), 0);
+    MBI := Default(TMemoryBasicInformation);
     InumDict := TDictionary<UInt64, UInt64>.Create;
     try
       for I := 0 to VMData.Count - 1 do
@@ -193,9 +247,10 @@ begin
         Line := VMData[I];
         if Line = '' then
           Continue;
+
         buff := PByte(@Line[1]);
         buff := ScanHex(buff, MBI.BaseAddress);
-        buff := ScanChar(buff, Delimiter);
+        buff := ScanChar(buff, Delimiter{%H-});
         buff := ScanHex(buff, HighIdx);
         MBI.RegionSize := HighIdx - MBI.BaseAddress;
         buff := ScanAccess(buff, MBI.Read, MBI.Write, MBI.Execute, MBI.Shared);
@@ -231,9 +286,6 @@ begin
 
         Result.Add(MBI);
 
-        if (AQueryAddr <> 0) and (AQueryAddr >= MBI.BaseAddress) and (AQueryAddr < HighIdx) then
-          Break;
-
       end;
     finally
       InumDict.Free;
@@ -244,21 +296,22 @@ begin
   end;
 end;
 
-function VirtualQueryMBI(AProcessID: Integer; AQueryAddr: UInt64; out
-  MBI: TMemoryBasicInformation): Boolean;
+function Do_fpPTrace(ptrace_request: cint; pid: TPid; addr: Pointer; data: pointer): PtrInt;
 var
-  L: TMemoryBasicInformationList;
-  Tmp: TMemoryBasicInformation;
+  WorkQueue: TFpThreadPriorityWorkerQueue;
+  WorkItem: TThreadWorkerFpTrace;
 begin
-  FillChar(MBI, SizeOf(MBI), 0);
-  L := LoadVirtualMemoryInformation(AProcessID, AQueryAddr);
-  try
-    Tmp := L.Last;
-    Result := (Tmp.BaseAddress <= AQueryAddr) and (Tmp.BaseAddress + Tmp.RegionSize > AQueryAddr);
-    if Result then
-      MBI := Tmp;
-  finally
-    L.Free;
+  if LinuxDebugger = nil then Exit;
+  if LinuxDebugger.State <> dsPause then Exit;
+  WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
+  if Assigned(WorkQueue) then
+  begin
+    WorkItem := TThreadWorkerFpTrace.Create(
+      TFpDebugDebugger(LinuxDebugger), ptrace_request, pid, addr, data);
+    WorkQueue.PushItem(WorkItem);
+    WorkQueue.WaitForItem(WorkItem, True);
+    Result := WorkItem.ThreadResult;
+    WorkItem.DecRef;
   end;
 end;
 
@@ -272,7 +325,7 @@ begin
   Result := Default(TIntelThreadContext);
   io.iov_base := @(Regs.regs32[0]);
   io.iov_len := SizeOf(Regs);
-  if fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
 
   {$IFDEF CPUX86}
@@ -294,16 +347,6 @@ begin
   Result.SegDs := Regs.regs64[XDS];
   Result.SegCs := Regs.regs64[XCS];
   Result.SegSs := Regs.regs64[XSS];
-
-  //Result.ControlWord := Ctx.FloatSave.ControlWord;
-  //Result.StatusWord := Ctx.FloatSave.StatusWord;
-  //Result.TagWord := Ctx.FloatSave.TagWord;
-  //Result.ErrorOffset := Ctx.FloatSave.ErrorOffset;
-  //Result.ErrorSelector := Ctx.FloatSave.ErrorSelector;
-  //Result.DataOffset := Ctx.FloatSave.DataOffset;
-  //Result.DataSelector := Ctx.FloatSave.DataSelector;
-  //Result.MxCsr := PDWORD(@Ctx.ExtendedRegisters[$18])^;
-  //Move(Ctx.FloatSave.RegisterArea[0], Result.FloatRegisters[0], SIZE_OF_80387_REGISTERS);
   {$ENDIF}
 
   {$IFDEF CPUX64}
@@ -332,37 +375,13 @@ begin
   Result.SegDs := Regs.regs64[DS];
   Result.SegCs := Regs.regs64[CS];
   Result.SegSs := Regs.regs64[SS];
-
-  //Result.ControlWord := Ctx.FltSave.ControlWord;
-  //Result.StatusWord := Ctx.FltSave.StatusWord;
-  //Result.TagWord := Ctx.FltSave.TagWord;
-  //Result.ErrorOffset := Ctx.FltSave.ErrorOffset;
-  //Result.ErrorSelector := Ctx.FltSave.ErrorSelector;
-  //Result.DataOffset := Ctx.FltSave.DataOffset;
-  //Result.DataSelector := Ctx.FltSave.DataSelector;
-  //Result.MxCsr := Ctx.MxCsr;
-  //Move(Ctx.FltSave.FloatRegisters[0], Result.FloatRegisters[0], SIZE_OF_80387_REGISTERS);
   {$ENDIF}
 
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
-  if fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
     Exit;
 
-  {$IFDEF CPUX86}
-  Result.ControlWord := FpRegs.cwd;
-  Result.StatusWord := FpRegs.swd;
-  Result.TagWord := FpRegs.twd;
-  //Result.ErrorOffset := Ctx.FloatSave.ErrorOffset;
-  //Result.ErrorSelector := Ctx.FloatSave.ErrorSelector;
-  //Result.DataOffset := Ctx.FloatSave.DataOffset;
-  //Result.DataSelector := Ctx.FloatSave.DataSelector;
-  Result.MxCsr := FpRegs.mxcsr;
-  //for I := 0 to 7 do
-  //  Move(Ctx.FloatSave.RegisterArea[0], Result.FloatRegisters[0], SIZE_OF_80387_REGISTERS);
-  {$ENDIF}
-
-  {$IFDEF CPUX64}
   Result.ControlWord := FpRegs.cwd;
   Result.StatusWord := FpRegs.swd;
   Result.TagWord := FpRegs.twd;
@@ -373,32 +392,140 @@ begin
   Result.MxCsr := FpRegs.mxcsr;
   for I := 0 to 7 do
     Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
-  {$ENDIF}
+  Result.XmmCount := 8;
+  for I := 0 to Result.XmmCount - 1 do
+    Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
+  Result.YmmPresent := False;
 end;
 
 function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 begin
-
+  Result := False;
 end;
 
 function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
 begin
-
+  Result := Default(TIntelThreadContext);
 end;
 
 function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 begin
-
+  Result := False;
 end;
 
-function GetThreadStackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
+{ TCommonUtils }
+
+function TCommonUtils.GetMemList: TMemoryBasicInformationList;
+begin
+  if FMemList = nil then
+    FMemList := LoadVirtualMemoryInformation(ProcessID);
+  Result := FMemList;
+end;
+
+function TCommonUtils.VirtualQueryMBI(AQueryAddr: UInt64; out
+  MBI: TMemoryBasicInformation): Boolean;
+var
+  List: TMemoryBasicInformationList;
+  Index: SizeInt;
+begin
+  List := GetMemList;
+  if List.Count = 0 then Exit(False);
+  MBI.BaseAddress := AQueryAddr;
+  Result := List.BinarySearch(MBI, Index);
+  if Result then
+    MBI := List[Index]
+  else
+  begin
+    MBI := List[Index - 1];
+    Result := (MBI.BaseAddress <= AQueryAddr) and
+      (AQueryAddr < MBI.BaseAddress + MBI.RegionSize);
+  end;
+end;
+
+procedure TCommonUtils.SetProcessID(const Value: Integer);
+begin
+  inherited SetProcessID(Value);
+end;
+
+destructor TCommonUtils.Destroy;
+begin
+  FMemList.Free;
+  inherited Destroy;
+end;
+
+function TCommonUtils.GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean
+  ): TStackLimit;
+var
+  io: iovec;
+  Regs: TUserRegs;
+  StackBase: UInt64;
+  MBI: TMemoryBasicInformation;
+begin
+  Result := Default(TStackLimit);
+  io.iov_base := @(Regs.regs32[0]);
+  io.iov_len := SizeOf(Regs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+    Exit;
+  {$IFDEF CPUX32}
+  StackBase := Max(Regs.regs32[UESP], Regs.regs32[EBP]);
+  {$ENDIF}
+  {$IFDEF CPUX64}
+  StackBase := Max(Regs.regs64[RSP], Regs.regs64[RBP]);
+  {$ENDIF}
+  if VirtualQueryMBI(StackBase, MBI) then
+  begin
+    Result.Limit := MBI.BaseAddress;
+    Result.Base := MBI.BaseAddress + MBI.RegionSize;
+  end;
+end;
+
+function TCommonUtils.NeedUpdateReadData: Boolean;
+begin
+  Result := False;
+end;
+
+function TCommonUtils.QueryRegion(AddrVA: Int64; out RegionData: TRegionData
+  ): Boolean;
+var
+  MBI: TMemoryBasicInformation;
+begin
+  Result := VirtualQueryMBI(AddrVA, MBI);
+  if Result then
+  begin
+    RegionData.AllocationBase := MBI.AllocationBase;
+    RegionData.BaseAddr := MBI.BaseAddress;
+    RegionData.RegionSize := MBI.RegionSize;
+  end;
+end;
+
+function TCommonUtils.ReadData(AddrVA: Pointer; var Buff; ASize: Longint
+  ): Longint;
 begin
 
 end;
 
-function GetThreadWow64StackLimit(ProcessID, ThreadID: DWORD): TStackLimit;
+procedure TCommonUtils.Update;
 begin
+  FreeAndNil(FMemList);
+  if ProcessID = 0 then Exit;
+  FMemList := LoadVirtualMemoryInformation(ProcessID);
+end;
 
+{ TThreadWorkerFpTrace }
+
+procedure TThreadWorkerFpTrace.DoExecute;
+begin
+  FResult := fpPTrace(Fptrace_request, Fpid, Faddr, Fdata);
+end;
+
+constructor TThreadWorkerFpTrace.Create(ADebugger: TFpDebugDebuggerBase;
+  ptrace_request: cint; pid: TPid; addr: Pointer; data: pointer);
+begin
+  inherited Create(ADebugger, twpContinue);
+  Fptrace_request := ptrace_request;
+  Fpid := pid;
+  Faddr := addr;
+  Fdata := data;
 end;
 
 end.
