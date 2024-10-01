@@ -2,7 +2,13 @@ Advanced CPU-View for Lazarus.
 ================
 
 Attention - BETA, version!!!
-Need: FWHexView https://github.com/AlexanderBagel/FWHexView
+
+### Setup and use: 
+1. Download FWHexView https://github.com/AlexanderBagel/FWHexView and compile FWHexView.LCL.lpk
+2. Open CPUView_D.lpk and install it in the IDE (menu: Package->Install/Uninstall Packages) 
+3. Rebuild IDE
+4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
+5. Enjoy
 
 ### Four active editors:
 1. Disassembler
