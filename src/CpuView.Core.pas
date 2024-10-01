@@ -54,8 +54,6 @@ type
   { TCpuViewCore }
 
   TCpuViewCore = class
-  private const
-    CacheVisibleRows = 150;
   private
     FAddrIndex: TDictionary<Int64, Integer>;
     FAsmView: TAsmView;
@@ -100,6 +98,7 @@ type
     procedure SetStackView(const Value: TStackView);
   protected
     procedure BuildAsmWindow(AAddress: Int64);
+    function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
     function GetKnownFunctionAtAddr(AddrVA: Uint64): string;
     procedure LoadFromCache(AIndex: Integer);
@@ -134,7 +133,7 @@ type
 implementation
 
 const
-  DisasmBuffSize = 4096;
+  DisasmBuffSize = 384;
 
 { TCpuViewCore }
 
@@ -178,6 +177,14 @@ begin
     FAsmView.SelStart := Max(FAsmSelStart, FCacheList.List[CacheIndex].AddrVA);
     FAsmView.SelEnd := FAsmSelEnd;
   end;
+end;
+
+function TCpuViewCore.CacheVisibleRows: Integer;
+begin
+  if Assigned(AsmView) then
+    Result := AsmView.VisibleRowCount shl 1
+  else
+    Result := 0;
 end;
 
 constructor TCpuViewCore.Create;
@@ -305,7 +312,7 @@ begin
   if FDisassemblyStream = nil then Exit;
   ResetCache;
   FUtils.QueryRegion(AAddress, RegData);
-  WindowAddr := Max(AAddress - 1024, RegData.AllocationBase);
+  WindowAddr := Max(AAddress - 128, RegData.AllocationBase);
   TopCacheSize := AAddress - WindowAddr;
 
   FDisassemblyStream.SetAddrWindow(WindowAddr, DisasmBuffSize);
@@ -441,7 +448,7 @@ begin
   if NewCacheIndex < 0 then
     NewCacheIndex := GenerateCache(FCacheList[0].AddrVA);
   if NewCacheIndex >= FCacheList.Count - CacheVisibleRows then
-    NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - 1].AddrVA);
+    NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - CacheVisibleRows].AddrVA);
   FLockSelChange := True;
   if (NewCacheIndex >= 0) and (NewCacheIndex < FCacheList.Count) then
     BuildAsmWindow(FCacheList[NewCacheIndex].AddrVA)
@@ -488,8 +495,11 @@ begin
       UpdateStreamsProcessID;
     adsPaused:
     begin
-      FUtils.Update;
-      RefreshView;
+      if Assigned(FDebugger) and (FDebugger.CurrentInstructionPoint <> FAsmView.InstructionPoint) then
+      begin
+        FUtils.Update;
+        RefreshView;
+      end;
     end;
     adsRunning:
     begin

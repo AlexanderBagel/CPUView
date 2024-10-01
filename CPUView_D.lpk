@@ -4,92 +4,95 @@
     <PathDelim Value="\"/>
     <Name Value="CPUView_D"/>
     <Type Value="RunAndDesignTime"/>
+    <Author Value="Alexander (Rouse_) Bagel"/>
     <CompilerOptions>
       <Version Value="11"/>
       <PathDelim Value="\"/>
       <SearchPaths>
-        <IncludeFiles Value="gui;src;src\gui"/>
-        <OtherUnitFiles Value="gui;src;src\gui"/>
+        <IncludeFiles Value="src;src\gui"/>
+        <OtherUnitFiles Value="src;src\gui"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="15">
-      <Item1>
+    <Description Value="Advanced CPU-View for Lazarus"/>
+    <License Value="GPL v3"/>
+    <Version Major="1"/>
+    <Files>
+      <Item>
         <Filename Value="src\CpuView.Actions.pas"/>
         <UnitName Value="CpuView.Actions"/>
-      </Item1>
-      <Item2>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.Common.pas"/>
         <UnitName Value="CpuView.Common"/>
-      </Item2>
-      <Item3>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.Core.pas"/>
         <UnitName Value="CpuView.Core"/>
-      </Item3>
-      <Item4>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.CPUContext.pas"/>
         <UnitName Value="CpuView.CPUContext"/>
-      </Item4>
-      <Item5>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.DebugerGate.pas"/>
         <UnitName Value="CpuView.DebugerGate"/>
-      </Item5>
-      <Item6>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.FpDebug.pas"/>
         <UnitName Value="CpuView.FpDebug"/>
-      </Item6>
-      <Item7>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.IntelContext.pas"/>
         <UnitName Value="CpuView.IntelContext"/>
-      </Item7>
-      <Item8>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.IntelContext.Types.pas"/>
         <UnitName Value="CpuView.IntelContext.Types"/>
-      </Item8>
-      <Item9>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.Reg.LCL.pas"/>
         <UnitName Value="CpuView.Reg.LCL"/>
-      </Item9>
-      <Item10>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.Reg.pas"/>
         <HasRegisterProc Value="True"/>
         <UnitName Value="CpuView.Reg"/>
-      </Item10>
-      <Item11>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.ScriptExecutor.pas"/>
         <UnitName Value="CpuView.ScriptExecutor"/>
-      </Item11>
-      <Item12>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.Settings.pas"/>
         <UnitName Value="CpuView.Settings"/>
-      </Item12>
-      <Item13>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.Stream.pas"/>
         <UnitName Value="CpuView.Stream"/>
-      </Item13>
-      <Item14>
+      </Item>
+      <Item>
         <Filename Value="src\CpuView.Viewers.pas"/>
         <UnitName Value="CpuView.Viewers"/>
-      </Item14>
-      <Item15>
+      </Item>
+      <Item>
         <Filename Value="src\CpuViewCfg.inc"/>
         <Type Value="Include"/>
-      </Item15>
+      </Item>
     </Files>
-    <CompatibilityMode Value="True"/>
-    <RequiredPkgs Count="3">
-      <Item1>
+    <RequiredPkgs>
+      <Item>
         <PackageName Value="FWHexView.LCL"/>
-      </Item1>
-      <Item2>
+      </Item>
+      <Item>
         <PackageName Value="IdeDebugger"/>
-      </Item2>
-      <Item3>
+      </Item>
+      <Item>
         <PackageName Value="FCL"/>
-      </Item3>
+      </Item>
     </RequiredPkgs>
     <UsageOptions>
-      <UnitPath Value=".;src;src\gui"/>
+      <UnitPath Value="$(PkgOutDir)"/>
     </UsageOptions>
     <PublishOptions>
       <Version Value="2"/>

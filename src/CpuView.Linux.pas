@@ -73,6 +73,21 @@ type
     property ThreadResult: PtrInt read FResult;
   end;
 
+  { TThreadWorkerReadData }
+
+  TThreadWorkerReadData = class(TFpDbgDebggerThreadWorkerItem)
+  private
+    FAddrVA: TDBGPtr;
+    FBuff: Pointer;
+    FSize, FResult: Cardinal;
+  protected
+    procedure DoExecute; override;
+  public
+    constructor Create(ADebugger: TFpDebugDebuggerBase;
+      AAddrVA: TDBGPtr; ABuff: Pointer; ASize: Cardinal);
+    property ThreadResult: Cardinal read FResult;
+  end;
+
   function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
   function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
   function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
@@ -209,7 +224,7 @@ var
   VMData: TStringList;
   M: TMemoryStream;
   InumDict: TDictionary<UInt64, UInt64>;
-  MBI: TMemoryBasicInformation;
+  FirstMBI, MBI: TMemoryBasicInformation;
   I: Integer;
   HighIdx, DummyIdx, InumIdx: UInt64;
   buff: PByte;
@@ -284,6 +299,14 @@ begin
             MBI.MappedFile := PChar(buff);
         end;
 
+        // special case... first empty region
+        if Result.Count = 0 then
+        begin
+          FirstMBI := Default(TMemoryBasicInformation);
+          FirstMBI.RegionSize := MBI.AllocationBase;
+          Result.Add(FirstMBI);
+        end;
+
         Result.Add(MBI);
 
       end;
@@ -302,7 +325,6 @@ var
   WorkItem: TThreadWorkerFpTrace;
 begin
   if LinuxDebugger = nil then Exit;
-  if LinuxDebugger.State <> dsPause then Exit;
   WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
@@ -436,7 +458,9 @@ begin
     MBI := List[Index]
   else
   begin
-    MBI := List[Index - 1];
+    if Index > 0 then
+      Dec(Index);
+    MBI := List[Index];
     Result := (MBI.BaseAddress <= AQueryAddr) and
       (AQueryAddr < MBI.BaseAddress + MBI.RegionSize);
   end;
@@ -500,8 +524,30 @@ end;
 
 function TCommonUtils.ReadData(AddrVA: Pointer; var Buff; ASize: Longint
   ): Longint;
+var
+  WorkQueue: TFpThreadPriorityWorkerQueue;
+  WorkItem: TThreadWorkerReadData;
+  RemainingBytes: Longint;
+  RemainingBuff: PByte;
 begin
-
+  if LinuxDebugger = nil then Exit;
+  WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
+  if Assigned(WorkQueue) then
+  begin
+    WorkItem := TThreadWorkerReadData.Create(
+      TFpDebugDebugger(LinuxDebugger), TDbgPtr(AddrVA), @Buff, Cardinal(ASize));
+    WorkQueue.PushItem(WorkItem);
+    WorkQueue.WaitForItem(WorkItem, True);
+    Result := Longint(WorkItem.ThreadResult);
+    WorkItem.DecRef;
+  end;
+  RemainingBytes := ASize - Result;
+  if RemainingBytes > 0 then
+  begin
+    RemainingBuff := PByte(@Buff) + Result;
+    FillChar(RemainingBuff^, RemainingBytes, 0);
+    Result := ASize;
+  end;
 end;
 
 procedure TCommonUtils.Update;
@@ -526,6 +572,23 @@ begin
   Fpid := pid;
   Faddr := addr;
   Fdata := data;
+end;
+
+{ TThreadWorkerReadData }
+
+procedure TThreadWorkerReadData.DoExecute;
+begin
+  inherited DoExecute;
+  LinuxDebugger.MemReader.ReadMemory(FAddrVA, FSize, FBuff, FResult);
+end;
+
+constructor TThreadWorkerReadData.Create(ADebugger: TFpDebugDebuggerBase;
+  AAddrVA: TDBGPtr; ABuff: Pointer; ASize: Cardinal);
+begin
+  inherited Create(ADebugger, twpContinue);
+  FAddrVA := AAddrVA;
+  FBuff := ABuff;
+  FSize := ASize;
 end;
 
 end.

@@ -480,7 +480,10 @@ begin
     end;
     FDebugger := nil;
   end;
+  {$message 'Плохой подход, утилитарка должна быть самостоятельной'}
+  {$IFDEF LINUX}
   LinuxDebugger := nil;
+  {$ENDIF}
   FDbgController := nil;
   FProcess := nil;
   FUtils.ProcessID := 0;
@@ -504,7 +507,9 @@ begin
   FDebugger := ADebugger;
   if Assigned(FDebugger) and (FDebugger is TFpDebugDebugger) then
   begin
+    {$IFDEF LINUX}
     LinuxDebugger := TFpDebugDebugger(FDebugger);
+    {$ENDIF}
     FDbgController := TFpDebugDebugger(FDebugger).DbgController;
     FProcess := FDbgController.CurrentProcess;
     if Assigned(FProcess) and not FProcess.GotExitProcess then

@@ -8,11 +8,11 @@ unit CPUView_D;
 interface
 
 uses
-  dlgCpuView, dlgCpuViewIntel, dlgInputBox, CpuView.Actions, CpuView.Common, 
-  CpuView.Core, CpuView.CPUContext, CpuView.DebugerGate, CpuView.FpDebug, 
-  CpuView.IntelContext, CpuView.IntelContext.Types, CpuView.Reg.LCL, 
-  CpuView.Reg, CpuView.ScriptExecutor.Intel, CpuView.ScriptExecutor, 
-  CpuView.Settings, CpuView.Stream, CpuView.Viewers, LazarusPackageIntf;
+  CpuView.Actions, CpuView.Common, CpuView.Core, CpuView.CPUContext, 
+  CpuView.DebugerGate, CpuView.FpDebug, CpuView.IntelContext, 
+  CpuView.IntelContext.Types, CpuView.Reg.LCL, CpuView.Reg, 
+  CpuView.ScriptExecutor, CpuView.Settings, CpuView.Stream, CpuView.Viewers, 
+  LazarusPackageIntf;
 
 implementation
 
