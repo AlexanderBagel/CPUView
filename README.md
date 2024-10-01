@@ -10,6 +10,13 @@ Need: FWHexView https://github.com/AlexanderBagel/FWHexView
 3. Dump
 4. Stack
 
+Common features:
+* OS: Windows and Linux support via Gtk2 (Qt not tested)
+* Proc: Intel x86_64 (ARM not yet implemented)
+* Light and dark display themes
+* Crosscompiling support (tested on Windows)
+* Supports thread switching with instantaneous change of displayed information about the active thread
+
 The disassembler supports:
 * Output debugging information
 * Jump direction display
@@ -20,7 +27,6 @@ The disassembler supports:
 * Offsets
 * Hinting on the selected instruction with a menu to jump to each block of the received information
 * Instruction coloring for easy code reading
-* Light and dark display themes
 
 Register window:
 * Contains debugging information for each register (RAX..R15)
