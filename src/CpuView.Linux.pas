@@ -40,7 +40,6 @@ type
 
   TCommonUtils = class(TCommonAbstractUtils)
   private
-    FProcessHandle: THandle;
     FMemList: TMemoryBasicInformationList;
     function GetMemList: TMemoryBasicInformationList;
   protected
@@ -48,6 +47,7 @@ type
       MBI: TMemoryBasicInformation): Boolean;
     procedure SetProcessID(const Value: Integer); override;
   public
+    constructor Create;
     destructor Destroy; override;
     function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function NeedUpdateReadData: Boolean; override;
@@ -97,6 +97,9 @@ var
   LinuxDebugger: TFpDebugDebuggerBase;
 
 implementation
+
+var
+  MainThreadID: TThreadID;
 
 function ReadVirtualFile(const FilePath: string): TMemoryStream;
 var
@@ -319,22 +322,32 @@ begin
   end;
 end;
 
+function IsMainThread: Boolean;
+begin
+  Result := MainThreadID = GetCurrentThreadId;
+end;
+
 function Do_fpPTrace(ptrace_request: cint; pid: TPid; addr: Pointer; data: pointer): PtrInt;
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerFpTrace;
 begin
-  if LinuxDebugger = nil then Exit;
-  WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
-  if Assigned(WorkQueue) then
+  if IsMainThread then
   begin
-    WorkItem := TThreadWorkerFpTrace.Create(
-      TFpDebugDebugger(LinuxDebugger), ptrace_request, pid, addr, data);
-    WorkQueue.PushItem(WorkItem);
-    WorkQueue.WaitForItem(WorkItem, True);
-    Result := WorkItem.ThreadResult;
-    WorkItem.DecRef;
-  end;
+    if LinuxDebugger = nil then Exit(-1);
+    WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
+    if Assigned(WorkQueue) then
+    begin
+      WorkItem := TThreadWorkerFpTrace.Create(
+        TFpDebugDebugger(LinuxDebugger), ptrace_request, pid, addr, data);
+      WorkQueue.PushItem(WorkItem);
+      WorkQueue.WaitForItem(WorkItem, True);
+      Result := WorkItem.ThreadResult;
+      WorkItem.DecRef;
+    end;
+  end
+  else
+    Result := fpPTrace(ptrace_request, pid, addr, data);
 end;
 
 function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
@@ -342,7 +355,7 @@ var
   I: Integer;
   io: iovec;
   Regs: TUserRegs;
-  FpRegs: user_fpxregs_struct32;
+  FpRegs: user_fpregs_struct64;
 begin
   Result := Default(TIntelThreadContext);
   io.iov_base := @(Regs.regs32[0]);
@@ -362,13 +375,15 @@ begin
   Result.Rdi := Regs.regs32[EDI];
   Result.Rip := Regs.regs32[EIP];
 
-  Result.EFlags := Regs.regs64[EFL];
-  Result.SegGs := Regs.regs64[XGS];
-  Result.SegFs := Regs.regs64[XFS];
-  Result.SegEs := Regs.regs64[XES];
-  Result.SegDs := Regs.regs64[XDS];
-  Result.SegCs := Regs.regs64[XCS];
-  Result.SegSs := Regs.regs64[XSS];
+  Result.EFlags := Regs.regs32[EFL];
+  Result.SegGs := Regs.regs32[XGS];
+  Result.SegFs := Regs.regs32[XFS];
+  Result.SegEs := Regs.regs32[XES];
+  Result.SegDs := Regs.regs32[XDS];
+  Result.SegCs := Regs.regs32[XCS];
+  Result.SegSs := Regs.regs32[XSS];
+
+  Result.XmmCount := 8;
   {$ENDIF}
 
   {$IFDEF CPUX64}
@@ -397,6 +412,8 @@ begin
   Result.SegDs := Regs.regs64[DS];
   Result.SegCs := Regs.regs64[CS];
   Result.SegSs := Regs.regs64[SS];
+
+  Result.XmmCount := 16;
   {$ENDIF}
 
   io.iov_base := @FpRegs;
@@ -406,33 +423,180 @@ begin
 
   Result.ControlWord := FpRegs.cwd;
   Result.StatusWord := FpRegs.swd;
-  Result.TagWord := FpRegs.twd;
-  //Result.ErrorOffset := Ctx.FltSave.ErrorOffset;
-  //Result.ErrorSelector := Ctx.FltSave.ErrorSelector;
-  //Result.DataOffset := Ctx.FltSave.DataOffset;
-  //Result.DataSelector := Ctx.FltSave.DataSelector;
+  Result.TagWord := FpRegs.ftw;
   Result.MxCsr := FpRegs.mxcsr;
   for I := 0 to 7 do
     Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
-  Result.XmmCount := 8;
   for I := 0 to Result.XmmCount - 1 do
     Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
   Result.YmmPresent := False;
 end;
 
 function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+var
+  I: Integer;
+  io: iovec;
+  Regs: TUserRegs;
+  FpRegs: user_fpregs_struct64;
 begin
   Result := False;
+  io.iov_base := @(Regs.regs32[0]);
+  io.iov_len := SizeOf(Regs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+    Exit;
+
+  {$IFDEF CPUX86}
+  Regs.regs32[EAX] := AContext.Rax;
+  Regs.regs32[EBX] := AContext.Rbx;
+  Regs.regs32[ECX] := AContext.Rcx;
+  Regs.regs32[EDX] := AContext.Rdx;
+  Regs.regs32[UESP] := AContext.Rsp;
+  Regs.regs32[EBP] := AContext.Rbp;
+  Regs.regs32[ESI] := AContext.Rsi;
+  Regs.regs32[EDI] := AContext.Rdi;
+  Regs.regs32[EIP] := AContext.Rip;
+  Regs.regs32[EFL] := AContext.EFlags;
+  {$ENDIF}
+
+  {$IFDEF CPUX64}
+  Regs.regs64[RAX] := AContext.Rax;
+  Regs.regs64[RBX] := AContext.Rbx;
+  Regs.regs64[RCX] := AContext.Rcx;
+  Regs.regs64[RDX] := AContext.Rdx;
+  Regs.regs64[RSP] := AContext.Rsp;
+  Regs.regs64[RBP] := AContext.Rbp;
+  Regs.regs64[RSI] := AContext.Rsi;
+  Regs.regs64[RDI] := AContext.Rdi;
+  Regs.regs64[RIP] := AContext.Rip;
+  Regs.regs64[R8] := AContext.R[8];
+  Regs.regs64[R9] := AContext.R[9];
+  Regs.regs64[R10] := AContext.R[10];
+  Regs.regs64[R11] := AContext.R[11];
+  Regs.regs64[R12] := AContext.R[12];
+  Regs.regs64[R13] := AContext.R[13];
+  Regs.regs64[R14] := AContext.R[14];
+  Regs.regs64[R15] := AContext.R[15];
+  Regs.regs64[EFLAGS] := AContext.EFlags;
+  {$ENDIF}
+
+  io.iov_base := @(Regs.regs32[0]);
+  io.iov_len := SizeOf(Regs);
+  if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+    Exit;
+
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
+
+  FpRegs.cwd := AContext.ControlWord;
+  FpRegs.swd := AContext.StatusWord;
+  FpRegs.ftw := AContext.TagWord;
+  FpRegs.mxcsr := AContext.MxCsr;
+
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
+
+  Result := True;
 end;
 
 function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
+var
+  I: Integer;
+  io: iovec;
+  Regs: TUserRegs;
+  FpRegs: user_fpxregs_struct32;
 begin
   Result := Default(TIntelThreadContext);
+  io.iov_base := @(Regs.regs32[0]);
+  io.iov_len := SizeOf(Regs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+    Exit;
+
+  Result.x86Context := True;
+  Result.Rax := Regs.regs32[EAX];
+  Result.Rbx := Regs.regs32[EBX];
+  Result.Rcx := Regs.regs32[ECX];
+  Result.Rdx := Regs.regs32[EDX];
+  Result.Rsp := Regs.regs32[UESP];
+  Result.Rbp := Regs.regs32[EBP];
+  Result.Rsi := Regs.regs32[ESI];
+  Result.Rdi := Regs.regs32[EDI];
+  Result.Rip := Regs.regs32[EIP];
+
+  Result.EFlags := Regs.regs32[EFL];
+  Result.SegGs := Regs.regs32[XGS];
+  Result.SegFs := Regs.regs32[XFS];
+  Result.SegEs := Regs.regs32[XES];
+  Result.SegDs := Regs.regs32[XDS];
+  Result.SegCs := Regs.regs32[XCS];
+  Result.SegSs := Regs.regs32[XSS];
+
+  Result.XmmCount := 8;
+
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
+
+  Result.ControlWord := FpRegs.cwd;
+  Result.StatusWord := FpRegs.swd;
+  Result.TagWord := FpRegs.twd;
+  Result.MxCsr := FpRegs.mxcsr;
+  for I := 0 to 7 do
+    Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
+  for I := 0 to Result.XmmCount - 1 do
+    Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
+  Result.YmmPresent := False;
 end;
 
 function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+var
+  I: Integer;
+  io: iovec;
+  Regs: TUserRegs;
+  FpRegs: user_fpxregs_struct32;
 begin
   Result := False;
+  io.iov_base := @(Regs.regs32[0]);
+  io.iov_len := SizeOf(Regs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+    Exit;
+
+  Regs.regs32[EAX] := AContext.Rax;
+  Regs.regs32[EBX] := AContext.Rbx;
+  Regs.regs32[ECX] := AContext.Rcx;
+  Regs.regs32[EDX] := AContext.Rdx;
+  Regs.regs32[UESP] := AContext.Rsp;
+  Regs.regs32[EBP] := AContext.Rbp;
+  Regs.regs32[ESI] := AContext.Rsi;
+  Regs.regs32[EDI] := AContext.Rdi;
+  Regs.regs32[EIP] := AContext.Rip;
+  Regs.regs32[EFL] := AContext.EFlags;
+
+  io.iov_base := @(Regs.regs32[0]);
+  io.iov_len := SizeOf(Regs);
+  if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+    Exit;
+
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
+
+  FpRegs.cwd := AContext.ControlWord;
+  FpRegs.swd := AContext.StatusWord;
+  FpRegs.twd := AContext.TagWord;
+  FpRegs.mxcsr := AContext.MxCsr;
+
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
+
+  Result := True;
 end;
 
 { TCommonUtils }
@@ -469,6 +633,11 @@ end;
 procedure TCommonUtils.SetProcessID(const Value: Integer);
 begin
   inherited SetProcessID(Value);
+end;
+
+constructor TCommonUtils.Create;
+begin
+  MainThreadID := GetCurrentThreadId;
 end;
 
 destructor TCommonUtils.Destroy;
