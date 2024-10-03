@@ -30,6 +30,8 @@ type
     AllocationBase,
     BaseAddr,
     RegionSize: Int64;
+    Executable: Boolean;
+    Readable: Boolean;
   end;
 
   { TCommonAbstractUtils }

@@ -54,10 +54,10 @@ type
     procedure UpdateModifyed(const Value: TIntelThreadContext);
   protected
     procedure BuildMap; override;
-    procedure DoChangeViewMode(RegID: Integer; const Value: TRegViewMode); override;
-    function GetRegValue(RegID: Integer; out ARegValue: UInt64): Boolean; override;
+    procedure DoChangeViewMode(RegID: TRegID; const Value: TRegViewMode); override;
+    function GetRegValue(RegID: TRegID; out ARegValue: UInt64): Boolean; override;
     procedure InitKnownRegs; override;
-    procedure UpdateLastRegData(RegID: Integer); override;
+    procedure UpdateLastRegData(RegID: TRegID); override;
   protected
     function StToR(Index: Integer): Integer;
     function RToSt(Index: Integer): Integer;
@@ -88,12 +88,12 @@ type
     function QueryRegIndexByName(const RegName: string; out Index: Integer): Boolean; override;
     function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; override;
     function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; override;
-    function RegSetValueAtIndex(RegID, Index: Integer): string; override;
-    function RegSetValueCount(RegID: Integer): Integer; override;
+    function RegSetValueAtIndex(RegID: TRegID; Index: Integer): string; override;
+    function RegSetValueCount(RegID: TRegID): Integer; override;
     function StackBase: UInt64; override;
     function StackPoint: UInt64; override;
     function Update(CurrentIP: UInt64 = 0): Boolean; override;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean; override;
+    function UpdateRegValue(RegID: TRegID; ANewRegValue: UInt64): Boolean; override;
     property Context: TIntelThreadContext read FContext write SetContext;
     property FPUMode: TFPUMode read FFPUMode write SetFPUMode;
     property MapMode: TIntelCpuMapMode read FMapMode write SetMapMode;
@@ -389,7 +389,7 @@ begin
     FSavedDetailed[I] := I <> 2;
 end;
 
-procedure TIntelCpuContext.DoChangeViewMode(RegID: Integer;
+procedure TIntelCpuContext.DoChangeViewMode(RegID: TRegID;
   const Value: TRegViewMode);
 var
   I: Integer;
@@ -521,7 +521,7 @@ begin
   Result := (Context.TagWord shr Index) and 3;
 end;
 
-function TIntelCpuContext.GetRegValue(RegID: Integer; out ARegValue: UInt64): Boolean;
+function TIntelCpuContext.GetRegValue(RegID: TRegID; out ARegValue: UInt64): Boolean;
 begin
   Result := True;
   case RegID of
@@ -978,7 +978,7 @@ end;
 function TIntelCpuContext.QueryRegIndexByName(const RegName: string; out
   Index: Integer): Boolean;
 const
-  RegsBuff: array[0..69] of string = (
+  RegsBuff: array[0..70] of string = (
     'RAX', 'EAX', 'AX', 'AH', 'AL',
     'RBX', 'EBX', 'BX', 'BH', 'BL',
     'RCX', 'ECX', 'CX', 'CH', 'CL',
@@ -987,7 +987,7 @@ const
     'RSP', 'ESP', 'SP', 'SPL',
     'RSI', 'ESI', 'SI', 'SIL',
     'RDI', 'EDI', 'DI', 'DIL',
-    'RIP', 'EIP',
+    'RIP', 'EIP', 'IP',
     'R8', 'R8D', 'R8W', 'R8B',
     'R9', 'R9D', 'R9W', 'R9B',
     'R10', 'R10D', 'R10W', 'R10B',
@@ -997,7 +997,7 @@ const
     'R14', 'R14D', 'R14W', 'R14B',
     'R15', 'R15D', 'R15W', 'R15B'
   );
-  RegIndex: array[0..69] of Integer = (
+  RegIndex: array[0..70] of Integer = (
     0, 0, 0, 0, 0,
     1, 1, 1, 1, 1,
     2, 2, 2, 2, 2,
@@ -1006,7 +1006,7 @@ const
     5, 5, 5, 5,
     6, 6, 6, 6,
     7, 7, 7, 7,
-    8, 8,
+    8, 8, 8,
     9, 9, 9, 9,
     10, 10, 10, 10,
     11, 11, 11, 11,
@@ -1033,7 +1033,7 @@ end;
 function TIntelCpuContext.QueryRegValueByName(const RegName: string;
   out RegValue: UInt64): Boolean;
 const
-  ValueType: array[0..69] of Integer = (
+  ValueType: array[0..70] of Integer = (
     0, 1, 2, 3, 4,
     0, 1, 2, 3, 4,
     0, 1, 2, 3, 4,
@@ -1042,7 +1042,7 @@ const
     0, 1, 2, 4,
     0, 1, 2, 4,
     0, 1, 2, 4,
-    0, 1,
+    0, 1, 2,
     0, 1, 2, 4,
     0, 1, 2, 4,
     0, 1, 2, 4,
@@ -1075,7 +1075,7 @@ begin
   Result := GetRegValue(RegInfo(RowIndex, RegIndex).RegID, ARegValue);
 end;
 
-function TIntelCpuContext.RegSetValueAtIndex(RegID, Index: Integer): string;
+function TIntelCpuContext.RegSetValueAtIndex(RegID: TRegID; Index: Integer): string;
 begin
   Result := '';
   case RegID of
@@ -1122,7 +1122,7 @@ begin
   end;
 end;
 
-function TIntelCpuContext.RegSetValueCount(RegID: Integer): Integer;
+function TIntelCpuContext.RegSetValueCount(RegID: TRegID): Integer;
 begin
   case RegID of
     102..109,        // x87 TagWord Tag WorkSet
@@ -1348,7 +1348,7 @@ begin
   end;
 end;
 
-procedure TIntelCpuContext.UpdateLastRegData(RegID: Integer);
+procedure TIntelCpuContext.UpdateLastRegData(RegID: TRegID);
 
   function ExtFmt(Index: Integer): string;
   var
@@ -1730,7 +1730,7 @@ begin
   CheckReg(FContext.Dr7, Value.Dr7, 29);
 end;
 
-function TIntelCpuContext.UpdateRegValue(RegID: Integer;
+function TIntelCpuContext.UpdateRegValue(RegID: TRegID;
   ANewRegValue: UInt64): Boolean;
 begin
   {$IFDEF CPUX64}

@@ -651,7 +651,6 @@ var
   Disasm: TDbgAsmDecoder;
   Process: TDbgProcess;
   Instruction: TInstruction;
-  I: Integer;
   PrevVA: Int64;
   ACodeBytes, ACode, RipSimbol: string;
   AnInfo: TDbgInstInfo;
@@ -674,7 +673,7 @@ begin
       Instruction.Len := 0;
       Result.Add(Instruction);
     end;
-    PrevVA := Int64(pBuff);
+    PrevVA := {%H-}Int64(pBuff);
     Disasm.Disassemble(pBuff, ACodeBytes, ACode, AnInfo);
     Instruction.AddrVA := AddrVA;
     Instruction.AsString := FormatAsmCode(ACode, AnInfo, Length(ACodeBytes) shr 1);
@@ -709,7 +708,7 @@ begin
       end;
     end;
 
-    Instruction.Len := Int64(pBuff) - PrevVA;
+    Instruction.Len := {%H-}Int64(pBuff) - PrevVA;
     Inc(AddrVA, Instruction.Len);
     Dec(nSize, Instruction.Len);
     if nSize >= 0 then
@@ -792,7 +791,6 @@ var
   Editor: TSourceEditorInterface;
   ASrcLineNumber: Cardinal;
   ASrcFileName: string;
-  Tmp: Int64;
 begin
   Result := '';
   if FDbgController = nil then Exit;

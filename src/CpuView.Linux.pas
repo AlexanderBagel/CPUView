@@ -682,12 +682,15 @@ function TCommonUtils.QueryRegion(AddrVA: Int64; out RegionData: TRegionData
 var
   MBI: TMemoryBasicInformation;
 begin
+  RegionData := Default(TRegionData);
   Result := VirtualQueryMBI(AddrVA, MBI);
   if Result then
   begin
     RegionData.AllocationBase := MBI.AllocationBase;
     RegionData.BaseAddr := MBI.BaseAddress;
     RegionData.RegionSize := MBI.RegionSize;
+    RegionData.Executable := MBI.Execute;
+    RegionData.Readable := MBI.Read;
   end;
 end;
 

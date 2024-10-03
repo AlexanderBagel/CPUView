@@ -661,14 +661,22 @@ var
   MBI: TMemoryBasicInformation;
   dwLength: Cardinal;
 begin
+  RegionData := Default(TRegionData);
   if FProcessHandle = 0 then Exit(False);
   dwLength := SizeOf(TMemoryBasicInformation);
-  Result := VirtualQueryEx(FProcessHandle, Pointer(AddrVA), MBI, dwLength) = dwLength;
+  Result := VirtualQueryEx(FProcessHandle, {%H-}Pointer(AddrVA), MBI{%H-}, dwLength) = dwLength;
   if Result then
   begin
-    RegionData.AllocationBase := Int64(MBI.AllocationBase);
-    RegionData.BaseAddr := Int64(MBI.BaseAddress);
+    RegionData.AllocationBase := {%H-}Int64(MBI.AllocationBase);
+    RegionData.BaseAddr := {%H-}Int64(MBI.BaseAddress);
     RegionData.RegionSize := Int64(MBI.RegionSize);
+    if MBI.State = MEM_COMMIT then
+    begin
+      RegionData.Executable := MBI.Protect and (
+        PAGE_EXECUTE_READ or PAGE_EXECUTE_READWRITE) <> 0;
+      RegionData.Readable := RegionData.Executable or
+        (MBI.Protect and (PAGE_READONLY or PAGE_READWRITE) <> 0);
+    end;
   end;
 end;
 

@@ -224,13 +224,15 @@ begin
 end;
 
 function TCpuViewCore.AddrInAsm(AddrVA: Int64): Boolean;
+var
+  RegionData: TRegionData;
 begin
   Result :=
     Assigned(Debugger) and
     Assigned(AsmView) and
     Assigned(AsmView.DataStream) and
-    (AddrVA > $10000) and
-    (AddrVA < AsmView.StartAddress + AsmView.DataStream.Size - Debugger.PointerSize);
+    FUtils.QueryRegion(AddrVA, RegionData) and
+    RegionData.Readable and RegionData.Executable;
 end;
 
 function TCpuViewCore.AddrInDump(AddrVA: Int64): Boolean;
@@ -242,11 +244,7 @@ begin
   if AddrVA < FInvalidReg.RegionSize then
     Result := False
   else
-  begin
-    Result := FUtils.QueryRegion(AddrVA, RegData);
-    if Result then
-      Result := (AddrVA > 0) and (AddrVA >= RegData.AllocationBase);
-  end;
+    Result := FUtils.QueryRegion(AddrVA, RegData) and RegData.Readable;
 end;
 
 function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
@@ -311,8 +309,10 @@ begin
   Result := -1;
   if FDisassemblyStream = nil then Exit;
   ResetCache;
-  FUtils.QueryRegion(AAddress, RegData);
-  WindowAddr := Max(AAddress - 128, RegData.AllocationBase);
+  if FUtils.QueryRegion(AAddress, RegData) then
+    WindowAddr := Max(AAddress - 128, RegData.AllocationBase)
+  else
+    WindowAddr := AAddress;
   TopCacheSize := AAddress - WindowAddr;
 
   FDisassemblyStream.SetAddrWindow(WindowAddr, DisasmBuffSize);
@@ -320,7 +320,8 @@ begin
   Count := FDisassemblyStream.Read(Buff[0], DisasmBuffSize);
   if Count > 0 then
   begin
-    BuildCacheFromBuff(WindowAddr, @Buff[0], TopCacheSize);
+    if TopCacheSize > 0 then
+      BuildCacheFromBuff(WindowAddr, @Buff[0], TopCacheSize);
     Result := FCacheList.Count;
     BuildCacheFromBuff(AAddress, @Buff[TopCacheSize], Count - TopCacheSize);
   end;

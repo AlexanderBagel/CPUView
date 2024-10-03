@@ -74,6 +74,19 @@ type
 
   // Минимальный класс необходимый для работы StackView
 
+  TRegID = Integer;
+  TRegValue = record
+    ValueSize: Integer;
+    case Integer of
+      1: (ByteValue: Byte);
+      2: (WordValue: Word);
+      4: (DwordValue: Cardinal);
+      8: (QwordValue: UInt64);
+      10: (Ext10: array [0..9] of Byte);
+      16: (Ext16: array [0..15] of Byte);
+      32: (Ext32: array [0..31] of Byte);
+  end;
+
   { TAbstractCPUContext }
 
   TAbstractCPUContext = class(TComponent)
@@ -84,8 +97,8 @@ type
   protected
     procedure DoQueryRegHint(AddrVA: UInt64; var AHint: string);
     procedure DoUpdate(AChangeType: TContextChangeType);
-    function GetViewMode(RegID: Integer): TRegViewMode; virtual; abstract;
-    procedure SetViewMode(RegID: Integer; const Value: TRegViewMode); virtual; abstract;
+    function GetViewMode(RegID: TRegID): TRegViewMode; virtual; abstract;
+    procedure SetViewMode(RegID: TRegID; const Value: TRegViewMode); virtual; abstract;
   public
     function Count: Integer; virtual; abstract;
     function EmptyRow(RowIndex: Integer): Boolean; virtual; abstract;
@@ -94,11 +107,11 @@ type
     function RegCount(RowIndex: Integer): Integer; virtual; abstract;
     function RegData(RowIndex, RegIndex: Integer; NameNeeded: Boolean): string; virtual; abstract;
     function RegInfo(RowIndex, RegIndex: Integer): TRegister; virtual; abstract;
-    function RegParam(RegID: Integer; out Param: TRegParam): Boolean; virtual; abstract;
-    function RegQuery(RegID: Integer; out RowIndex, RegIndex: Integer): Boolean;
+    function RegParam(RegID: TRegID; out Param: TRegParam): Boolean; virtual; abstract;
+    function RegQuery(RegID: TRegID; out RowIndex, RegIndex: Integer): Boolean;
     function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; virtual; abstract;
     property AddressMode: TAddressMode read FAddressMode write FAddressMode;
-    property ViewMode[RegID: Integer]: TRegViewMode read GetViewMode write SetViewMode;
+    property ViewMode[RegID: TRegID]: TRegViewMode read GetViewMode write SetViewMode;
     property OnChange: TContextChangeEvent read FChange write FChange;
     property OnQueryRegHint: TContextQueryRegHintEvent read FQueryHint write FQueryHint;
   end;
@@ -237,7 +250,7 @@ begin
     FChange(Self, AChangeType);
 end;
 
-function TAbstractCPUContext.RegQuery(RegID: Integer; out RowIndex,
+function TAbstractCPUContext.RegQuery(RegID: TRegID; out RowIndex,
   RegIndex: Integer): Boolean;
 var
   Param: TRegParam;
