@@ -159,11 +159,24 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
     end
     inherited acViewGoto: TAction[69]
     end
+    inherited acAsmReturnToIP: TAction[70]
+    end
+    inherited acAsmSetNewIP: TAction[71]
+    end
+    inherited acAsmShowSource: TAction[72]
+    end
+    inherited acShowInNewDump: TAction[73]
+    end
+    inherited acDumpsClosePage: TAction[74]
+    end
+  end
+  inherited pmDump: TPopupMenu
+    Left = 176
   end
   inherited pmHint: TPopupMenu
     OnPopup = pmHintPopup
   end
-  object pmIntelReg: TPopupMenu[12]
+  object pmIntelReg: TPopupMenu[13]
     Left = 1544
     Top = 112
     object miRegIntelViewMode: TMenuItem

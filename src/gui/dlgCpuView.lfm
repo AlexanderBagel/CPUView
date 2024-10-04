@@ -1,7 +1,7 @@
 object frmCpuView: TfrmCpuView
-  Left = 693
+  Left = 1370
   Height = 1304
-  Top = 268
+  Top = 467
   Width = 2096
   Caption = 'Cpu-View'
   ClientHeight = 1304
@@ -188,6 +188,7 @@ object frmCpuView: TfrmCpuView
         Width = 1071
         ActivePage = tabDump0
         Align = alClient
+        PopupMenu = pmDumps
         TabIndex = 0
         TabOrder = 0
         object tabDump0: TTabSheet
@@ -270,6 +271,9 @@ object frmCpuView: TfrmCpuView
     end
     object miRegShowInDump: TMenuItem
       Action = acShowInDump
+    end
+    object miRegShowInNewDump: TMenuItem
+      Action = acShowInNewDump
     end
     object miRegSep2: TMenuItem
       Caption = '-'
@@ -479,7 +483,7 @@ object frmCpuView: TfrmCpuView
     end
     object acStackFollowRSP: TAction
       Category = 'StackView Actions'
-      Caption = 'Follow StackPoint'
+      Caption = 'Go to StackPoint'
       OnExecute = acStackFollowRSPExecute
       OnUpdate = acShowInStackUpdate
     end
@@ -695,6 +699,18 @@ object frmCpuView: TfrmCpuView
       OnExecute = acAsmShowSourceExecute
       OnUpdate = acAsmShowSourceUpdate
     end
+    object acShowInNewDump: TAction
+      Category = 'Goto Actions'
+      Caption = 'Show in New Dump'
+      OnExecute = acShowInNewDumpExecute
+      OnUpdate = acShowInDumpUpdate
+    end
+    object acDumpsClosePage: TAction
+      Category = 'Dumps Actions'
+      Caption = 'Close'
+      OnExecute = acDumpsClosePageExecute
+      OnUpdate = acDumpsClosePageUpdate
+    end
   end
   object pmStack: TPopupMenu
     Left = 1656
@@ -702,8 +718,17 @@ object frmCpuView: TfrmCpuView
     object miStackShowInAsm: TMenuItem
       Action = acShowInAsm
     end
+    object miStackShowInStack: TMenuItem
+      Action = acShowInStack
+    end
     object miStackShowInDump: TMenuItem
       Action = acShowInDump
+    end
+    object miStackShowInNewDump: TMenuItem
+      Action = acShowInNewDump
+    end
+    object miStackSep0: TMenuItem
+      Caption = '-'
     end
     object miStackFollowRsp: TMenuItem
       Action = acStackFollowRSP
@@ -739,6 +764,15 @@ object frmCpuView: TfrmCpuView
     end
     object miDumpShowInStack: TMenuItem
       Action = acShowInStack
+    end
+    object miDumpShowInDump: TMenuItem
+      Action = acShowInDump
+    end
+    object miDumpShowInNewDump: TMenuItem
+      Action = acShowInNewDump
+    end
+    object miDumpSep0: TMenuItem
+      Caption = '-'
     end
     object miDumpGoto: TMenuItem
       Action = acViewGoto
@@ -867,17 +901,23 @@ object frmCpuView: TfrmCpuView
     object miAsmShowInDump: TMenuItem
       Action = acShowInDump
     end
+    object miAsmShowInNewDump: TMenuItem
+      Action = acShowInNewDump
+    end
     object miAsmShowInStack: TMenuItem
       Action = acShowInStack
+    end
+    object miAsmSep0: TMenuItem
+      Caption = '-'
     end
     object miAsmCurrentIP: TMenuItem
       Action = acAsmReturnToIP
     end
-    object miAsmSource: TMenuItem
-      Action = acAsmShowSource
-    end
     object miAsmGoto: TMenuItem
       Action = acViewGoto
+    end
+    object miAsmSource: TMenuItem
+      Action = acAsmShowSource
     end
     object miAsmSep1: TMenuItem
       Caption = '-'
@@ -910,5 +950,12 @@ object frmCpuView: TfrmCpuView
     OnTimer = tmpZOrderLockTimer
     Left = 656
     Top = 104
+  end
+  object pmDumps: TPopupMenu
+    Left = 368
+    Top = 1040
+    object miDumpsClosePage: TMenuItem
+      Action = acDumpsClosePage
+    end
   end
 end

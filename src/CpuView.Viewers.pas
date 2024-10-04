@@ -1738,7 +1738,7 @@ begin
   for I := 0 to Frames.Count - 1 do
   begin
     AddrPC := Frames.List[I].AddrPC;
-    FAddrPCDict.Add(RawData.AddressToRowIndex(AddrPC), AddrPC);
+    FAddrPCDict.AddOrSetValue(RawData.AddressToRowIndex(AddrPC), AddrPC);
   end;
   Invalidate;
 end;

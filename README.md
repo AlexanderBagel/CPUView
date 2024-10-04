@@ -10,11 +10,12 @@ Attention - BETA, version!!!
 4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
 5. Enjoy
 
-### Four active editors:
+### Five active editors:
 1. Disassembler
 2. Registers
 3. Dump
 4. Stack
+5. Script and Hint
 
 Common features:
 * OS: Windows and Linux support via Gtk2 (Qt not tested)
@@ -22,6 +23,7 @@ Common features:
 * Light and dark display themes
 * Crosscompiling support (tested on Windows)
 * Supports thread switching with instantaneous change of displayed information about the active thread
+* Command to jump the selected address in any of the windows
 
 The disassembler supports:
 * Output debugging information
@@ -29,7 +31,6 @@ The disassembler supports:
 * Active jump highlighting
 * Highlighting of the selected register (in the register window)
 * Displays the names of called functions instead of their addresses
-* Commands to switch to dump or stack mode
 * Offsets
 * Hinting on the selected instruction with a menu to jump to each block of the received information
 * Instruction coloring for easy code reading
@@ -41,19 +42,17 @@ Register window:
 * Two display modes (full and compact)
 * Three display modes for x87 registers (ST-R-M)
 * Quick hint on active jump instructions
-* Commands to jump to disassembler, dump, or stack mode
 
 Stack supports:
 * Debug information
 * Active and previous frames highlighting
 * Return address highlighting
 * Offsets
-* Commands to switch to disassembler or dump mode
 
 Dump supports:
-* Commands to switch to disassembler or stack mode
 * Offsets
-* Multiple dump windows (Not yet implemented)
+* Multiple dump windows
+* Selections (not yet implemented)
 
 ### Appearance:
 

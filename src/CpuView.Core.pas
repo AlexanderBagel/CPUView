@@ -51,6 +51,48 @@ type
     CallInstruction: Boolean;
   end;
 
+  TDumpViewRec = record
+    View: TDumpView;
+    Stream: TBufferedROStream;
+    LastAddrVA: Int64;
+  end;
+
+  { TDumpViewList }
+
+  TDumpViewList = class
+  private
+    FActive: Boolean;
+    FAddressMode: TAddressMode;
+    FItemIndex: Integer;
+    FItems: TList<TDumpViewRec>;
+    FOnUpdated: TOnCacheUpdated;
+    FUtils: TCommonUtils;
+    FOnUpdate: TOnCacheUpdated;
+    function CheckIndex(AValue: Integer): Boolean;
+    function GetLastAddrVA: Int64;
+    function GetStream: TBufferedROStream;
+    function GetView: TDumpView;
+    procedure SetAddressMode(AValue: TAddressMode);
+    procedure SetItemIndex(AValue: Integer);
+    procedure SetLastAddrVA(AValue: Int64);
+    procedure SetOnUpdated(AValue: TOnCacheUpdated);
+  public
+    constructor Create(AUtils: TCommonUtils);
+    destructor Destroy; override;
+    function Add(AValue: TDumpView): Integer;
+    function Count: Integer;
+    procedure Delete(Index: Integer);
+    procedure Reset;
+    procedure Restore(DefAddrVA: Int64);
+    procedure Update(Index: Integer; AddrVA: Int64);
+    property AddressMode: TAddressMode read FAddressMode write SetAddressMode;
+    property ItemIndex: Integer read FItemIndex write SetItemIndex;
+    property LastAddrVA: Int64 read GetLastAddrVA write SetLastAddrVA;
+    property Stream: TBufferedROStream read GetStream;
+    property View: TDumpView read GetView;
+    property OnUpdated: TOnCacheUpdated read FOnUpdated write SetOnUpdated;
+  end;
+
   { TCpuViewCore }
 
   TCpuViewCore = class
@@ -63,6 +105,7 @@ type
     FCacheListIndex: Integer;
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
+    FDumpViewList: TDumpViewList;
     FInvalidReg: TRegionData;
     FJmpStack: TStack<Int64>;
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
@@ -73,9 +116,6 @@ type
     FShowCallFuncName: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
-    FDumpView: TDumpView;
-    FDumpStream:  TBufferedROStream;
-    FDumpLastAddrVA: Int64;
     FOldAsmScroll: TOnVerticalScrollEvent;
     FOldAsmSelect: TNotifyEvent;
     FUtils: TCommonUtils;
@@ -92,7 +132,6 @@ type
     procedure OnDebugerStateChange(Sender: TObject);
     procedure SetAsmView(const Value: TAsmView);
     procedure SetDebugger(const Value: TAbstractDebugger);
-    procedure SetDumpView(const Value: TDumpView);
     procedure SetRegView(const Value: TRegView);
     procedure SetShowCallFuncName(AValue: Boolean);
     procedure SetStackView(const Value: TStackView);
@@ -122,7 +161,7 @@ type
     function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean;
     property AsmView: TAsmView read FAsmView write SetAsmView;
     property Debugger: TAbstractDebugger read FDebugger write SetDebugger;
-    property DumpView: TDumpView read FDumpView write SetDumpView;
+    property DumpViewList: TDumpViewList read FDumpViewList;
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
   public
@@ -134,6 +173,159 @@ implementation
 
 const
   DisasmBuffSize = 384;
+
+{ TDumpViewList }
+
+function TDumpViewList.CheckIndex(AValue: Integer): Boolean;
+begin
+  Result := (AValue >= 0) and (AValue < FItems.Count);
+end;
+
+function TDumpViewList.GetLastAddrVA: Int64;
+begin
+  if CheckIndex(ItemIndex) then
+    Result := FItems.List[ItemIndex].LastAddrVA
+  else
+    Result := 0;
+end;
+
+function TDumpViewList.GetStream: TBufferedROStream;
+begin
+  if CheckIndex(ItemIndex) then
+    Result := FItems.List[ItemIndex].Stream
+  else
+    Result := nil;
+end;
+
+function TDumpViewList.GetView: TDumpView;
+begin
+  if CheckIndex(ItemIndex) then
+    Result := FItems.List[ItemIndex].View
+  else
+    Result := nil;
+end;
+
+procedure TDumpViewList.SetAddressMode(AValue: TAddressMode);
+var
+  I: Integer;
+begin
+  if AddressMode <> AValue then
+  begin
+    FAddressMode := AValue;
+    for I := 0 to Count - 1 do
+    begin
+      FItems.List[ItemIndex].View.AddressMode := AValue;
+      FItems.List[ItemIndex].View.FitColumnsToBestSize;
+    end;
+  end;
+end;
+
+procedure TDumpViewList.SetItemIndex(AValue: Integer);
+begin
+  if ItemIndex <> AValue then
+  begin
+    if CheckIndex(AValue) then
+      FItemIndex := AValue
+    else
+      FItemIndex := -1;
+  end;
+end;
+
+procedure TDumpViewList.SetLastAddrVA(AValue: Int64);
+begin
+  if CheckIndex(ItemIndex) then
+    FItems.List[ItemIndex].LastAddrVA := AValue;
+end;
+
+procedure TDumpViewList.SetOnUpdated(AValue: TOnCacheUpdated);
+var
+  I: Integer;
+begin
+  FOnUpdated := AValue;
+  for I := 0 to Count - 1 do
+    FItems.List[ItemIndex].Stream.Stream.OnUpdated := AValue;
+end;
+
+constructor TDumpViewList.Create(AUtils: TCommonUtils);
+begin
+  FUtils := AUtils;
+  FItems := TList<TDumpViewRec>.Create;
+end;
+
+destructor TDumpViewList.Destroy;
+begin
+  while Count > 0 do
+    Delete(0);
+  FItems.Free;
+  inherited Destroy;
+end;
+
+function TDumpViewList.Add(AValue: TDumpView): Integer;
+var
+  RemoteStream: TRemoteStream;
+  Data: TDumpViewRec;
+begin
+  Data.LastAddrVA := 0;
+  Data.View := AValue;
+  RemoteStream := TRemoteStream.Create(FUtils);
+  Data.Stream := TBufferedROStream.Create(RemoteStream, soOwned);
+  Result := FItems.Add(Data);
+  AValue.AddressMode := AddressMode;
+  AValue.FitColumnsToBestSize;
+end;
+
+function TDumpViewList.Count: Integer;
+begin
+  Result := FItems.Count;
+end;
+
+procedure TDumpViewList.Delete(Index: Integer);
+begin
+  if not CheckIndex(Index) then Exit;
+  FItems.List[Index].View.SetDataStream(nil, 0);
+  FItems.List[Index].Stream.Free;
+  FItems.Delete(Index);
+  if Index < ItemIndex then
+    Dec(FItemIndex);
+end;
+
+procedure TDumpViewList.Reset;
+var
+  I: Integer;
+begin
+  for I := 0 to Count - 1 do
+    FItems.List[I].View.SetDataStream(nil, 0);
+end;
+
+procedure TDumpViewList.Restore(DefAddrVA: Int64);
+var
+  I: Integer;
+begin
+  for I := 0 to Count - 1 do
+  begin
+    if FItems.List[I].LastAddrVA = 0 then
+      FItems.List[I].LastAddrVA := DefAddrVA;
+    Update(I, FItems.List[I].LastAddrVA);
+  end;
+end;
+
+procedure TDumpViewList.Update(Index: Integer; AddrVA: Int64);
+var
+  RegData: TRegionData;
+  AStream: TBufferedROStream;
+  AView: TDumpView;
+begin
+  if not CheckIndex(Index) then Exit;
+  if not FUtils.QueryRegion(AddrVA, RegData) then Exit;
+  AView := FItems.List[Index].View;
+  AStream := FItems.List[Index].Stream;
+  AStream.Stream.OnUpdated := FOnUpdate;
+  AStream.SetAddrWindow(RegData.BaseAddr, RegData.RegionSize);
+  AView.SetDataStream(AStream, RegData.BaseAddr);
+  AView.AddressMode := AddressMode;
+  AView.FocusOnAddress(AddrVA, ccmSelectRow);
+  FItems.List[Index].LastAddrVA := AddrVA;
+end;
 
 { TCpuViewCore }
 
@@ -194,6 +386,7 @@ begin
   FCacheList := TList<TAsmLine>.Create;
   FAddrIndex := TDictionary<Int64, Integer>.Create;
   FUtils := TCommonUtils.Create;
+  FDumpViewList := TDumpViewList.Create(FUtils);
   RemoteStream := TRemoteStream.Create(FUtils);
   FAsmStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FAsmStream.BufferSize := DisasmBuffSize;
@@ -202,8 +395,6 @@ begin
   FDisassemblyStream.BufferSize := DisasmBuffSize;
   RemoteStream := TRemoteStream.Create(FUtils);
   FStackStream := TBufferedROStream.Create(RemoteStream, soOwned);
-  RemoteStream := TRemoteStream.Create(FUtils);
-  FDumpStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
   FShowCallFuncName := True;
   FJmpStack := TStack<Int64>.Create;
@@ -212,11 +403,11 @@ end;
 destructor TCpuViewCore.Destroy;
 begin
   FCacheList.Free;
+  FDumpViewList.Free;
   FAddrIndex.Free;
   FAsmStream.Free;
   FDisassemblyStream.Free;
   FStackStream.Free;
-  FDumpStream.Free;
   FKnownFunctionAddrVA.Free;
   FJmpStack.Free;
   FUtils.Free;
@@ -524,10 +715,9 @@ begin
         FAsmView.SetDataStream(nil, 0);
       if Assigned(FRegView) then
         FRegView.Context := nil;
-      if Assigned(FDumpView) then
-        FDumpView.SetDataStream(nil, 0);
       if Assigned(FStackView) then
         FStackView.SetDataStream(nil, 0);
+      FDumpViewList.Reset;
       DoReset;
     end;
   end;
@@ -553,11 +743,8 @@ begin
     FStackView.FramesUpdated;
     FStackView.FocusOnAddress(FLastCtx.StackPoint, ccmSelectRow);
   end;
-  if Assigned(FDumpView) then
-  begin
-    FDumpView.AddressMode := GetAddrMode;
-    ShowDumpAtAddr(FDumpLastAddrVA);
-  end;
+  FDumpViewList.AddressMode := GetAddrMode;
+  FDumpViewList.Restore(FDebugger.CurrentInstructionPoint);
 end;
 
 procedure TCpuViewCore.RefreshAsmView(Forced: Boolean);
@@ -622,28 +809,17 @@ begin
     FDebugger.OnBreakPointsChange := OnBreakPointsChange;
     FAsmStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
     FDisassemblyStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
-    FDumpStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+    FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
     FStackStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   end
   else
   begin
     FAsmStream.Stream.OnUpdated := nil;
     FDisassemblyStream.Stream.OnUpdated := nil;
-    FDumpStream.Stream.OnUpdated := nil;
+    FDumpViewList.OnUpdated := nil;
     FStackStream.Stream.OnUpdated := nil;
   end;
   UpdateStreamsProcessID;
-end;
-
-procedure TCpuViewCore.SetDumpView(const Value: TDumpView);
-begin
-  if DumpView <> Value then
-  begin
-    FDumpView := Value;
-    if Value = nil then Exit;
-    Value.FitColumnsToBestSize;
-    RefreshView;
-  end;
 end;
 
 procedure TCpuViewCore.SetRegView(const Value: TRegView);
@@ -702,18 +878,11 @@ begin
 end;
 
 procedure TCpuViewCore.ShowDumpAtAddr(AddrVA: Int64);
-var
-  RegData: TRegionData;
 begin
-  if FDumpView = nil then Exit;
+  if FDumpViewList.Count = 0 then Exit;
   if (AddrVA = 0) and CanWork then
     AddrVA := FDebugger.CurrentInstructionPoint;
-  {$message 'чо бум делать если память не доступна?'}
-  if not FUtils.QueryRegion(AddrVA, RegData) then Exit;
-  FDumpStream.SetAddrWindow(RegData.BaseAddr, RegData.RegionSize);
-  FDumpView.SetDataStream(FDumpStream, RegData.BaseAddr);
-  FDumpView.FocusOnAddress(AddrVA, ccmSelectRow);
-  FDumpLastAddrVA := AddrVA;
+  FDumpViewList.Update(FDumpViewList.ItemIndex, AddrVA);
 end;
 
 procedure TCpuViewCore.ShowStackAtAddr(AddrVA: Int64);

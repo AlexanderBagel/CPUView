@@ -9,10 +9,9 @@ interface
 
 uses
   CpuView.Actions, CpuView.Common, CpuView.Core, CpuView.CPUContext, 
-  CpuView.DebugerGate, CpuView.FpDebug, CpuView.IntelContext, 
-  CpuView.IntelContext.Types, CpuView.Reg.LCL, CpuView.Reg, 
+  CpuView.DebugerGate, CpuView.FpDebug, CpuView.Reg.LCL, CpuView.Reg, 
   CpuView.ScriptExecutor, CpuView.Settings, CpuView.Stream, CpuView.Viewers, 
-  LazarusPackageIntf;
+  dlgCpuView, LazarusPackageIntf;
 
 implementation
 

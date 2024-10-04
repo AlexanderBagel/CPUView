@@ -49,6 +49,8 @@ type
     acAsmReturnToIP: TAction;
     acAsmSetNewIP: TAction;
     acAsmShowSource: TAction;
+    acShowInNewDump: TAction;
+    acDumpsClosePage: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -95,6 +97,13 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miStackShowInNewDump: TMenuItem;
+    miDumpShowInNewDump: TMenuItem;
+    miAsmShowInNewDump: TMenuItem;
+    miRegShowInNewDump: TMenuItem;
+    miDumpsClosePage: TMenuItem;
+    miStackShowInStack: TMenuItem;
+    miDumpShowInDump: TMenuItem;
     miAsmSource: TMenuItem;
     miAsmCurrentIP: TMenuItem;
     miAsmSetNewIP: TMenuItem;
@@ -205,10 +214,14 @@ type
     pnDebug: TPanel;
     pmRegSelected: TPopupMenu;
     pmHint: TPopupMenu;
+    pmDumps: TPopupMenu;
     RegView: TRegView;
     miRegSep1: TMenuItem;
     miAsmSep3: TMenuItem;
     miAsmSep1: TMenuItem;
+    miAsmSep0: TMenuItem;
+    miDumpSep0: TMenuItem;
+    miStackSep0: TMenuItem;
     splitAsmDumps: TSplitter;
     splitDumpStack: TSplitter;
     splitAsmReg: TSplitter;
@@ -235,6 +248,8 @@ type
     procedure acDbgStepInExecute(Sender: TObject);
     procedure acDbgStepOutExecute(Sender: TObject);
     procedure acDbgToggleBpExecute(Sender: TObject);
+    procedure acDumpsClosePageExecute(Sender: TObject);
+    procedure acDumpsClosePageUpdate(Sender: TObject);
     procedure acHighlightRegExecute(Sender: TObject);
     procedure acHighlightRegUpdate(Sender: TObject);
     procedure acRegModifyDecExecute(Sender: TObject);
@@ -246,6 +261,7 @@ type
     procedure acShowInAsmUpdate(Sender: TObject);
     procedure acShowInDumpExecute(Sender: TObject);
     procedure acShowInDumpUpdate(Sender: TObject);
+    procedure acShowInNewDumpExecute(Sender: TObject);
     procedure acShowInStackExecute(Sender: TObject);
     procedure acShowInStackUpdate(Sender: TObject);
     procedure acStackFollowRSPExecute(Sender: TObject);
@@ -274,11 +290,13 @@ type
     FContextRegValue,
     FDumpSelectedValue,
     FStackSelectedValue: UInt64;
+    FDumpNameIdx: Integer;
     FContextRegName, FSourcePath: string;
     FContextRegister: TRegister;
     FContextRegisterParam: TRegParam;
     FSourceLine: Integer;
     function ActiveViewerSelectedValue: UInt64;
+    procedure InternalShowInDump(AddrVA: Int64);
   protected
     function ActiveDumpView: TDumpView;
     function ActiveViewIndex: Integer;
@@ -315,7 +333,7 @@ begin
   FCore.Debugger := FDbgGate;
   FCore.AsmView := AsmView;
   FCore.RegView := RegView;
-  FCore.DumpView := DumpView;
+  FCore.DumpViewList.Add(DumpView);
   FCore.StackView := StackView;
   ToolBar.Images := IDEImages.Images_16;
   tbBreakPoint.ImageIndex := IDEImages.LoadImage('ActiveBreakPoint');
@@ -401,9 +419,20 @@ begin
     Result := FStackSelectedValue;
 end;
 
+procedure TfrmCpuView.InternalShowInDump(AddrVA: Int64);
+begin
+  Core.ShowDumpAtAddr(AddrVA);
+  ActiveDumpView.SelStart := AddrVA;
+  if ActiveViewIndex = 0 then
+    ActiveDumpView.SelEnd := AddrVA + AsmView.SelectedRawLength - 1
+  else
+    ActiveDumpView.SelEnd := AddrVA + FDbgGate.PointerSize - 1;
+  ActiveControl := ActiveDumpView;
+end;
+
 function TfrmCpuView.ActiveDumpView: TDumpView;
 begin
-  Result := DumpView;
+  Result := pcDumps.ActivePage.Controls[0] as TDumpView;
 end;
 
 function TfrmCpuView.ActiveViewIndex: Integer;
@@ -517,6 +546,27 @@ begin
     Core.AddrInDump(ActiveViewerSelectedValue);
 end;
 
+procedure TfrmCpuView.acShowInNewDumpExecute(Sender: TObject);
+var
+  NewPage: TTabSheet;
+  NewDump: TDumpView;
+  AddrVA: Int64;
+begin
+  AddrVA := ActiveViewerSelectedValue;
+  Inc(FDumpNameIdx);
+  NewPage := pcDumps.AddTabSheet;
+  NewPage.Caption := 'DUMP' + IntToStr(FDumpNameIdx);
+  NewDump := TDumpView.Create(NewPage);
+  NewDump.Parent := NewPage;
+  NewDump.Align := alClient;
+  NewDump.PopupMenu := pmDump;
+  NewDump.OnSelectionChange := DumpViewSelectionChange;
+  Core.DumpViewList.Add(NewDump);
+  pcDumps.ActivePage := NewPage;
+  Core.DumpViewList.ItemIndex := NewPage.PageIndex;
+  InternalShowInDump(AddrVA);
+end;
+
 procedure TfrmCpuView.acShowInStackExecute(Sender: TObject);
 begin
   Core.ShowStackAtAddr(ActiveViewerSelectedValue);
@@ -555,13 +605,7 @@ end;
 
 procedure TfrmCpuView.acShowInDumpExecute(Sender: TObject);
 begin
-  Core.ShowDumpAtAddr(ActiveViewerSelectedValue);
-  ActiveDumpView.SelStart := ActiveViewerSelectedValue;
-  if ActiveViewIndex = 0 then
-    ActiveDumpView.SelEnd := ActiveViewerSelectedValue + AsmView.SelectedRawLength - 1
-  else
-    ActiveDumpView.SelEnd := ActiveViewerSelectedValue + FDbgGate.PointerSize - 1;
-  ActiveControl := ActiveDumpView;
+  InternalShowInDump(ActiveViewerSelectedValue);
 end;
 
 procedure TfrmCpuView.acShowInAsmUpdate(Sender: TObject);
@@ -691,7 +735,7 @@ end;
 procedure TfrmCpuView.acDbgRunToUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled := (DbgGate.DebugState = adsPaused) and
-    Core.AddrInAsm(FAsmViewSelectedAddr);
+    (FAsmViewSelectedAddr <> 0);
 end;
 
 procedure TfrmCpuView.acDbgStepInExecute(Sender: TObject);
@@ -710,6 +754,18 @@ procedure TfrmCpuView.acDbgToggleBpExecute(Sender: TObject);
 begin
   FAsmViewSelectedAddr := AsmView.SelectedInstructionAddr;
   DbgGate.ToggleBreakPoint(FAsmViewSelectedAddr);
+end;
+
+procedure TfrmCpuView.acDumpsClosePageExecute(Sender: TObject);
+begin
+  Core.DumpViewList.Delete(pcDumps.PageIndex);
+  pcDumps.ActivePage.Free;
+  Core.DumpViewList.ItemIndex := pcDumps.PageIndex;
+end;
+
+procedure TfrmCpuView.acDumpsClosePageUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := pcDumps.PageIndex > 0;
 end;
 
 end.
