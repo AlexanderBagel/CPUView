@@ -21,7 +21,7 @@ Common features:
 * OS: Windows and Linux support via Gtk2 (Qt not tested)
 * Proc: Intel x86_64 (ARM not yet implemented)
 * Light and dark display themes
-* Crosscompiling support (tested on Windows)
+* Crosscompiling support
 * Supports thread switching with instantaneous change of displayed information about the active thread
 * Command to jump the selected address in any of the windows
 

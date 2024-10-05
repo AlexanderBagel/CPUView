@@ -101,6 +101,18 @@ implementation
 var
   MainThreadID: TThreadID;
 
+type
+  user_fpregs_struct32 = record
+      cwd : longint;
+      swd : longint;
+      twd : longint;
+      fip : longint;
+      fcs : longint;
+      foo : longint;
+      fos : longint;
+      st_space : array[0..79] of Byte;
+    end;
+
 function ReadVirtualFile(const FilePath: string): TMemoryStream;
 var
   F: TFileStream;
@@ -355,7 +367,13 @@ var
   I: Integer;
   io: iovec;
   Regs: TUserRegs;
+  {$IFDEF CPUX86}
+  FpRegs: user_fpxregs_struct32;
+  xmm: user_fpxregs_struct32;
+  {$ENDIF}
+  {$IFDEF CPUX64}
   FpRegs: user_fpregs_struct64;
+  {$ENDIF}
 begin
   Result := Default(TIntelThreadContext);
   io.iov_base := @(Regs.regs32[0]);
@@ -383,7 +401,33 @@ begin
   Result.SegCs := Regs.regs32[XCS];
   Result.SegSs := Regs.regs32[XSS];
 
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
+
+  Result.ControlWord := FpRegs.cwd;
+  Result.StatusWord := FpRegs.swd;
+  Result.TagWord := FpRegs.twd;
+  for I := 0 to 7 do
+    Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I * 10], 10);
+
+  Result.XmmCount := 0;
+  Result.YmmPresent := False;
+
+  io.iov_base := @xmm;
+  io.iov_len := SizeOf(xmm);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
+    Exit;
+
   Result.XmmCount := 8;
+  Result.MxCsr := xmm.mxcsr;
+  for I := 0 to 7 do
+    Move(xmm.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
+  for I := 0 to Result.XmmCount - 1 do
+    Move(xmm.xmm_space[I * 4], Result.Ymm[I].Low, 16);
+
+  Result.YmmPresent := False;
   {$ENDIF}
 
   {$IFDEF CPUX64}
@@ -414,8 +458,6 @@ begin
   Result.SegSs := Regs.regs64[SS];
 
   Result.XmmCount := 16;
-  {$ENDIF}
-
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
   if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
@@ -430,6 +472,7 @@ begin
   for I := 0 to Result.XmmCount - 1 do
     Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
   Result.YmmPresent := False;
+  {$ENDIF}
 end;
 
 function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
@@ -437,7 +480,12 @@ var
   I: Integer;
   io: iovec;
   Regs: TUserRegs;
+  {$IFDEF CPUX86}
+  FpRegs: user_fpxregs_struct32;
+  {$ENDIF}
+  {$IFDEF CPUX64}
   FpRegs: user_fpregs_struct64;
+  {$ENDIF}
 begin
   Result := False;
   io.iov_base := @(Regs.regs32[0]);
@@ -456,6 +504,25 @@ begin
   Regs.regs32[EDI] := AContext.Rdi;
   Regs.regs32[EIP] := AContext.Rip;
   Regs.regs32[EFL] := AContext.EFlags;
+
+  io.iov_base := @(Regs.regs32[0]);
+  io.iov_len := SizeOf(Regs.regs32);
+  if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+    Exit;
+
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
+
+  FpRegs.cwd := AContext.ControlWord;
+  FpRegs.swd := AContext.StatusWord;
+  FpRegs.ftw := AContext.TagWord;
+
+  io.iov_base := @FpRegs;
+  io.iov_len := SizeOf(FpRegs);
+  if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+    Exit;
   {$ENDIF}
 
   {$IFDEF CPUX64}
@@ -477,10 +544,9 @@ begin
   Regs.regs64[R14] := AContext.R[14];
   Regs.regs64[R15] := AContext.R[15];
   Regs.regs64[EFLAGS] := AContext.EFlags;
-  {$ENDIF}
 
   io.iov_base := @(Regs.regs32[0]);
-  io.iov_len := SizeOf(Regs);
+  io.iov_len := SizeOf(Regs.regs64);
   if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
 
@@ -498,6 +564,7 @@ begin
   io.iov_len := SizeOf(FpRegs);
   if Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
     Exit;
+  {$ENDIF}
 
   Result := True;
 end;
@@ -507,7 +574,8 @@ var
   I: Integer;
   io: iovec;
   Regs: TUserRegs;
-  FpRegs: user_fpxregs_struct32;
+  FpRegs: user_fpregs_struct32;
+  xmm: user_fpxregs_struct32;
 begin
   Result := Default(TIntelThreadContext);
   io.iov_base := @(Regs.regs32[0]);
@@ -534,8 +602,6 @@ begin
   Result.SegCs := Regs.regs32[XCS];
   Result.SegSs := Regs.regs32[XSS];
 
-  Result.XmmCount := 8;
-
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
   if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
@@ -544,11 +610,24 @@ begin
   Result.ControlWord := FpRegs.cwd;
   Result.StatusWord := FpRegs.swd;
   Result.TagWord := FpRegs.twd;
-  Result.MxCsr := FpRegs.mxcsr;
   for I := 0 to 7 do
-    Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
+    Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I * 10], 10);
+
+  Result.XmmCount := 0;
+  Result.YmmPresent := False;
+
+  io.iov_base := @xmm;
+  io.iov_len := SizeOf(xmm);
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
+    Exit;
+
+  Result.XmmCount := 8;
+  Result.MxCsr := xmm.mxcsr;
+  for I := 0 to 7 do
+    Move(xmm.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
   for I := 0 to Result.XmmCount - 1 do
-    Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
+    Move(xmm.xmm_space[I * 4], Result.Ymm[I].Low, 16);
+
   Result.YmmPresent := False;
 end;
 
@@ -557,7 +636,7 @@ var
   I: Integer;
   io: iovec;
   Regs: TUserRegs;
-  FpRegs: user_fpxregs_struct32;
+  FpRegs: user_fpregs_struct32;
 begin
   Result := False;
   io.iov_base := @(Regs.regs32[0]);
@@ -589,7 +668,6 @@ begin
   FpRegs.cwd := AContext.ControlWord;
   FpRegs.swd := AContext.StatusWord;
   FpRegs.twd := AContext.TagWord;
-  FpRegs.mxcsr := AContext.MxCsr;
 
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
@@ -663,7 +741,10 @@ begin
   StackBase := Max(Regs.regs32[UESP], Regs.regs32[EBP]);
   {$ENDIF}
   {$IFDEF CPUX64}
-  StackBase := Max(Regs.regs64[RSP], Regs.regs64[RBP]);
+  if ThreadIs32 then
+    StackBase := Max(Regs.regs32[UESP], Regs.regs32[EBP])
+  else
+    StackBase := Max(Regs.regs64[RSP], Regs.regs64[RBP]);
   {$ENDIF}
   if VirtualQueryMBI(StackBase, MBI) then
   begin

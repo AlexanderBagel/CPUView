@@ -61,7 +61,6 @@ type
 
   TDumpViewList = class
   private
-    FActive: Boolean;
     FAddressMode: TAddressMode;
     FItemIndex: Integer;
     FItems: TList<TDumpViewRec>;
@@ -142,12 +141,12 @@ type
     function GetKnownFunctionAtAddr(AddrVA: Uint64): string;
     procedure LoadFromCache(AIndex: Integer);
     procedure RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
-      var AComment: string);
+      AColumn: TColumnType; var AComment: string);
     procedure RefreshView(Forced: Boolean = False);
     procedure RefreshAsmView(Forced: Boolean);
     procedure ResetCache;
     procedure StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
-      var AComment: string);
+      AColumn: TColumnType; var AComment: string);
     procedure UpdateStreamsProcessID;
   public
     constructor Create;
@@ -507,7 +506,7 @@ begin
   TopCacheSize := AAddress - WindowAddr;
 
   FDisassemblyStream.SetAddrWindow(WindowAddr, DisasmBuffSize);
-  SetLength(Buff, DisasmBuffSize);
+  SetLength(Buff{%H-}, DisasmBuffSize);
   Count := FDisassemblyStream.Read(Buff[0], DisasmBuffSize);
   if Count > 0 then
   begin
@@ -566,7 +565,7 @@ begin
 end;
 
 procedure TCpuViewCore.RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
-  var AComment: string);
+  AColumn: TColumnType; var AComment: string);
 begin
   AComment := GetKnownFunctionAtAddr(AddrVA);
 end;
@@ -772,15 +771,21 @@ begin
 end;
 
 procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
-  var AComment: string);
+  AColumn: TColumnType; var AComment: string);
 var
   AStackValue: Int64;
 begin
-  AStackValue := 0;
-  if not CanWork then Exit;
-  FStackStream.Stream.Position := AddrVA;
-  FStackStream.Stream.ReadBuffer(AStackValue, Debugger.PointerSize);
-  AComment := GetKnownFunctionAtAddr(AStackValue);
+  case AColumn of
+    ctNone: ;
+    ctComment:
+    begin
+      AStackValue := 0;
+      if not CanWork then Exit;
+      FStackStream.Stream.Position := AddrVA;
+      FStackStream.Stream.ReadBuffer(AStackValue, Debugger.PointerSize);
+      AComment := GetKnownFunctionAtAddr(AStackValue);
+    end;
+  end;
 end;
 
 procedure TCpuViewCore.SetAsmView(const Value: TAsmView);

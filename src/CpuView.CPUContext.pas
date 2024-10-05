@@ -70,7 +70,8 @@ type
   TContextChangeType = (cctRemaped, cctDataChange);
   TContextChangeEvent = procedure(Sender: TObject;
     AChangeType: TContextChangeType) of object;
-  TContextQueryRegHintEvent = procedure(Sender: TObject; AddrVA: UInt64; var AHint: string) of object;
+  TContextQueryRegHintEvent = procedure(Sender: TObject; AddrVA: UInt64;
+    AColumnType: TColumnType; var AHint: string) of object;
 
   // Минимальный класс необходимый для работы StackView
 
@@ -241,7 +242,7 @@ end;
 procedure TAbstractCPUContext.DoQueryRegHint(AddrVA: UInt64; var AHint: string);
 begin
   if Assigned(FQueryHint) then
-    FQueryHint(Self, AddrVA, AHint);
+    FQueryHint(Self, AddrVA, ctComment, AHint);
 end;
 
 procedure TAbstractCPUContext.DoUpdate(AChangeType: TContextChangeType);

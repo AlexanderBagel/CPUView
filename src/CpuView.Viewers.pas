@@ -1044,7 +1044,7 @@ procedure TExecutionPointPostPainter.PostPaint(ACanvas: TCanvas; StartRow,
   EndRow: Int64; var Offset: TPoint);
 var
   AsmView: TCustomAsmView;
-  RowIndex: Int64;
+  AddrVA, RowIndex: Int64;
   R: TRect;
   Param: TDrawLineParam;
   JmpLine: Int64;
@@ -1086,6 +1086,8 @@ begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font.Color := AsmView.ColorMap.RIPMarkColor;
   OffsetRect(R, 0, -1 + (R.Height - RowHeight) div 2);
+  // пока что тут тормозну
+  //DoQueryComment()
   DrawText(ACanvas.Handle, PChar('IP'), -1, R, 0);
 end;
 
