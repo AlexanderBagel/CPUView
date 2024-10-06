@@ -75,6 +75,7 @@ const
   xmlSelectInactiveColor = 'selectInactive';
   xmlTextColor = 'text';
   xmlTextCommentColor = 'textComment';
+  xmlWorkSpaceTextColor = 'workSpaceText';
   xmlActiveJumpColor = 'asmActiveJmp';
   xmlArrowDownColor = 'asmArrowDown';
   xmlArrowDownSelectedColor = 'asmArrowDownSelected';
@@ -90,7 +91,6 @@ const
   xmlBpFontColor = 'asmBpFont';
   xmlRegHighlightBackColor = 'asmRegHighlight';
   xmlRegHighlightFontColor = 'asmRegHighlightFont';
-  xmlRIPMarkColor = 'asmRip';
   xmlRIPBackgroundColor = 'asmRipBk';
   xmlRIPBackgroundFontColor = 'asmRipFont';
   xmlSourceLineColor = 'asmSourceLine';
@@ -408,6 +408,7 @@ begin
     Cm.SelectInactiveColor := GetNodeAttr(Root, xmlSelectInactiveColor);
     Cm.TextColor := GetNodeAttr(Root, xmlTextColor);
     Cm.TextCommentColor := GetNodeAttr(Root, xmlTextCommentColor);
+    Cm.WorkSpaceTextColor := GetNodeAttr(Root, xmlWorkSpaceTextColor);
   end;
   UpdateColorMap(CmAsm);
   UpdateColorMap(CmStack);
@@ -441,7 +442,6 @@ begin
     CmAsm.NopColor := GetNodeAttr(Root, xmlNopColor);
     CmAsm.RegHighlightBackColor := GetNodeAttr(Root, xmlRegHighlightBackColor);
     CmAsm.RegHighlightFontColor := GetNodeAttr(Root, xmlRegHighlightFontColor);
-    CmAsm.RIPMarkColor := GetNodeAttr(Root, xmlRIPMarkColor);
     CmAsm.RIPBackgroundColor := GetNodeAttr(Root, xmlRIPBackgroundColor);
     CmAsm.RIPBackgroundFontColor := GetNodeAttr(Root, xmlRIPBackgroundFontColor);
     CmAsm.SizePfxColor := GetNodeAttr(Root, xmlSizePfxColor);
@@ -609,6 +609,7 @@ begin
     SetNodeAttr(Root, xmlSelectInactiveColor, Cm.SelectInactiveColor);
     SetNodeAttr(Root, xmlTextColor, Cm.TextColor);
     SetNodeAttr(Root, xmlTextCommentColor, Cm.TextCommentColor);
+    SetNodeAttr(Root, xmlWorkSpaceTextColor, Cm.WorkSpaceTextColor);
   end;
   // настройки цвета для дизассемблера
   CmAsm := FAsmView.ColorMap;
@@ -639,7 +640,6 @@ begin
     SetNodeAttr(Root, xmlNopColor, CmAsm.NopColor);
     SetNodeAttr(Root, xmlRegHighlightBackColor, CmAsm.RegHighlightBackColor);
     SetNodeAttr(Root, xmlRegHighlightFontColor, CmAsm.RegHighlightFontColor);
-    SetNodeAttr(Root, xmlRIPMarkColor, CmAsm.RIPMarkColor);
     SetNodeAttr(Root, xmlRIPBackgroundColor, CmAsm.RIPBackgroundColor);
     SetNodeAttr(Root, xmlRIPBackgroundFontColor, CmAsm.RIPBackgroundFontColor);
     SetNodeAttr(Root, xmlSizePfxColor, CmAsm.SizePfxColor);

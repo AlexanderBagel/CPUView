@@ -135,6 +135,8 @@ type
     procedure SetShowCallFuncName(AValue: Boolean);
     procedure SetStackView(const Value: TStackView);
   protected
+    procedure AsmViewQueryComment(Sender: TObject; AddrVA: UInt64;
+      AColumn: TColumnType; var AComment: string);
     procedure BuildAsmWindow(AAddress: Int64);
     function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
@@ -334,6 +336,14 @@ var
 begin
   StackLim := FDebugger.ThreadStackLimit;
   Result := (AddrVA <= StackLim.Base) and (AddrVA >= StackLim.Limit);
+end;
+
+procedure TCpuViewCore.AsmViewQueryComment(Sender: TObject; AddrVA: UInt64;
+  AColumn: TColumnType; var AComment: string);
+begin
+  case AColumn of
+    ctWorkSpace: AComment := FDebugger.Context.QueryRegNameAtAddr(AddrVA);
+  end;
 end;
 
 procedure TCpuViewCore.BuildAsmWindow(AAddress: Int64);
@@ -776,7 +786,7 @@ var
   AStackValue: Int64;
 begin
   case AColumn of
-    ctNone: ;
+    ctWorkSpace: AComment := FDebugger.Context.QueryRegNameAtAddr(AddrVA);
     ctComment:
     begin
       AStackValue := 0;
@@ -797,6 +807,7 @@ begin
     FOldAsmSelect := FAsmView.OnSelectionChange;
     FAsmView.OnJmpTo := OnAsmJmpTo;
     FAsmView.OnSelectionChange := OnAsmSelectionChange;
+    FAsmView.OnQueryComment := AsmViewQueryComment;
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;
     FAsmView.FitColumnsToBestSize;

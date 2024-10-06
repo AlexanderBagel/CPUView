@@ -14,6 +14,7 @@ uses
 {$ENDIF}
   SysUtils,
   Classes,
+  Generics.Collections,
   FWHexView.Common,
   CpuView.Common,
   CpuView.CPUContext,
@@ -38,6 +39,7 @@ type
     FContext: TIntelThreadContext;
     FMapMode: TIntelCpuMapMode;
     FFPUMode: TFPUMode;
+    FQueryRegAtAddr: TDictionary<Int64, string>;
     FShowDebug: Boolean;
     FShowXMM: Boolean;
     FShowYMM: Boolean;
@@ -51,6 +53,7 @@ type
     procedure SetShowFPU(const Value: Boolean);
     procedure SetShowXMM(const Value: Boolean);
     procedure SetShowYMM(const Value: Boolean);
+    procedure UpdateQueryRegs;
     procedure UpdateModifyed(const Value: TIntelThreadContext);
   protected
     procedure BuildMap; override;
@@ -80,12 +83,14 @@ type
     procedure SetMxCsrRoundingValue(AValue: Byte);
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure InitDefault; override;
     function InstructonPoint: UInt64; override;
     function InstructonPointID: Integer; override;
     function IsActiveJump(const Value: string): Boolean; override;
     function PointerSize: Integer; override;
     function QueryRegIndexByName(const RegName: string; out Index: Integer): Boolean; override;
+    function QueryRegNameAtAddr(AddrVA: Int64): string; override;
     function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; override;
     function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; override;
     function RegSetValueAtIndex(RegID: TRegID; Index: Integer): string; override;
@@ -387,6 +392,13 @@ begin
   FShowFPU := True;
   for I := 0 to 3 do
     FSavedDetailed[I] := I <> 2;
+  FQueryRegAtAddr := TDictionary<Int64, string>.Create;
+end;
+
+destructor TIntelCpuContext.Destroy;
+begin
+  FQueryRegAtAddr.Free;
+  inherited;
 end;
 
 procedure TIntelCpuContext.DoChangeViewMode(RegID: TRegID;
@@ -1030,6 +1042,12 @@ begin
   Index := -1;
 end;
 
+function TIntelCpuContext.QueryRegNameAtAddr(AddrVA: Int64): string;
+begin
+  if not FQueryRegAtAddr.TryGetValue(AddrVA, Result) then
+    Result := '';
+end;
+
 function TIntelCpuContext.QueryRegValueByName(const RegName: string;
   out RegValue: UInt64): Boolean;
 const
@@ -1334,6 +1352,7 @@ begin
       ACtx.Rip := CurrentIP;
       Context := ACtx;
     end;
+    UpdateQueryRegs;
     Exit;
   end;
   {$ENDIF}
@@ -1346,6 +1365,7 @@ begin
     ACtx.Rip := CurrentIP;
     Context := ACtx;
   end;
+  UpdateQueryRegs;
 end;
 
 procedure TIntelCpuContext.UpdateLastRegData(RegID: TRegID);
@@ -1728,6 +1748,34 @@ begin
   CheckReg(FContext.Dr3, Value.Dr3, 27);
   CheckReg(FContext.Dr6, Value.Dr6, 28);
   CheckReg(FContext.Dr7, Value.Dr7, 29);
+end;
+
+procedure TIntelCpuContext.UpdateQueryRegs;
+
+  procedure AddReg(const RegName: string; AddrVA: Int64);
+  var
+    Param: string;
+  begin
+    if FQueryRegAtAddr.TryGetValue(AddrVA, Param) then
+      Param := Param + ' ' + RegName
+    else
+      Param := RegName;
+    FQueryRegAtAddr.AddOrSetValue(AddrVA, Param);
+  end;
+
+var
+  I: Integer;
+  RegValue: UInt64;
+begin
+  FQueryRegAtAddr.Clear;
+  // RAX..R15, DR0..DR3
+  for I in [0..16, 24..27] do
+  begin
+    LastReg.RegID := I;
+    UpdateLastRegData(I);
+    GetRegValue(I, RegValue);
+    AddReg(LastReg.RegName, RegValue);
+  end;
 end;
 
 function TIntelCpuContext.UpdateRegValue(RegID: TRegID;

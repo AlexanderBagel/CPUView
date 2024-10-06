@@ -194,6 +194,7 @@ type
     function InstructonPointID: Integer; virtual; abstract;
     function IsActiveJump(const Value: string): Boolean; virtual; abstract;
     function QueryRegIndexByName(const RegName: string; out Index: Integer): Boolean; virtual; abstract;
+    function QueryRegNameAtAddr(AddrVA: Int64): string; virtual; abstract;
     function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; virtual; abstract;
     function RegCount(RowIndex: Integer): Integer; override;
     function RegData(RowIndex, ColIndex: Integer;

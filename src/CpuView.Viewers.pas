@@ -71,7 +71,6 @@ type
     FRegHighlightFontColor: TColor;
     FRIPBackgroundColor: TColor;
     FRIPBackgroundFontColor: TColor;
-    FRIPMarkColor: TColor;
     FSourceLineColor: TColor;
     FSizePfxColor: TColor;
     procedure SetActiveJmpColor(const Value: TColor);
@@ -92,7 +91,6 @@ type
     procedure SetRegHighlightFontColor(AValue: TColor);
     procedure SetRIPBackgroundColor(AValue: TColor);
     procedure SetRIPBackgroundFontColor(AValue: TColor);
-    procedure SetRIPMarkColor(AValue: TColor);
     procedure SetSourceLineColor(AValue: TColor);
     procedure SetSizePfxColor(const Value: TColor);
   protected
@@ -117,7 +115,6 @@ type
     property RegHighlightFontColor: TColor read FRegHighlightFontColor write SetRegHighlightFontColor stored IsColorStored;
     property RIPBackgroundColor: TColor read FRIPBackgroundColor write SetRIPBackgroundColor stored IsColorStored;
     property RIPBackgroundFontColor: TColor read FRIPBackgroundFontColor write SetRIPBackgroundFontColor stored IsColorStored;
-    property RIPMarkColor: TColor read FRIPMarkColor write SetRIPMarkColor stored IsColorStored;
     property SizePfxColor: TColor read FSizePfxColor write SetSizePfxColor stored IsColorStored;
     property SourceLineColor: TColor read FSourceLineColor write SetSourceLineColor stored IsColorStored;
   end;
@@ -431,10 +428,7 @@ type
   strict private
     FFrames: TList<TStackFrame>;
     FAddrPCDict: TDictionary<Int64, UInt64>;
-    FStartDescription, FEndDescription: string;
     function GetColorMap: TStackColorMap;
-    procedure SetEndDescription(const Value: string);
-    procedure SetStartDescription(const Value: string);
     procedure UpdateFrameDescriptions;
   protected
     function ByteViewModeCommandEnabled(Value: TByteViewMode; var AChecked: Boolean): Boolean; override;
@@ -454,8 +448,6 @@ type
     property Frames: TList<TStackFrame> read FFrames;
   protected
     property ColorMap: TStackColorMap read GetColorMap;
-    property EndDescription: string read FEndDescription write SetEndDescription;
-    property StartDescription: string read FStartDescription write SetStartDescription;
   end;
 
   { TStackView }
@@ -717,7 +709,6 @@ begin
   FRegHighlightFontColor := clWhite;
   FRIPBackgroundColor := $009D116C;
   FRIPBackgroundFontColor := clWhite;
-  FRIPMarkColor := clWhite;
   FSizePfxColor := $C9FFE8;
   FSourceLineColor := $A0A0A0;
 end;
@@ -743,7 +734,6 @@ begin
   FRegHighlightFontColor := clWhite;
   FRIPBackgroundColor := $009D116C;
   FRIPBackgroundFontColor := clWhite;
-  FRIPMarkColor := clDkGray;
   FSizePfxColor := clGreen;
   FSourceLineColor := clBlack;
 end;
@@ -910,15 +900,6 @@ begin
   end;
 end;
 
-procedure TAsmColorMap.SetRIPMarkColor(AValue: TColor);
-begin
-  if RIPMarkColor <> AValue then
-  begin
-    FRIPMarkColor := AValue;
-    DoChange;
-  end;
-end;
-
 procedure TAsmColorMap.SetSizePfxColor(const Value: TColor);
 begin
   if SizePfxColor <> Value then
@@ -1078,17 +1059,6 @@ begin
     Param.SecondDraw := False;
     DrawLine(ACanvas, Param);
   end;
-
-  R.Left := SplitMargin + Offset.X;
-  R.Top := GetRowOffset(RowIndex);
-  R.Width := DblSize(TextMargin) + CharWidth * 3;
-  R.Height := RowHeight;
-  ACanvas.Brush.Style := bsClear;
-  ACanvas.Font.Color := AsmView.ColorMap.RIPMarkColor;
-  OffsetRect(R, 0, -1 + (R.Height - RowHeight) div 2);
-  // пока что тут тормозну
-  //DoQueryComment()
-  DrawText(ACanvas.Handle, PChar('IP'), -1, R, 0);
 end;
 
 { TCustomAsmView }
@@ -1577,26 +1547,7 @@ begin
     Param.RowTo := AddressToRowIndex(AFrame.AddrFrame);
 
     if I = 0 then
-    begin
-      Param.LineColor := TStackColorMap(StackView.ColorMap).FrameActiveColor;
-      if RowVisible(Param.RowFrom) then
-      begin
-        R := Bounds(SplitMargin, GetRowOffset(Param.RowFrom),
-          ACanvas.TextWidth(StackView.StartDescription), RowHeight);
-        DrawText(ACanvas.Handle, PChar(StackView.StartDescription), -1, R, 0);
-      end;
-
-      // если фрейм еще не сформирован, пропускаем отрисовку нижней части.
-      if Param.RowTo <= Param.RowFrom then
-        Continue;
-
-      if RowVisible(Param.RowTo) then
-      begin
-        R := Bounds(SplitMargin, GetRowOffset(Param.RowTo),
-          ACanvas.TextWidth(StackView.EndDescription), RowHeight);
-        DrawText(ACanvas.Handle, PChar(StackView.EndDescription), -1, R, 0);
-      end;
-    end
+      Param.LineColor := TStackColorMap(StackView.ColorMap).FrameActiveColor
     else
       Param.LineColor := TStackColorMap(StackView.ColorMap).FrameColor;
 
@@ -1782,39 +1733,11 @@ begin
   Result := FAddrPCDict.TryGetValue(AIndex, AddrVA);
 end;
 
-procedure TCustomStackView.SetEndDescription(const Value: string);
-begin
-  if EndDescription <> Value then
-  begin
-    FEndDescription := Value;
-    Invalidate;
-  end;
-end;
-
-procedure TCustomStackView.SetStartDescription(const Value: string);
-begin
-  if StartDescription <> Value then
-  begin
-    FStartDescription := Value;
-    Invalidate;
-  end;
-end;
-
 procedure TCustomStackView.UpdateFrameDescriptions;
 begin
   case AddressMode of
-    am32bit:
-    begin
-      StartDescription := 'ESP';
-      EndDescription := 'EBP';
-      BytesInRow := 4;
-    end;
-    am64bit:
-    begin
-      StartDescription := 'RSP';
-      EndDescription := 'RBP';
-      BytesInRow := 8;
-    end;
+    am32bit: BytesInRow := 4;
+    am64bit: BytesInRow := 8;
   else
     raise Exception.Create('Unsupported AddressMode');
   end;
