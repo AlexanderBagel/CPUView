@@ -1,6 +1,6 @@
 inherited frmCpuViewIntel: TfrmCpuViewIntel
-  Left = 1645
-  Top = 651
+  Left = 1035
+  Top = 650
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   inherited pnDebug: TPanel
@@ -168,6 +168,8 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
     inherited acShowInNewDump: TAction[73]
     end
     inherited acDumpsClosePage: TAction[74]
+    end
+    inherited acDumpsCloseAllToTheRight: TAction[75]
     end
   end
   inherited pmDump: TPopupMenu

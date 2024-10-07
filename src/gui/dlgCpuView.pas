@@ -51,6 +51,7 @@ type
     acAsmShowSource: TAction;
     acShowInNewDump: TAction;
     acDumpsClosePage: TAction;
+    acDumpsCloseAllToTheRight: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -97,6 +98,7 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    MenuItem1: TMenuItem;
     miStackShowInNewDump: TMenuItem;
     miDumpShowInNewDump: TMenuItem;
     miAsmShowInNewDump: TMenuItem;
@@ -248,6 +250,8 @@ type
     procedure acDbgStepInExecute(Sender: TObject);
     procedure acDbgStepOutExecute(Sender: TObject);
     procedure acDbgToggleBpExecute(Sender: TObject);
+    procedure acDumpsCloseAllToTheRightExecute(Sender: TObject);
+    procedure acDumpsCloseAllToTheRightUpdate(Sender: TObject);
     procedure acDumpsClosePageExecute(Sender: TObject);
     procedure acDumpsClosePageUpdate(Sender: TObject);
     procedure acHighlightRegExecute(Sender: TObject);
@@ -276,7 +280,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure pmRegSelectedPopup(Sender: TObject);
+    procedure pcDumpsChange(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
       RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
     procedure RegViewSelectionChange(Sender: TObject);
@@ -360,9 +364,9 @@ begin
   FDbgGate.Free;
 end;
 
-procedure TfrmCpuView.pmRegSelectedPopup(Sender: TObject);
+procedure TfrmCpuView.pcDumpsChange(Sender: TObject);
 begin
-  {$message 'Если не примут патч - забить и реализовать его прямо тут'}
+  Core.DumpViewList.ItemIndex := pcDumps.PageIndex;
 end;
 
 procedure TfrmCpuView.RegViewSelectedContextPopup(Sender: TObject;
@@ -754,6 +758,22 @@ procedure TfrmCpuView.acDbgToggleBpExecute(Sender: TObject);
 begin
   FAsmViewSelectedAddr := AsmView.SelectedInstructionAddr;
   DbgGate.ToggleBreakPoint(FAsmViewSelectedAddr);
+end;
+
+procedure TfrmCpuView.acDumpsCloseAllToTheRightExecute(Sender: TObject);
+var
+  I: Integer;
+begin
+  for I := pcDumps.PageCount - 1 downto pcDumps.PageIndex + 1 do
+  begin
+    Core.DumpViewList.Delete(I);
+    pcDumps.Pages[I].Free;
+  end;
+end;
+
+procedure TfrmCpuView.acDumpsCloseAllToTheRightUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := pcDumps.PageIndex < pcDumps.PageCount - 1;
 end;
 
 procedure TfrmCpuView.acDumpsClosePageExecute(Sender: TObject);

@@ -191,6 +191,7 @@ object frmCpuView: TfrmCpuView
         PopupMenu = pmDumps
         TabIndex = 0
         TabOrder = 0
+        OnChange = pcDumpsChange
         object tabDump0: TTabSheet
           Caption = 'DUMP 0'
           ClientHeight = 387
@@ -242,7 +243,6 @@ object frmCpuView: TfrmCpuView
     ResizeAnchor = akBottom
   end
   object pmRegSelected: TPopupMenu
-    OnPopup = pmRegSelectedPopup
     Left = 1656
     Top = 176
     object miRegIncValue: TMenuItem
@@ -711,6 +711,12 @@ object frmCpuView: TfrmCpuView
       OnExecute = acDumpsClosePageExecute
       OnUpdate = acDumpsClosePageUpdate
     end
+    object acDumpsCloseAllToTheRight: TAction
+      Category = 'Dumps Actions'
+      Caption = 'Close All to the Right'
+      OnExecute = acDumpsCloseAllToTheRightExecute
+      OnUpdate = acDumpsCloseAllToTheRightUpdate
+    end
   end
   object pmStack: TPopupMenu
     Left = 1656
@@ -956,6 +962,9 @@ object frmCpuView: TfrmCpuView
     Top = 1040
     object miDumpsClosePage: TMenuItem
       Action = acDumpsClosePage
+    end
+    object MenuItem1: TMenuItem
+      Action = acDumpsCloseAllToTheRight
     end
   end
 end
