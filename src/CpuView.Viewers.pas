@@ -586,7 +586,7 @@ type
     FActiveRegParam: TRegParam;
     FPopup: TOnSelectedContextPopupEvent;
     FSelectedRegName: string;
-    FSelectedRegValue: UInt64;
+    FSelectedRegValue: TRegValue;
     FSelectedRegister: TRegister;
     procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
     function GetColorMap: TRegistersColorMap;
@@ -1025,8 +1025,7 @@ procedure TExecutionPointPostPainter.PostPaint(ACanvas: TCanvas; StartRow,
   EndRow: Int64; var Offset: TPoint);
 var
   AsmView: TCustomAsmView;
-  AddrVA, RowIndex: Int64;
-  R: TRect;
+  RowIndex: Int64;
   Param: TDrawLineParam;
   JmpLine: Int64;
 begin
@@ -1528,7 +1527,6 @@ var
   I: Integer;
   AFrame: TStackFrame;
   Param: TDrawLineParam;
-  R: TRect;
 begin
   PaintedLinesCount := 1;
   Param.DrawArrow := False;
@@ -1547,7 +1545,12 @@ begin
     Param.RowTo := AddressToRowIndex(AFrame.AddrFrame);
 
     if I = 0 then
+    begin
+      // если фрейм еще не сформирован, пропускаем отрисовку нижней части.
+      if Param.RowTo <= Param.RowFrom then
+        Continue;
       Param.LineColor := TStackColorMap(StackView.ColorMap).FrameActiveColor
+    end
     else
       Param.LineColor := TStackColorMap(StackView.ColorMap).FrameColor;
 
@@ -1802,8 +1805,8 @@ begin
     for I := 0 to FContext.RegCount(RowIndex) - 1 do
     begin
       Info := FContext.RegInfo(RowIndex, I);
-      RowStr := RowStr + AlignLine(FContext.RegData(RowIndex, I, True), Info.RegNameSize);
-      RowStr := RowStr + AlignLine(FContext.RegData(RowIndex, I, False), Info.ValueSize);
+      RowStr := RowStr + AlignLine(FContext.RegQueryString(Info.RegID, rqstName), Info.RegNameSize);
+      RowStr := RowStr + AlignLine(FContext.RegQueryString(Info.RegID, rqstValue), Info.ValueSize);
       RowStr := RowStr + AlignLine('', Info.ValueSeparatorSize);
     end;
   end;
@@ -1836,7 +1839,7 @@ begin
     else
       ACanvas.Font.Color := TRegistersColorMap(Owner.ColorMap).RegColor;
     ACanvas.Brush.Style := bsClear;
-    DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegData(RowIndex, I, True),
+    DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegQueryString(Info.RegID, rqstName),
       TextMetric.CharPointer(AColumn, 0));
     Inc(DrawR.Left, TextMetric.CharLength(AColumn, 1, Info.RegNameSize));
 
@@ -1867,7 +1870,7 @@ begin
         ACanvas.Font.Color := TRegistersColorMap(Owner.ColorMap).ValueColor;
     end;
     ACanvas.Brush.Style := bsClear;
-    DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegData(RowIndex, I, False),
+    DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegQueryString(Info.RegID, rqstValue),
       TextMetric.CharPointer(AColumn, 0));
     Inc(DrawR.Left, TextMetric.CharLength(AColumn, 1,
       Info.ValueSize + Info.ValueSeparatorSize));
@@ -1925,11 +1928,10 @@ end;
 
 function TRegistersRawData.AddressToRowIndex(Value: Int64): Int64;
 var
-  ValueOffset: Integer;
-  IntResult: Integer;
+  Descriptor: TRegDescriptor;
 begin
-  if FContext.RegQuery(Integer(Value), IntResult, ValueOffset) then
-    Result := IntResult
+  if FContext.RegDescriptor(Integer(Value), Descriptor) then
+    Result := Descriptor.RowIndex
   else
     Result := 0;
 end;
@@ -2112,7 +2114,7 @@ end;
 
 procedure TCustomRegView.DoSelectionChage(AStartAddr, AEndAddr: Int64);
 var
-  RegID, RowIndex, RegIndex: Integer;
+  RegID: Integer;
 begin
   FillChar(FSelectedRegister, SizeOf(FSelectedRegister), 0);
   FSelectedRegister.RegID := -1;
@@ -2121,20 +2123,19 @@ begin
   begin
     // проверка типа поля для подсветки
     // работать можно только с реальными регистрами, флаги и прочее игнорируются
-    Context.RegQuery(RegID, RowIndex, RegIndex);
-    FSelectedRegister := Context.RegInfo(RowIndex, RegIndex);
-    if not (FSelectedRegister.ValueType in [crtValue..crtSetValue]) then
+    FSelectedRegister := Context.RegInfo(RegID);
+    if not (FSelectedRegister.ValueType in [crtValue..crtEnumValue]) then
       RegID := -1;
   end;
   if RegID >= 0 then
   begin
-    FSelectedRegName := Context.RegData(RowIndex, RegIndex, True);
-    if not Context.RegQueryValue(RowIndex, RegIndex, FSelectedRegValue) then
-      FSelectedRegValue := 0;
+    FSelectedRegName := Context.RegQueryString(RegID, rqstName);
+    if not Context.RegQueryValue(RegID, FSelectedRegValue) then
+      FSelectedRegValue := Default(TRegValue);
   end
   else
   begin
-    FSelectedRegValue := 0;
+    FSelectedRegValue := Default(TRegValue);
     FSelectedRegName := '';
   end;
   inherited;
@@ -2238,8 +2239,8 @@ begin
     Result := 0
   else
   begin
-    Result := Min(nSize, Context.PointerSize);
-    Move(FSelectedRegValue, pBuffer, Result);
+    Result := Min(nSize, FSelectedRegValue.ValueSize);
+    Move(FSelectedRegValue.ByteValue, pBuffer, Result);
   end;
 end;
 

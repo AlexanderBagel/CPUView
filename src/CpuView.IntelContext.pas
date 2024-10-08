@@ -45,6 +45,7 @@ type
     FShowYMM: Boolean;
     FShowFPU: Boolean;
     FSavedDetailed: array [0..3] of Boolean;
+    function GetRegExtendedIndex(const ARegName: string): Integer;
     procedure SetContext(const Value: TIntelThreadContext);
     procedure SetFPUMode(const Value: TFPUMode);
     procedure SetMapMode(const Value: TIntelCpuMapMode);
@@ -57,10 +58,9 @@ type
     procedure UpdateModifyed(const Value: TIntelThreadContext);
   protected
     procedure BuildMap; override;
-    procedure DoChangeViewMode(RegID: TRegID; const Value: TRegViewMode); override;
-    function GetRegValue(RegID: TRegID; out ARegValue: UInt64): Boolean; override;
+    procedure DoChangeViewMode(ARegID: TRegID; const Value: TRegViewMode); override;
     procedure InitKnownRegs; override;
-    procedure UpdateLastRegData(RegID: TRegID); override;
+    procedure UpdateLastRegData(ARegID: TRegID); override;
   protected
     function StToR(Index: Integer): Integer;
     function RToSt(Index: Integer): Integer;
@@ -86,19 +86,19 @@ type
     destructor Destroy; override;
     procedure InitDefault; override;
     function InstructonPoint: UInt64; override;
-    function InstructonPointID: Integer; override;
+    function InstructonPointID: TRegID; override;
     function IsActiveJump(const Value: string): Boolean; override;
     function PointerSize: Integer; override;
-    function QueryRegIndexByName(const RegName: string; out Index: Integer): Boolean; override;
-    function QueryRegNameAtAddr(AddrVA: Int64): string; override;
-    function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; override;
-    function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; override;
-    function RegSetValueAtIndex(RegID: TRegID; Index: Integer): string; override;
-    function RegSetValueCount(RegID: TRegID): Integer; override;
+    function RegDescriptor(const ARegName: string; out ADescriptor: TRegDescriptor): Boolean; overload; override;
+    function RegQueryEnumString(ARegID: TRegID; AEnumIndex: Integer): string; override;
+    function RegQueryEnumValuesCount(ARegID: TRegID): Integer; override;
+    function RegQueryNamesAtAddr(AAddrVA: UInt64): string; override;
+    function RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean; overload; override;
+    function RegQueryValue(const ARegName: string; out ARegValue: TRegValue): Boolean; overload; override;
+    function RegSetValue(ARegID: TRegID; const ANewRegValue: TRegValue): Boolean; override;
     function StackBase: UInt64; override;
     function StackPoint: UInt64; override;
-    function Update(CurrentIP: UInt64 = 0): Boolean; override;
-    function UpdateRegValue(RegID: TRegID; ANewRegValue: UInt64): Boolean; override;
+    function Update(ANewInstructionPoint: UInt64 = 0): Boolean; override;
     property Context: TIntelThreadContext read FContext write SetContext;
     property FPUMode: TFPUMode read FFPUMode write SetFPUMode;
     property MapMode: TIntelCpuMapMode read FMapMode write SetMapMode;
@@ -109,6 +109,46 @@ type
   end;
 
 implementation
+
+const
+  ExtendedRegNames: array[0..70] of string = (
+    'RAX', 'EAX', 'AX', 'AH', 'AL',
+    'RBX', 'EBX', 'BX', 'BH', 'BL',
+    'RCX', 'ECX', 'CX', 'CH', 'CL',
+    'RDX', 'EDX', 'DX', 'DH', 'DL',
+    'RBP', 'EBP', 'BP', 'BPL',
+    'RSP', 'ESP', 'SP', 'SPL',
+    'RSI', 'ESI', 'SI', 'SIL',
+    'RDI', 'EDI', 'DI', 'DIL',
+    'RIP', 'EIP', 'IP',
+    'R8', 'R8D', 'R8W', 'R8B',
+    'R9', 'R9D', 'R9W', 'R9B',
+    'R10', 'R10D', 'R10W', 'R10B',
+    'R11', 'R11D', 'R11W', 'R11B',
+    'R12', 'R12D', 'R12W', 'R12B',
+    'R13', 'R13D', 'R13W', 'R13B',
+    'R14', 'R14D', 'R14W', 'R14B',
+    'R15', 'R15D', 'R15W', 'R15B'
+  );
+  ExtendedRegIndex: array[0..70] of TRegID = (
+    0, 0, 0, 0, 0,
+    1, 1, 1, 1, 1,
+    2, 2, 2, 2, 2,
+    3, 3, 3, 3, 3,
+    4, 4, 4, 4,
+    5, 5, 5, 5,
+    6, 6, 6, 6,
+    7, 7, 7, 7,
+    8, 8, 8,
+    9, 9, 9, 9,
+    10, 10, 10, 10,
+    11, 11, 11, 11,
+    12, 12, 12, 12,
+    13, 13, 13, 13,
+    14, 14, 14, 14,
+    15, 15, 15, 15,
+    16, 16, 16, 16
+  );
 
 { TIntelCpuContext }
 
@@ -401,12 +441,12 @@ begin
   inherited;
 end;
 
-procedure TIntelCpuContext.DoChangeViewMode(RegID: TRegID;
+procedure TIntelCpuContext.DoChangeViewMode(ARegID: TRegID;
   const Value: TRegViewMode);
 var
   I: Integer;
 begin
-  case RegID of
+  case ARegID of
     33..40: // MMX
       for I := 33 to 40 do
         KnownRegs.List[I].ViewMode := Value;
@@ -423,7 +463,7 @@ begin
       for I := 74 to 89 do
         KnownRegs.List[I].ViewMode := Value;
   else
-    KnownRegs.List[RegID].ViewMode := Value;
+    KnownRegs.List[ARegID].ViewMode := Value;
   end;
 end;
 
@@ -445,7 +485,7 @@ end;
 
 function TIntelCpuContext.ExtractControlWordPrecision: string;
 begin
-  Result := RegSetValueAtIndex(130, ExtractControlWordPrecisionValue);
+  Result := RegQueryEnumString(130, ExtractControlWordPrecisionValue);
 end;
 
 function TIntelCpuContext.ExtractControlWordPrecisionValue: Byte;
@@ -455,7 +495,7 @@ end;
 
 function TIntelCpuContext.ExtractControlWordRounding: string;
 begin
-  Result := RegSetValueAtIndex(132, ExtractControlWordRoundingValue);
+  Result := RegQueryEnumString(132, ExtractControlWordRoundingValue);
 end;
 
 function TIntelCpuContext.ExtractControlWordRoundingValue: Byte;
@@ -501,7 +541,7 @@ end;
 
 function TIntelCpuContext.ExtractMxCsrRounding: string;
 begin
-  Result := RegSetValueAtIndex(147, ExtractMxCsrRoundingValue);
+  Result := RegQueryEnumString(147, ExtractMxCsrRoundingValue);
 end;
 
 function TIntelCpuContext.ExtractMxCsrRoundingValue: Byte;
@@ -514,7 +554,7 @@ var
   Idx: Byte;
 begin
   Idx := ExtractStatusWordTopValue;
-  Result := Format('ST0=%s (%d)', [RegSetValueAtIndex(123, Idx), Idx]);
+  Result := Format('ST0=%s (%d)', [RegQueryEnumString(123, Idx), Idx]);
 end;
 
 function TIntelCpuContext.ExtractStatusWordTopValue: Byte;
@@ -524,7 +564,7 @@ end;
 
 function TIntelCpuContext.ExtractTagWordSet(Index: Integer): string;
 begin
-  Result := RegSetValueAtIndex(102, ExtractTagWordSetValue(Index));
+  Result := RegQueryEnumString(102, ExtractTagWordSetValue(Index));
 end;
 
 function TIntelCpuContext.ExtractTagWordSetValue(Index: Integer): Byte;
@@ -533,91 +573,17 @@ begin
   Result := (Context.TagWord shr Index) and 3;
 end;
 
-function TIntelCpuContext.GetRegValue(RegID: TRegID; out ARegValue: UInt64): Boolean;
+function TIntelCpuContext.GetRegExtendedIndex(const ARegName: string): Integer;
+var
+  I: Integer;
 begin
-  Result := True;
-  case RegID of
-    0: ARegValue := Context.Rax;
-    1: ARegValue := Context.Rbx;
-    2: ARegValue := Context.Rcx;
-    3: ARegValue := Context.Rdx;
-    4: ARegValue := Context.Rbp;
-    5: ARegValue := Context.Rsp;
-    6: ARegValue := Context.Rsi;
-    7: ARegValue := Context.Rdi;
-    8: ARegValue := Context.Rip;
-    9..16: ARegValue := Context.R[RegID - 1];
-    17: ARegValue := Context.EFlags;
-    18: ARegValue := Context.SegGs;
-    19: ARegValue := Context.SegFs;
-    20: ARegValue := Context.SegEs;
-    21: ARegValue := Context.SegDs;
-    22: ARegValue := Context.SegCs;
-    23: ARegValue := Context.SegSs;
-    24: ARegValue := Context.Dr0;
-    25: ARegValue := Context.Dr1;
-    26: ARegValue := Context.Dr2;
-    27: ARegValue := Context.Dr3;
-    28: ARegValue := Context.Dr6;
-    29: ARegValue := Context.Dr7;
-    30: ARegValue := Context.ControlWord;
-    31: ARegValue := Context.StatusWord;
-    32: ARegValue := Context.TagWord;
-    57: ARegValue := Context.MxCsr;
-    91: ARegValue := ExtractBitValue(Context.EFlags, 0);        // CF
-    92: ARegValue := ExtractBitValue(Context.EFlags, 2);        // PF
-    93: ARegValue := ExtractBitValue(Context.EFlags, 4);        // AF
-    94: ARegValue := ExtractBitValue(Context.EFlags, 6);        // ZF
-    95: ARegValue := ExtractBitValue(Context.EFlags, 7);        // SF
-    96: ARegValue := ExtractBitValue(Context.EFlags, 8);        // TF
-    97: ARegValue := ExtractBitValue(Context.EFlags, 9);        // IF
-    98: ARegValue := ExtractBitValue(Context.EFlags, 10);       // DF
-    99: ARegValue := ExtractBitValue(Context.EFlags, 11);       // OF
-    100: ARegValue := Context.LastError;
-    101: ARegValue := Context.LastStatus;
-    102..109: ARegValue := ExtractTagWordSetValue(RegID - 102); // TW set
-    110: ARegValue := ExtractBitValue(Context.StatusWord, 7);   // ES
-    111: ARegValue := ExtractBitValue(Context.StatusWord, 0);   // IE
-    112: ARegValue := ExtractBitValue(Context.StatusWord, 1);   // DE
-    113: ARegValue := ExtractBitValue(Context.StatusWord, 2);   // ZE
-    114: ARegValue := ExtractBitValue(Context.StatusWord, 3);   // OE
-    115: ARegValue := ExtractBitValue(Context.StatusWord, 4);   // UE
-    116: ARegValue := ExtractBitValue(Context.StatusWord, 15);  // B
-    117: ARegValue := ExtractBitValue(Context.StatusWord, 8);   // C0
-    118: ARegValue := ExtractBitValue(Context.StatusWord, 9);   // C1
-    119: ARegValue := ExtractBitValue(Context.StatusWord, 10);  // C2
-    120: ARegValue := ExtractBitValue(Context.StatusWord, 14);  // C3
-    121: ARegValue := ExtractBitValue(Context.StatusWord, 5);   // PE
-    122: ARegValue := ExtractBitValue(Context.StatusWord, 6);   // SF
-    123: ARegValue := ExtractStatusWordTopValue;                // TOP set
-    124: ARegValue := ExtractBitValue(Context.ControlWord, 0);  // IM
-    125: ARegValue := ExtractBitValue(Context.ControlWord, 1);  // DM
-    126: ARegValue := ExtractBitValue(Context.ControlWord, 2);  // ZM
-    127: ARegValue := ExtractBitValue(Context.ControlWord, 3);  // OM
-    128: ARegValue := ExtractBitValue(Context.ControlWord, 4);  // UM
-    129: ARegValue := ExtractBitValue(Context.ControlWord, 5);  // PM
-    130: ARegValue := ExtractControlWordPrecisionValue;         // WordPrecision set
-    131: ARegValue := ExtractBitValue(Context.ControlWord, 12); // IC
-    132: ARegValue := ExtractControlWordRoundingValue;          // WordRounding set
-    133: ARegValue := ExtractBitValue(Context.MxCsr, 0);        // IE
-    134: ARegValue := ExtractBitValue(Context.MxCsr, 1);        // DE
-    135: ARegValue := ExtractBitValue(Context.MxCsr, 2);        // ZE
-    136: ARegValue := ExtractBitValue(Context.MxCsr, 3);        // OE
-    137: ARegValue := ExtractBitValue(Context.MxCsr, 4);        // UE
-    138: ARegValue := ExtractBitValue(Context.MxCsr, 5);        // PE
-    139: ARegValue := ExtractBitValue(Context.MxCsr, 7);        // IM
-    140: ARegValue := ExtractBitValue(Context.MxCsr, 8);        // DM
-    141: ARegValue := ExtractBitValue(Context.MxCsr, 9);        // ZM
-    142: ARegValue := ExtractBitValue(Context.MxCsr, 10);       // OM
-    143: ARegValue := ExtractBitValue(Context.MxCsr, 11);       // UM
-    144: ARegValue := ExtractBitValue(Context.MxCsr, 12);       // PM
-    145: ARegValue := ExtractBitValue(Context.MxCsr, 6);        // DAZ
-    146: ARegValue := ExtractBitValue(Context.MxCsr, 15);       // FTZ
-    147: ARegValue := ExtractMxCsrRoundingValue;                // RC
-  else
-    ARegValue := 0;
-    Result := False;
-  end;
+  for I := 0 to Length(ExtendedRegNames) - 1 do
+    if AnsiSameText(ARegName, ExtendedRegNames[I]) then
+    begin
+      Result := I;
+      Exit;
+    end;
+  Result := -1;
 end;
 
 procedure TIntelCpuContext.InitDefault;
@@ -648,7 +614,7 @@ procedure TIntelCpuContext.InitKnownRegs;
     R.Modifyed := False;
     case RegType of
       crtBitValue: ModifyActions := [maToggle];
-      crtSetValue: ModifyActions := [maChange];
+      crtEnumValue: ModifyActions := [maChange];
     end;
     R.ModifyActions := ModifyActions;
     R.SupportedViewMode := SupportedViewMode;
@@ -790,16 +756,16 @@ begin
   Add(crtExtra, vmDefOnly, [maZero, maChange]);     // 100 - LastError
   Add(crtExtra, vmDefOnly, [maZero, maChange]);     // 101 - LastStatus
 
-  // x87TagWord sets
+  // x87TagWords
 
-  Add(crtSetValue, vmDefOnly);  // 102 - TW0
-  Add(crtSetValue, vmDefOnly);  // 103 - TW1
-  Add(crtSetValue, vmDefOnly);  // 104 - TW2
-  Add(crtSetValue, vmDefOnly);  // 105 - TW3
-  Add(crtSetValue, vmDefOnly);  // 106 - TW4
-  Add(crtSetValue, vmDefOnly);  // 107 - TW5
-  Add(crtSetValue, vmDefOnly);  // 108 - TW6
-  Add(crtSetValue, vmDefOnly);  // 109 - TW7
+  Add(crtEnumValue, vmDefOnly);  // 102 - TW0
+  Add(crtEnumValue, vmDefOnly);  // 103 - TW1
+  Add(crtEnumValue, vmDefOnly);  // 104 - TW2
+  Add(crtEnumValue, vmDefOnly);  // 105 - TW3
+  Add(crtEnumValue, vmDefOnly);  // 106 - TW4
+  Add(crtEnumValue, vmDefOnly);  // 107 - TW5
+  Add(crtEnumValue, vmDefOnly);  // 108 - TW6
+  Add(crtEnumValue, vmDefOnly);  // 109 - TW7
 
   // x87StatusWord bits
 
@@ -816,7 +782,7 @@ begin
   Add(crtBitValue, vmDefOnly);  // 120 - C3
   Add(crtBitValue, vmDefOnly);  // 121 - PE
   Add(crtBitValue, vmDefOnly);  // 122 - SF
-  Add(crtSetValue, vmDefOnly);  // 123 - TOP
+  Add(crtEnumValue, vmDefOnly); // 123 - TOP
 
   // x87ControlWord bits
 
@@ -826,9 +792,9 @@ begin
   Add(crtBitValue, vmDefOnly);  // 127 - OM
   Add(crtBitValue, vmDefOnly);  // 128 - UM
   Add(crtBitValue, vmDefOnly);  // 129 - PM
-  Add(crtSetValue, vmDefOnly);  // 130 - PC
+  Add(crtEnumValue, vmDefOnly); // 130 - PC
   Add(crtBitValue, vmDefOnly);  // 131 - IC
-  Add(crtSetValue, vmDefOnly);  // 132 - RC
+  Add(crtEnumValue, vmDefOnly); // 132 - RC
 
   // MxCsr bits
 
@@ -846,7 +812,7 @@ begin
   Add(crtBitValue, vmDefOnly);  // 144 - PM
   Add(crtBitValue, vmDefOnly);  // 145 - DAZ
   Add(crtBitValue, vmDefOnly);  // 146 - FTZ
-  Add(crtSetValue, vmDefOnly);  // 147 - RC
+  Add(crtEnumValue, vmDefOnly); // 147 - RC
 
   // x87 Hint regs
 
@@ -897,7 +863,7 @@ begin
   Result := FContext.Rip;
 end;
 
-function TIntelCpuContext.InstructonPointID: Integer;
+function TIntelCpuContext.InstructonPointID: TRegID;
 begin
   Result := 8;
 end;
@@ -987,69 +953,92 @@ begin
   end;
 end;
 
-function TIntelCpuContext.QueryRegIndexByName(const RegName: string; out
-  Index: Integer): Boolean;
-const
-  RegsBuff: array[0..70] of string = (
-    'RAX', 'EAX', 'AX', 'AH', 'AL',
-    'RBX', 'EBX', 'BX', 'BH', 'BL',
-    'RCX', 'ECX', 'CX', 'CH', 'CL',
-    'RDX', 'EDX', 'DX', 'DH', 'DL',
-    'RBP', 'EBP', 'BP', 'BPL',
-    'RSP', 'ESP', 'SP', 'SPL',
-    'RSI', 'ESI', 'SI', 'SIL',
-    'RDI', 'EDI', 'DI', 'DIL',
-    'RIP', 'EIP', 'IP',
-    'R8', 'R8D', 'R8W', 'R8B',
-    'R9', 'R9D', 'R9W', 'R9B',
-    'R10', 'R10D', 'R10W', 'R10B',
-    'R11', 'R11D', 'R11W', 'R11B',
-    'R12', 'R12D', 'R12W', 'R12B',
-    'R13', 'R13D', 'R13W', 'R13B',
-    'R14', 'R14D', 'R14W', 'R14B',
-    'R15', 'R15D', 'R15W', 'R15B'
-  );
-  RegIndex: array[0..70] of Integer = (
-    0, 0, 0, 0, 0,
-    1, 1, 1, 1, 1,
-    2, 2, 2, 2, 2,
-    3, 3, 3, 3, 3,
-    4, 4, 4, 4,
-    5, 5, 5, 5,
-    6, 6, 6, 6,
-    7, 7, 7, 7,
-    8, 8, 8,
-    9, 9, 9, 9,
-    10, 10, 10, 10,
-    11, 11, 11, 11,
-    12, 12, 12, 12,
-    13, 13, 13, 13,
-    14, 14, 14, 14,
-    15, 15, 15, 15,
-    16, 16, 16, 16
-  );
+function TIntelCpuContext.RegDescriptor(const ARegName: string;
+  out ADescriptor: TRegDescriptor): Boolean;
 var
-  I: Integer;
+  Idx: Integer;
 begin
-  for I := 0 to Length(RegsBuff) - 1 do
-    if AnsiSameText(RegName, RegsBuff[I]) then
-    begin
-      Result := True;
-      Index := RegIndex[I];
-      Exit;
-    end;
-  Result := False;
-  Index := -1;
+  Idx := GetRegExtendedIndex(ARegName);
+  if Idx < 0 then
+  begin
+    ADescriptor := Default(TRegDescriptor);
+    Result := False;
+  end
+  else
+    Result := RegDescriptor(ExtendedRegIndex[Idx], ADescriptor);
 end;
 
-function TIntelCpuContext.QueryRegNameAtAddr(AddrVA: Int64): string;
+function TIntelCpuContext.RegQueryEnumString(ARegID: TRegID;
+  AEnumIndex: Integer): string;
 begin
-  if not FQueryRegAtAddr.TryGetValue(AddrVA, Result) then
+  Result := '';
+  case ARegID of
+    102..109:  // x87 TagWord Tag WorkSet
+    begin
+      case AEnumIndex of
+        0: Result := '0 Nonzero';
+        1: Result := '1 Zero';
+        2: Result := '2 Spetial';
+        3: Result := '3 Empty';
+      end;
+    end;
+    123:  // x87 StatusWord Top
+    begin
+      Result := 'x87_R' + IntToStr(AEnumIndex);
+    end;
+    130:  // x87 ControlWord Precision
+    begin
+      case AEnumIndex of
+        0: Result := 'Real4 (0)';
+        1: Result := 'Not used (1)';
+        2: Result := 'Real8 (2)';
+        3: Result := 'Real10 (3)';
+      end;
+    end;
+    132:  // x87 ControlWord Rounding
+    begin
+      case AEnumIndex of
+        0: Result := 'Round Near (0)';
+        1: Result := 'Round Down (1)';
+        2: Result := 'Round Up (2)';
+        3: Result := 'Truncate (3)';
+      end;
+    end;
+    147:  // MxCsr Rounding
+    begin
+      case AEnumIndex of
+        0: Result := 'Round Near (0)';
+        1: Result := 'Toward Negative (1)';
+        2: Result := 'Toward Positive (2)';
+        3: Result := 'Toward Zero (3)';
+      end;
+    end;
+  end;
+end;
+
+function TIntelCpuContext.RegQueryEnumValuesCount(ARegID: TRegID): Integer;
+begin
+  case ARegID of
+    102..109,        // x87 TagWords Enum
+    130,             // x87 ControlWord Precision
+    132,             // x87 ControlWord Rounding
+    147:             // MxCsrRounding
+      Result := 4;
+    123:             // x87 StatusWord Top
+      Result := 8;
+  else
+    Result := 0;
+  end;
+end;
+
+function TIntelCpuContext.RegQueryNamesAtAddr(AAddrVA: UInt64): string;
+begin
+  if not FQueryRegAtAddr.TryGetValue(AAddrVA, Result) then
     Result := '';
 end;
 
-function TIntelCpuContext.QueryRegValueByName(const RegName: string;
-  out RegValue: UInt64): Boolean;
+function TIntelCpuContext.RegQueryValue(const ARegName: string;
+  out ARegValue: TRegValue): Boolean;
 const
   ValueType: array[0..70] of Integer = (
     0, 1, 2, 3, 4,
@@ -1071,87 +1060,240 @@ const
     0, 1, 2, 4
   );
 var
-  Index: Integer;
+  Idx: Integer;
+  FullRegValue: TRegValue;
 begin
-  if QueryRegIndexByName(RegName, Index) and GetRegValue(Index, RegValue) then
+  ARegValue := Default(TRegValue);
+  Idx := GetRegExtendedIndex(ARegName);
+  if (Idx >= 0) and RegQueryValue(ExtendedRegIndex[Idx], FullRegValue) then
   begin
-    case ValueType[Index] of
-      1: RegValue := Cardinal(RegValue);
-      2: RegValue := Word(RegValue);
-      3: RegValue := Byte(RegValue shr 8);
-      4: RegValue := Byte(RegValue);
+    case ValueType[Idx] of
+      1: ARegValue.DwordValue := FullRegValue.DwordValue;
+      2: ARegValue.WordValue := FullRegValue.WordValue;
+      3: ARegValue.ByteValue := Byte(FullRegValue.WordValue shr 8);
+      4: ARegValue.ByteValue := FullRegValue.ByteValue;
+    end;
+    case ValueType[Idx] of
+      1: ARegValue.ValueSize := 4;
+      2: ARegValue.ValueSize := 2;
+      3, 4: ARegValue.ValueSize := 1;
+    else
+      ARegValue.ValueSize := FullRegValue.ValueSize;
     end;
     Result := True;
     Exit;
   end;
-  RegValue := 0;
-  Result := False;    
+  Result := False;
 end;
 
-function TIntelCpuContext.RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean;
+function TIntelCpuContext.RegSetValue(ARegID: TRegID;
+  const ANewRegValue: TRegValue): Boolean;
 begin
-  Result := GetRegValue(RegInfo(RowIndex, RegIndex).RegID, ARegValue);
-end;
+  {$IFDEF CPUX64}
+  if AddressMode = am32bit then
+    FContext := GetIntelWow64Context(ThreadID)
+  else
+  {$ENDIF}
+    FContext := GetIntelContext(ThreadID);
 
-function TIntelCpuContext.RegSetValueAtIndex(RegID: TRegID; Index: Integer): string;
-begin
-  Result := '';
-  case RegID of
-    102..109:  // x87 TagWord Tag WorkSet
-    begin
-      case Index of
-        0: Result := '0 Nonzero';
-        1: Result := '1 Zero';
-        2: Result := '2 Spetial';
-        3: Result := '3 Empty';
-      end;
+  case ARegID of
+    0: FContext.Rax := ANewRegValue.QwordValue;
+    1: FContext.Rbx := ANewRegValue.QwordValue;
+    2: FContext.Rcx := ANewRegValue.QwordValue;
+    3: FContext.Rdx := ANewRegValue.QwordValue;
+    4: FContext.Rbp := ANewRegValue.QwordValue;
+    5: FContext.Rsp := ANewRegValue.QwordValue;
+    6: FContext.Rsi := ANewRegValue.QwordValue;
+    7: FContext.Rdi := ANewRegValue.QwordValue;
+    8: FContext.Rip := ANewRegValue.QwordValue;
+    9..16: FContext.R[ARegID - 1] := ANewRegValue.QwordValue;
+    17: FContext.EFlags := ANewRegValue.DwordValue;
+    18: FContext.SegGs := ANewRegValue.DwordValue;
+    19: FContext.SegFs := ANewRegValue.DwordValue;
+    20: FContext.SegEs := ANewRegValue.DwordValue;
+    21: FContext.SegDs := ANewRegValue.DwordValue;
+    22: FContext.SegCs := ANewRegValue.DwordValue;
+    23: FContext.SegSs := ANewRegValue.DwordValue;
+    24: FContext.Dr0 := ANewRegValue.QwordValue;
+    25: FContext.Dr1 := ANewRegValue.QwordValue;
+    26: FContext.Dr2 := ANewRegValue.QwordValue;
+    27: FContext.Dr3 := ANewRegValue.QwordValue;
+    28: FContext.Dr6 := ANewRegValue.QwordValue;
+    29: FContext.Dr7 := ANewRegValue.QwordValue;
+    30: FContext.ControlWord := ANewRegValue.WordValue;
+    31: FContext.StatusWord := ANewRegValue.WordValue;
+    32: FContext.TagWord := ANewRegValue.WordValue;
+    57: FContext.MxCsr := ANewRegValue.DwordValue;
+    91: SetBitValue(FContext.EFlags, 0, ANewRegValue.ByteValue);        // CF
+    92: SetBitValue(FContext.EFlags, 2, ANewRegValue.ByteValue);        // PF
+    93: SetBitValue(FContext.EFlags, 4, ANewRegValue.ByteValue);        // AF
+    94: SetBitValue(FContext.EFlags, 6, ANewRegValue.ByteValue);        // ZF
+    95: SetBitValue(FContext.EFlags, 7, ANewRegValue.ByteValue);        // SF
+    96: SetBitValue(FContext.EFlags, 8, ANewRegValue.ByteValue);        // TF
+    97: SetBitValue(FContext.EFlags, 9, ANewRegValue.ByteValue);        // IF
+    98: SetBitValue(FContext.EFlags, 10, ANewRegValue.ByteValue);       // DF
+    99: SetBitValue(FContext.EFlags, 11, ANewRegValue.ByteValue);       // OF
+    {$message 'Эти два флага пока не работают'}
+    100: FContext.LastError := ANewRegValue.DwordValue;
+    101: FContext.LastStatus := ANewRegValue.DwordValue;
+    102..109: SetTagWordSetValue(ARegID - 102, ANewRegValue.ByteValue);
+    110: SetBitValue(FContext.StatusWord, 7, ANewRegValue.ByteValue);   // ES
+    111: SetBitValue(FContext.StatusWord, 0, ANewRegValue.ByteValue);   // IE
+    112: SetBitValue(FContext.StatusWord, 1, ANewRegValue.ByteValue);   // DE
+    113: SetBitValue(FContext.StatusWord, 2, ANewRegValue.ByteValue);   // ZE
+    114: SetBitValue(FContext.StatusWord, 3, ANewRegValue.ByteValue);   // OE
+    115: SetBitValue(FContext.StatusWord, 4, ANewRegValue.ByteValue);   // UE
+    116: SetBitValue(FContext.StatusWord, 15, ANewRegValue.ByteValue);  // B
+    117: SetBitValue(FContext.StatusWord, 8, ANewRegValue.ByteValue);   // C0
+    118: SetBitValue(FContext.StatusWord, 9, ANewRegValue.ByteValue);   // C1
+    119: SetBitValue(FContext.StatusWord, 10, ANewRegValue.ByteValue);  // C2
+    120: SetBitValue(FContext.StatusWord, 14, ANewRegValue.ByteValue);  // C3
+    121: SetBitValue(FContext.StatusWord, 5, ANewRegValue.ByteValue);   // PE
+    122: SetBitValue(FContext.StatusWord, 6, ANewRegValue.ByteValue);   // SF
+    123: SetStatusWordTopValue(ANewRegValue.ByteValue);
+    124: SetBitValue(FContext.ControlWord, 0, ANewRegValue.ByteValue);  // IM
+    125: SetBitValue(FContext.ControlWord, 1, ANewRegValue.ByteValue);  // DM
+    126: SetBitValue(FContext.ControlWord, 2, ANewRegValue.ByteValue);  // ZM
+    127: SetBitValue(FContext.ControlWord, 3, ANewRegValue.ByteValue);  // OM
+    128: SetBitValue(FContext.ControlWord, 4, ANewRegValue.ByteValue);  // UM
+    129: SetBitValue(FContext.ControlWord, 5, ANewRegValue.ByteValue);  // PM
+    130: SetControlWordPrecisionValue(ANewRegValue.ByteValue);          // WordPrecision set
+    131: SetBitValue(FContext.ControlWord, 12, ANewRegValue.ByteValue); // IC
+    132: SetControlWordRoundingValue(ANewRegValue.ByteValue);           // WordRounding set
+    133: SetBitValue(FContext.MxCsr, 0, ANewRegValue.ByteValue);        // IE
+    134: SetBitValue(FContext.MxCsr, 1, ANewRegValue.ByteValue);        // DE
+    135: SetBitValue(FContext.MxCsr, 2, ANewRegValue.ByteValue);        // ZE
+    136: SetBitValue(FContext.MxCsr, 3, ANewRegValue.ByteValue);        // OE
+    137: SetBitValue(FContext.MxCsr, 4, ANewRegValue.ByteValue);        // UE
+    138: SetBitValue(FContext.MxCsr, 5, ANewRegValue.ByteValue);        // PE
+    139: SetBitValue(FContext.MxCsr, 7, ANewRegValue.ByteValue);        // IM
+    140: SetBitValue(FContext.MxCsr, 8, ANewRegValue.ByteValue);        // DM
+    141: SetBitValue(FContext.MxCsr, 9, ANewRegValue.ByteValue);        // ZM
+    142: SetBitValue(FContext.MxCsr, 10, ANewRegValue.ByteValue);       // OM
+    143: SetBitValue(FContext.MxCsr, 11, ANewRegValue.ByteValue);       // UM
+    144: SetBitValue(FContext.MxCsr, 12, ANewRegValue.ByteValue);       // PM
+    145: SetBitValue(FContext.MxCsr, 6, ANewRegValue.ByteValue);        // DAZ
+    146: SetBitValue(FContext.MxCsr, 15, ANewRegValue.ByteValue);       // FTZ
+    147: SetMxCsrRoundingValue(ANewRegValue.ByteValue);                 // RC
+  else
+    Exit(False);
+  end;
+
+  {$IFDEF CPUX64}
+  if AddressMode = am32bit then
+    Result := SetIntelWow64Context(ThreadID, FContext)
+  else
+  {$ENDIF}
+    Result := SetIntelContext(ThreadID, FContext);
+
+  if Result then
+  begin
+    KnownRegs.List[ARegID].Modifyed := True;
+    case ARegID of
+      91..99: KnownRegs.List[17].Modifyed := True;            // EFlags
+      102..109: KnownRegs.List[32].Modifyed := True;          // TagWord
+      110..123: KnownRegs.List[31].Modifyed := True;          // StatusWord
+      124..132: KnownRegs.List[30].Modifyed := True;          // ControlWord
+      133..147: KnownRegs.List[57].Modifyed := True;          // MxCsr
     end;
-    123:  // x87 StatusWord Top
-    begin
-      Result := 'x87_R' + IntToStr(Index);
-    end;
-    130:  // x87 ControlWord Precision
-    begin
-      case Index of
-        0: Result := 'Real4 (0)';
-        1: Result := 'Not used (1)';
-        2: Result := 'Real8 (2)';
-        3: Result := 'Real10 (3)';
-      end;
-    end;
-    132:  // x87 ControlWord Rounding
-    begin
-      case Index of
-        0: Result := 'Round Near (0)';
-        1: Result := 'Round Down (1)';
-        2: Result := 'Round Up (2)';
-        3: Result := 'Truncate (3)';
-      end;
-    end;
-    147:  // MxCsr Rounding
-    begin
-      case Index of
-        0: Result := 'Round Near (0)';
-        1: Result := 'Toward Negative (1)';
-        2: Result := 'Toward Positive (2)';
-        3: Result := 'Toward Zero (3)';
-      end;
-    end;
+    // Update LastReg cache...
+    UpdateLastRegData(ARegID);
+    LastReg.Modifyed := True;
   end;
 end;
 
-function TIntelCpuContext.RegSetValueCount(RegID: TRegID): Integer;
+function TIntelCpuContext.RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean;
 begin
-  case RegID of
-    102..109,        // x87 TagWord Tag WorkSet
-    130,             // x87 ControlWord Precision
-    132,             // x87 ControlWord Rounding
-    147:             // MxCsrRounding
-      Result := 4;
-    123:             // x87 StatusWord Top
-      Result := 8;
+  Result := True;
+  ARegValue := Default(TRegValue);
+  case ARegID of
+    0..16, 24..29: ARegValue.ValueSize := 8;
+    17..23, 57, 100, 101: ARegValue.ValueSize := 4;
+    30..32: ARegValue.ValueSize := 2;
+    91..99, 102..147: ARegValue.ValueSize := 1;
   else
-    Result := inherited;
+    ARegValue.ValueSize := 0;
+  end;
+  case ARegID of
+    0: ARegValue.QwordValue := Context.Rax;
+    1: ARegValue.QwordValue := Context.Rbx;
+    2: ARegValue.QwordValue := Context.Rcx;
+    3: ARegValue.QwordValue := Context.Rdx;
+    4: ARegValue.QwordValue := Context.Rbp;
+    5: ARegValue.QwordValue := Context.Rsp;
+    6: ARegValue.QwordValue := Context.Rsi;
+    7: ARegValue.QwordValue := Context.Rdi;
+    8: ARegValue.QwordValue := Context.Rip;
+    9..16: ARegValue.QwordValue := Context.R[ARegID - 1];
+    17: ARegValue.DwordValue := Context.EFlags;
+    18: ARegValue.DwordValue := Context.SegGs;
+    19: ARegValue.DwordValue := Context.SegFs;
+    20: ARegValue.DwordValue := Context.SegEs;
+    21: ARegValue.DwordValue := Context.SegDs;
+    22: ARegValue.DwordValue := Context.SegCs;
+    23: ARegValue.DwordValue := Context.SegSs;
+    24: ARegValue.QwordValue := Context.Dr0;
+    25: ARegValue.QwordValue := Context.Dr1;
+    26: ARegValue.QwordValue := Context.Dr2;
+    27: ARegValue.QwordValue := Context.Dr3;
+    28: ARegValue.QwordValue := Context.Dr6;
+    29: ARegValue.QwordValue := Context.Dr7;
+    30: ARegValue.WordValue := Context.ControlWord;
+    31: ARegValue.WordValue := Context.StatusWord;
+    32: ARegValue.WordValue := Context.TagWord;
+    57: ARegValue.DwordValue := Context.MxCsr;
+    91: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 0);        // CF
+    92: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 2);        // PF
+    93: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 4);        // AF
+    94: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 6);        // ZF
+    95: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 7);        // SF
+    96: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 8);        // TF
+    97: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 9);        // IF
+    98: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 10);       // DF
+    99: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 11);       // OF
+    100: ARegValue.DwordValue := Context.LastError;
+    101: ARegValue.DwordValue := Context.LastStatus;
+    102..109: ARegValue.ByteValue := ExtractTagWordSetValue(ARegID - 102);// TW enum
+    110: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 7);   // ES
+    111: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 0);   // IE
+    112: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 1);   // DE
+    113: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 2);   // ZE
+    114: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 3);   // OE
+    115: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 4);   // UE
+    116: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 15);  // B
+    117: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 8);   // C0
+    118: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 9);   // C1
+    119: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 10);  // C2
+    120: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 14);  // C3
+    121: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 5);   // PE
+    122: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 6);   // SF
+    123: ARegValue.ByteValue := ExtractStatusWordTopValue;                // TOP set
+    124: ARegValue.ByteValue := ExtractBitValue(Context.ControlWord, 0);  // IM
+    125: ARegValue.ByteValue := ExtractBitValue(Context.ControlWord, 1);  // DM
+    126: ARegValue.ByteValue := ExtractBitValue(Context.ControlWord, 2);  // ZM
+    127: ARegValue.ByteValue := ExtractBitValue(Context.ControlWord, 3);  // OM
+    128: ARegValue.ByteValue := ExtractBitValue(Context.ControlWord, 4);  // UM
+    129: ARegValue.ByteValue := ExtractBitValue(Context.ControlWord, 5);  // PM
+    130: ARegValue.ByteValue := ExtractControlWordPrecisionValue;         // WordPrecision enum
+    131: ARegValue.ByteValue := ExtractBitValue(Context.ControlWord, 12); // IC
+    132: ARegValue.ByteValue := ExtractControlWordRoundingValue;          // WordRounding enum
+    133: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 0);        // IE
+    134: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 1);        // DE
+    135: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 2);        // ZE
+    136: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 3);        // OE
+    137: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 4);        // UE
+    138: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 5);        // PE
+    139: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 7);        // IM
+    140: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 8);        // DM
+    141: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 9);        // ZM
+    142: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 10);       // OM
+    143: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 11);       // UM
+    144: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 12);       // PM
+    145: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 6);        // DAZ
+    146: ARegValue.ByteValue := ExtractBitValue(Context.MxCsr, 15);       // FTZ
+    147: ARegValue.ByteValue := ExtractMxCsrRoundingValue;                // RC
+  else
+    Result := False;
   end;
 end;
 
@@ -1332,7 +1474,7 @@ begin
     Dec(Result, 8);
 end;
 
-function TIntelCpuContext.Update(CurrentIP: UInt64): Boolean;
+function TIntelCpuContext.Update(ANewInstructionPoint: UInt64): Boolean;
 var
   ACtx: TIntelThreadContext;
 begin
@@ -1344,12 +1486,12 @@ begin
   {$IFDEF CPUX64}
   if AddressMode = am32bit then
   begin
-    if CurrentIP = 0 then
+    if ANewInstructionPoint = 0 then
       Context := GetIntelWow64Context(ThreadID)
     else
     begin
       ACtx := GetIntelWow64Context(ThreadID);
-      ACtx.Rip := CurrentIP;
+      ACtx.Rip := ANewInstructionPoint;
       Context := ACtx;
     end;
     UpdateQueryRegs;
@@ -1357,18 +1499,18 @@ begin
   end;
   {$ENDIF}
 
-  if CurrentIP = 0 then
+  if ANewInstructionPoint = 0 then
     Context := GetIntelContext(ThreadID)
   else
   begin
     ACtx := GetIntelContext(ThreadID);
-    ACtx.Rip := CurrentIP;
+    ACtx.Rip := ANewInstructionPoint;
     Context := ACtx;
   end;
   UpdateQueryRegs;
 end;
 
-procedure TIntelCpuContext.UpdateLastRegData(RegID: TRegID);
+procedure TIntelCpuContext.UpdateLastRegData(ARegID: TRegID);
 
   function ExtFmt(Index: Integer): string;
   var
@@ -1422,7 +1564,7 @@ var
   RegSize, XmmPfxSize: Integer;
   Index: Integer;
   AHint: string;
-  ARegValue: UInt64;
+  ARegValue: TRegValue;
 begin
   if FContext.x86Context then
   begin
@@ -1437,7 +1579,7 @@ begin
     XmmPfxSize := 6;
   end;
 
-  case RegID of
+  case ARegID of
     0: FillReg(Pfx + 'AX', Trim(RegValueFmt(@FContext.Rax, RegSize)), 4, 2);
     1: FillReg(Pfx + 'BX', Trim(RegValueFmt(@FContext.Rbx, RegSize)), 4, 2);
     2: FillReg(Pfx + 'CX', Trim(RegValueFmt(@FContext.Rcx, RegSize)), 4, 2);
@@ -1449,7 +1591,7 @@ begin
     8: FillReg(Pfx + 'IP', RegValueFmt(@FContext.Rip, RegSize), 4, 2);
     9..16:
     begin
-      Index := RegID - 9 + 8;
+      Index := ARegID - 9 + 8;
       FillReg(Pfx + IntToStr(Index), Trim(RegValueFmt(@FContext.R[Index], 8)), 4, 2);
     end;
     17: FillReg('EFLAGS', RegValueFmt(@FContext.EFlags, 4), 7, 2);
@@ -1470,32 +1612,32 @@ begin
     32: FillReg('x87TagWord', RegValueFmt(@FContext.TagWord, 2), 11);
     33..40:
     begin
-      Index := RegID - 33;
+      Index := ARegID - 33;
       FillReg('MM' + IntToStr(Index),
         RegValueFmt(@FContext.FloatRegisters[Index * 10], 8), 4);
     end;
     41..48:
     begin
-      Index := RToSt(RegID - 41);
-      FillReg('R' + IntToStr(RegID - 41),
+      Index := RToSt(ARegID - 41);
+      FillReg('R' + IntToStr(ARegID - 41),
         RegValueFmt(@FContext.FloatRegisters[Index * 10], 10), 3, 2);
     end;
     49..56:
     begin
-      Index := RegID - 49;
+      Index := ARegID - 49;
       FillReg('ST' + IntToStr(Index),
         RegValueFmt(@FContext.FloatRegisters[Index * 10], 10), 4, 2);
     end;
     57: FillReg('MxCsr', RegValueFmt(@FContext.MxCsr, 4), 6);
     58..73:
     begin
-      Index := RegID - 58;
+      Index := ARegID - 58;
       FillReg('XMM' + IntToStr(Index),
         RegValueFmt(@FContext.Ymm[Index].Low, 16), XmmPfxSize);
     end;
     74..89:
     begin
-      Index := RegID - 74;
+      Index := ARegID - 74;
       FillReg('YMM' + IntToStr(Index),
         RegValueFmt(@FContext.Ymm[Index], 32), XmmPfxSize);
     end;
@@ -1561,12 +1703,12 @@ begin
     begin
       if FPUMode = fpuST then
       begin
-        Index := RegID - 148;
+        Index := ARegID - 148;
         FillReg('R' + IntToStr(StToR(Index)), ExtFmt(Index), 3);
       end
       else
       begin
-        Index := RToSt(RegID - 148);
+        Index := RToSt(ARegID - 148);
         FillReg('ST' + IntToStr(Index), ExtFmt(Index), 4);
       end;
     end;
@@ -1575,8 +1717,8 @@ begin
     158..173:
     begin
       AHint := '';
-      if GetRegValue(RegID - 158, ARegValue) then
-        DoQueryRegHint(ARegValue, AHint);
+      if RegQueryValue(ARegID - 158, ARegValue) then
+        DoQueryRegHint(ARegValue.QwordValue, AHint);
       FillReg('', AHint, 0, Length(AHint));
     end;
   else
@@ -1765,7 +1907,7 @@ procedure TIntelCpuContext.UpdateQueryRegs;
 
 var
   I: Integer;
-  RegValue: UInt64;
+  RegValue: TRegValue;
 begin
   FQueryRegAtAddr.Clear;
   // RAX..R15, DR0..DR3
@@ -1773,124 +1915,8 @@ begin
   begin
     LastReg.RegID := I;
     UpdateLastRegData(I);
-    GetRegValue(I, RegValue);
-    AddReg(LastReg.RegName, RegValue);
-  end;
-end;
-
-function TIntelCpuContext.UpdateRegValue(RegID: TRegID;
-  ANewRegValue: UInt64): Boolean;
-begin
-  {$IFDEF CPUX64}
-  if AddressMode = am32bit then
-    FContext := GetIntelWow64Context(ThreadID)
-  else
-  {$ENDIF}
-    FContext := GetIntelContext(ThreadID);
-
-  case RegID of
-    0: FContext.Rax := ANewRegValue;
-    1: FContext.Rbx := ANewRegValue;
-    2: FContext.Rcx := ANewRegValue;
-    3: FContext.Rdx := ANewRegValue;
-    4: FContext.Rbp := ANewRegValue;
-    5: FContext.Rsp := ANewRegValue;
-    6: FContext.Rsi := ANewRegValue;
-    7: FContext.Rdi := ANewRegValue;
-    8: FContext.Rip := ANewRegValue;
-    9..16: FContext.R[RegID - 1] := ANewRegValue;
-    17: FContext.EFlags := ANewRegValue;
-    18: FContext.SegGs := ANewRegValue;
-    19: FContext.SegFs := ANewRegValue;
-    20: FContext.SegEs := ANewRegValue;
-    21: FContext.SegDs := ANewRegValue;
-    22: FContext.SegCs := ANewRegValue;
-    23: FContext.SegSs := ANewRegValue;
-    24: FContext.Dr0 := ANewRegValue;
-    25: FContext.Dr1 := ANewRegValue;
-    26: FContext.Dr2 := ANewRegValue;
-    27: FContext.Dr3 := ANewRegValue;
-    28: FContext.Dr6 := ANewRegValue;
-    29: FContext.Dr7 := ANewRegValue;
-    30: FContext.ControlWord := ANewRegValue;
-    31: FContext.StatusWord := ANewRegValue;
-    32: FContext.TagWord := ANewRegValue;
-    57: FContext.MxCsr := ANewRegValue;
-    91: SetBitValue(FContext.EFlags, 0, ANewRegValue);        // CF
-    92: SetBitValue(FContext.EFlags, 2, ANewRegValue);        // PF
-    93: SetBitValue(FContext.EFlags, 4, ANewRegValue);        // AF
-    94: SetBitValue(FContext.EFlags, 6, ANewRegValue);        // ZF
-    95: SetBitValue(FContext.EFlags, 7, ANewRegValue);        // SF
-    96: SetBitValue(FContext.EFlags, 8, ANewRegValue);        // TF
-    97: SetBitValue(FContext.EFlags, 9, ANewRegValue);        // IF
-    98: SetBitValue(FContext.EFlags, 10, ANewRegValue);       // DF
-    99: SetBitValue(FContext.EFlags, 11, ANewRegValue);       // OF
-    {$message 'Эти два флага пока не работают'}
-    100: FContext.LastError := ANewRegValue;
-    101: FContext.LastStatus := ANewRegValue;
-    102..109: SetTagWordSetValue(RegID - 102, ANewRegValue);
-    110: SetBitValue(FContext.StatusWord, 7, ANewRegValue);   // ES
-    111: SetBitValue(FContext.StatusWord, 0, ANewRegValue);   // IE
-    112: SetBitValue(FContext.StatusWord, 1, ANewRegValue);   // DE
-    113: SetBitValue(FContext.StatusWord, 2, ANewRegValue);   // ZE
-    114: SetBitValue(FContext.StatusWord, 3, ANewRegValue);   // OE
-    115: SetBitValue(FContext.StatusWord, 4, ANewRegValue);   // UE
-    116: SetBitValue(FContext.StatusWord, 15, ANewRegValue);  // B
-    117: SetBitValue(FContext.StatusWord, 8, ANewRegValue);   // C0
-    118: SetBitValue(FContext.StatusWord, 9, ANewRegValue);   // C1
-    119: SetBitValue(FContext.StatusWord, 10, ANewRegValue);  // C2
-    120: SetBitValue(FContext.StatusWord, 14, ANewRegValue);  // C3
-    121: SetBitValue(FContext.StatusWord, 5, ANewRegValue);   // PE
-    122: SetBitValue(FContext.StatusWord, 6, ANewRegValue);   // SF
-    123: SetStatusWordTopValue(ANewRegValue);
-    124: SetBitValue(FContext.ControlWord, 0, ANewRegValue);  // IM
-    125: SetBitValue(FContext.ControlWord, 1, ANewRegValue);  // DM
-    126: SetBitValue(FContext.ControlWord, 2, ANewRegValue);  // ZM
-    127: SetBitValue(FContext.ControlWord, 3, ANewRegValue);  // OM
-    128: SetBitValue(FContext.ControlWord, 4, ANewRegValue);  // UM
-    129: SetBitValue(FContext.ControlWord, 5, ANewRegValue);  // PM
-    130: SetControlWordPrecisionValue(ANewRegValue);          // WordPrecision set
-    131: SetBitValue(FContext.ControlWord, 12, ANewRegValue); // IC
-    132: SetControlWordRoundingValue(ANewRegValue);           // WordRounding set
-    133: SetBitValue(FContext.MxCsr, 0, ANewRegValue);        // IE
-    134: SetBitValue(FContext.MxCsr, 1, ANewRegValue);        // DE
-    135: SetBitValue(FContext.MxCsr, 2, ANewRegValue);        // ZE
-    136: SetBitValue(FContext.MxCsr, 3, ANewRegValue);        // OE
-    137: SetBitValue(FContext.MxCsr, 4, ANewRegValue);        // UE
-    138: SetBitValue(FContext.MxCsr, 5, ANewRegValue);        // PE
-    139: SetBitValue(FContext.MxCsr, 7, ANewRegValue);        // IM
-    140: SetBitValue(FContext.MxCsr, 8, ANewRegValue);        // DM
-    141: SetBitValue(FContext.MxCsr, 9, ANewRegValue);        // ZM
-    142: SetBitValue(FContext.MxCsr, 10, ANewRegValue);       // OM
-    143: SetBitValue(FContext.MxCsr, 11, ANewRegValue);       // UM
-    144: SetBitValue(FContext.MxCsr, 12, ANewRegValue);       // PM
-    145: SetBitValue(FContext.MxCsr, 6, ANewRegValue);        // DAZ
-    146: SetBitValue(FContext.MxCsr, 15, ANewRegValue);       // FTZ
-    147: SetMxCsrRoundingValue(ANewRegValue);                 // RC
-  else
-    Exit(False);
-  end;
-
-  {$IFDEF CPUX64}
-  if AddressMode = am32bit then
-    Result := SetIntelWow64Context(ThreadID, FContext)
-  else
-  {$ENDIF}
-    Result := SetIntelContext(ThreadID, FContext);
-
-  if Result then
-  begin
-    KnownRegs.List[RegID].Modifyed := True;
-    case RegID of
-      91..99: KnownRegs.List[17].Modifyed := True;            // EFlags
-      102..109: KnownRegs.List[32].Modifyed := True;          // TagWord
-      110..123: KnownRegs.List[31].Modifyed := True;          // StatusWord
-      124..132: KnownRegs.List[30].Modifyed := True;          // ControlWord
-      133..147: KnownRegs.List[57].Modifyed := True;          // MxCsr
-    end;
-    // Update LastReg cache...
-    UpdateLastRegData(RegID);
-    LastReg.Modifyed := True;
+    RegQueryValue(I, RegValue);
+    AddReg(LastReg.RegName, RegValue.QwordValue);
   end;
 end;
 

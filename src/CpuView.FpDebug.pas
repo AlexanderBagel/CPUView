@@ -93,12 +93,12 @@ type
   private
     FDbgIntf: TCpuViewDebugGate;
     FRegID: Integer;
-    FNewRegValue: UInt64;
+    FNewRegValue: TRegValue;
     FThreadResult: Boolean;
   protected
     procedure DoExecute; override;
   public
-    constructor Create(ADbgIntf: TCpuViewDebugGate; ARegID: Integer; ANewRegValue: UInt64);
+    constructor Create(ADbgIntf: TCpuViewDebugGate; ARegID: Integer; ANewRegValue: TRegValue);
     property ThreadResult: Boolean read FThreadResult;
   end;
 
@@ -205,14 +205,14 @@ begin
     DebugThread.BeforeContinue;
 
   FDbgIntf.Context.ThreadID := FDbgIntf.ThreadID;
-  FThreadResult := FDbgIntf.Context.UpdateRegValue(FRegID, FNewRegValue);
+  FThreadResult := FDbgIntf.Context.RegSetValue(FRegID, FNewRegValue);
 
   //if DebugThread <> nil then
   //  TDebugThreadAcces(DebugThread).ReadThreadState;
 end;
 
 constructor TThreadWorkerChangeThreadContext.Create(
-  ADbgIntf: TCpuViewDebugGate; ARegID: Integer; ANewRegValue: UInt64);
+  ADbgIntf: TCpuViewDebugGate; ARegID: Integer; ANewRegValue: TRegValue);
 begin
   inherited Create((ADbgIntf.Debugger as TFpDebugDebugger), twpContinue);
   FDbgIntf := ADbgIntf;
@@ -981,14 +981,17 @@ function TCpuViewDebugGate.UpdateRegValue(RegID: Integer; ANewRegValue: UInt64
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerChangeThreadContext;
+  RegValue: TRegValue;
 begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
   WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
+    RegValue := Default(TRegValue);
+    RegValue.QwordValue := ANewRegValue;
     WorkItem := TThreadWorkerChangeThreadContext.Create(
-      Self, RegID, ANewRegValue);
+      Self, RegID, RegValue);
     WorkQueue.PushItem(WorkItem);
     WorkQueue.WaitForItem(WorkItem, True);
     Result := WorkItem.ThreadResult;

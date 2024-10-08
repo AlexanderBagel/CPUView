@@ -10,6 +10,7 @@ uses
   SysUtils,
   StrUtils,
   Generics.Collections,
+  CpuView.CPUContext,
   CpuView.ScriptExecutor,
   FWHexView.AsmTokenizer;
 
@@ -73,6 +74,7 @@ var
   WaitState: TWaitStates;
   Sign, Multiply, Mem, RegPresent: Boolean;
   MemSize: Integer;
+  RegValue: TRegValue;
 begin
   Result := False;
   if (Context = nil) or (Debugger = nil) then Exit;
@@ -195,9 +197,10 @@ begin
             if (TokenStr = 'RIP') and Mem then
               Token.Value := CurrentRIPOffset
             else
-              if not Context.QueryRegValueByName(TokenStr, Token.Value) then
+              if not Context.RegQueryValue(TokenStr, RegValue) then
                 Exit;
             RegPresent := True;
+            Token.Value := RegValue.QwordValue;
             Token.Decrement := Sign;
             Sign := False;
             if Multiply then

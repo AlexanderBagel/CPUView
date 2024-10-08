@@ -658,13 +658,13 @@ begin
         end) then
           FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
     end;
-    crtSetValue:
+    crtEnumValue:
     begin
-      ACount := FDbgGate.Context.RegSetValueCount(FContextRegister.RegID);
+      ACount := FDbgGate.Context.RegQueryEnumValuesCount(FContextRegister.RegID);
       if ACount = 0 then Exit;
       SetLength(SetValues{%H-}, ACount);
       for I := 0 to ACount - 1 do
-        SetValues[I] := FDbgGate.Context.RegSetValueAtIndex(FContextRegister.RegID, I);
+        SetValues[I] := FDbgGate.Context.RegQueryEnumString(FContextRegister.RegID, I);
       I := Integer(FContextRegValue);
       if QuerySetList('Edit ' + FContextRegName, 'New value:', SetValues, I) then
       begin

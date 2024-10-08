@@ -34,7 +34,7 @@ type
     crtValue,           // обычный регистр
     crtExtra,           // специальный регистр EFlags, MSRCX etc...
     crtBitValue,        // флаг содержащий битовое значение регистра
-    crtSetValue,        // флаг являющий составной частью сета
+    crtEnumValue,       // флаг являющий составной частью энума
     crtSelectableHint,  // подсказка доступная для копирования пользователем (например текущие активные типы JMP)
     crtHint             // обычная "декоративная" подсказка
     );
@@ -42,6 +42,13 @@ type
   // Типы поддерживаемых операций с регистром при изменении
   TModifyAction = (maToggle, maIncrement, maZero, maChange);
   TModifyActions = set of TModifyAction;
+
+  TRegID = Integer;
+
+  TRegDescriptor = record
+    RegID: TRegID;                 // link to KnownRegs
+    RowIndex, RegIndex: Integer;   // link to Map
+  end;
 
   // Тип используемый при отрисовке каждого регистра в TRegView
   TRegister = record
@@ -73,9 +80,6 @@ type
   TContextQueryRegHintEvent = procedure(Sender: TObject; AddrVA: UInt64;
     AColumnType: TColumnType; var AHint: string) of object;
 
-  // Минимальный класс необходимый для работы StackView
-
-  TRegID = Integer;
   TRegValue = record
     ValueSize: Integer;
     case Integer of
@@ -88,7 +92,11 @@ type
       32: (Ext32: array [0..31] of Byte);
   end;
 
+  TRegQueryStringType = (rqstName, rqstValue);
+
   { TAbstractCPUContext }
+
+  // Минимальный класс с которым работает StackView
 
   TAbstractCPUContext = class(TComponent)
   private
@@ -102,15 +110,28 @@ type
     procedure SetViewMode(RegID: TRegID; const Value: TRegViewMode); virtual; abstract;
   public
     function Count: Integer; virtual; abstract;
-    function EmptyRow(RowIndex: Integer): Boolean; virtual; abstract;
+    function EmptyRow(ARowIndex: Integer): Boolean; virtual; abstract;
     procedure InitDefault; virtual; abstract;
+    function InstructonPoint: UInt64; virtual; abstract;
+    function InstructonPointID: TRegID; virtual; abstract;
+    function IsActiveJump(const Value: string): Boolean; virtual; abstract;
     function PointerSize: Integer; virtual; abstract;
-    function RegCount(RowIndex: Integer): Integer; virtual; abstract;
-    function RegData(RowIndex, RegIndex: Integer; NameNeeded: Boolean): string; virtual; abstract;
-    function RegInfo(RowIndex, RegIndex: Integer): TRegister; virtual; abstract;
-    function RegParam(RegID: TRegID; out Param: TRegParam): Boolean; virtual; abstract;
-    function RegQuery(RegID: TRegID; out RowIndex, RegIndex: Integer): Boolean;
-    function RegQueryValue(RowIndex, RegIndex: Integer; out ARegValue: UInt64): Boolean; virtual; abstract;
+    function RegCount(ARowIndex: Integer): Integer; virtual; abstract;
+    function RegDescriptor(ARegID: TRegID; out ADescriptor: TRegDescriptor): Boolean; overload;
+    function RegDescriptor(ARowIndex, ARegIndex: Integer; out ADescriptor: TRegDescriptor): Boolean; overload; virtual; abstract;
+    function RegDescriptor(const ARegName: string; out ADescriptor: TRegDescriptor): Boolean; overload; virtual; abstract;
+    function RegInfo(ARegID: TRegID): TRegister; overload; virtual; abstract;
+    function RegInfo(ARowIndex, ARegIndex: Integer): TRegister; overload; virtual; abstract;
+    function RegParam(ARegID: TRegID; out AParam: TRegParam): Boolean; virtual; abstract;
+    function RegQueryEnumString(ARegID: TRegID; AEnumIndex: Integer): string; virtual; abstract;
+    function RegQueryEnumValuesCount(ARegID: TRegID): Integer; virtual; abstract;
+    function RegQueryNamesAtAddr(AAddrVA: UInt64): string; virtual; abstract;
+    function RegQueryString(ARegID: TRegID; AType: TRegQueryStringType): string; virtual; abstract;
+    function RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
+    function RegQueryValue(const ARegName: string; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
+    function RegSetValue(ARegID: TRegID; const ANewRegValue: TRegValue): Boolean; virtual; abstract;
+    function Update(ANewInstructionPoint: UInt64 = 0): Boolean; virtual; abstract;
+  public
     property AddressMode: TAddressMode read FAddressMode write FAddressMode;
     property ViewMode[RegID: TRegID]: TRegViewMode read GetViewMode write SetViewMode;
     property OnChange: TContextChangeEvent read FChange write FChange;
@@ -162,7 +183,6 @@ type
     LastReg: TCustomRegData;
     procedure BuildMap; virtual; abstract;
     procedure DoChangeViewMode(RegID: Integer; const Value: TRegViewMode); virtual; abstract;
-    function GetRegValue(RegID: Integer; out ARegValue: UInt64): Boolean; virtual; abstract;
     function GetViewMode(RegID: Integer): TRegViewMode; override;
     procedure InitKnownRegs; virtual; abstract;
     procedure SetViewMode(RegID: Integer; const Value: TRegViewMode); override;
@@ -178,8 +198,9 @@ type
       NameGlyphCount, ValueSeparatorSize: Integer); overload;
     procedure FillReg(const RegName, Value: string;
       NameGlyphCount, ValueGlyphCount, ValueSeparatorSize: Integer); overload;
+    procedure FillRegData(RegID: TRegID); overload;
+    procedure FillRegData(RowIndex, ColIndex: Integer); overload;
     procedure FillSeparator;
-    procedure GetRegData(RowIndex, ColIndex: Integer);
     function RegValue(Value: PByte; ValueLen: Integer;
       AValueFmt: TRegViewMode): string;
     function RegValueFmt(Value: PByte; ValueLen: Integer): string;
@@ -189,24 +210,15 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     function Count: Integer; override;
-    function EmptyRow(RowIndex: Integer): Boolean; override;
-    function InstructonPoint: UInt64; virtual; abstract;
-    function InstructonPointID: Integer; virtual; abstract;
-    function IsActiveJump(const Value: string): Boolean; virtual; abstract;
-    function QueryRegIndexByName(const RegName: string; out Index: Integer): Boolean; virtual; abstract;
-    function QueryRegNameAtAddr(AddrVA: Int64): string; virtual; abstract;
-    function QueryRegValueByName(const RegName: string; out RegValue: UInt64): Boolean; virtual; abstract;
-    function RegCount(RowIndex: Integer): Integer; override;
-    function RegData(RowIndex, ColIndex: Integer;
-      NameNeeded: Boolean): string; override;
-    function RegInfo(RowIndex, ColIndex: Integer): TRegister; override;
-    function RegParam(RegID: Integer; out Param: TRegParam): Boolean; override;
-    function RegSetValueAtIndex(RegID, Index: Integer): string; virtual; abstract;
-    function RegSetValueCount(RegID: Integer): Integer; virtual;
+    function EmptyRow(ARowIndex: Integer): Boolean; override;
+    function RegCount(ARowIndex: Integer): Integer; override;
+    function RegDescriptor(ARowIndex, ARegIndex: Integer; out ADescriptor: TRegDescriptor): Boolean; overload; override; deprecated;
+    function RegInfo(ARegID: TRegID): TRegister; overload; override;
+    function RegInfo(ARowIndex, AColIndex: Integer): TRegister; overload; override;
+    function RegParam(ARegID: TRegID; out AParam: TRegParam): Boolean; override;
+    function RegQueryString(ARegID: TRegID; AType: TRegQueryStringType): string; override;
     function StackBase: UInt64; virtual; abstract;
     function StackPoint: UInt64; virtual; abstract;
-    function Update(CurrentIP: UInt64 = 0): Boolean; virtual; abstract;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean; virtual; abstract;
     property ThreadID: Cardinal read FThreadID write FThreadID;
   end;
 
@@ -252,16 +264,18 @@ begin
     FChange(Self, AChangeType);
 end;
 
-function TAbstractCPUContext.RegQuery(RegID: TRegID; out RowIndex,
-  RegIndex: Integer): Boolean;
+function TAbstractCPUContext.RegDescriptor(ARegID: TRegID;
+  out ADescriptor: TRegDescriptor): Boolean;
 var
   Param: TRegParam;
 begin
-  Result := RegParam(RegID, Param);
+  ADescriptor := Default(TRegDescriptor);
+  Result := RegParam(ARegID, Param);
   if Result then
   begin
-    RowIndex := Param.RowIndex;
-    RegIndex := Param.ColIndex;
+    ADescriptor.RegID := ARegID;
+    ADescriptor.RowIndex := Param.RowIndex;
+    ADescriptor.RegIndex := Param.ColIndex;
   end;
 end;
 
@@ -288,13 +302,13 @@ begin
   inherited;
 end;
 
-function TCommonCpuContext.EmptyRow(RowIndex: Integer): Boolean;
+function TCommonCpuContext.EmptyRow(ARowIndex: Integer): Boolean;
 var
   ARegID: Integer;
 begin
-  if (RowIndex >= 0) and (RowIndex < Map.Count) then
+  if (ARowIndex >= 0) and (ARowIndex < Map.Count) then
   begin
-    ARegID := Map[RowIndex].RegID;
+    ARegID := Map[ARowIndex].RegID;
     Result := ARegID < 0;
     if not Result then
       Result := KnownRegs[ARegID].RegType = crtHint;
@@ -331,29 +345,20 @@ begin
   LastReg.ValueSeparatorSize := ValueSeparatorSize;
 end;
 
-procedure TCommonCpuContext.FillReg(const RegName, Value: string;
-  NameGlyphCount: Integer);
+procedure TCommonCpuContext.FillRegData(RowIndex, ColIndex: Integer);
 begin
-  FillReg(RegName, Value, NameGlyphCount, Length(Value), 0);
+  if Map.CheckRegIndex(RowIndex, ColIndex) then
+    FillRegData(Map[RowIndex][ColIndex].RegID);
 end;
 
-procedure TCommonCpuContext.FillSeparator;
-begin
-  FillReg('', '', 0, 0);
-end;
-
-procedure TCommonCpuContext.GetRegData(RowIndex, ColIndex: Integer);
+procedure TCommonCpuContext.FillRegData(RegID: TRegID);
 var
-  RegID: Integer;
   RegParam: TRegParam;
 begin
-  if not Map.CheckRegIndex(RowIndex, ColIndex) then
-    Exit;
-
-  RegID := Map[RowIndex][ColIndex].RegID;
-
   // check cache
   if LastReg.RegID = RegID then Exit;
+
+  if (RegID < 0) or (RegID >= KnownRegs.Count) then Exit;
 
   // real fill reg data
   LastReg.RegID := RegID;
@@ -367,29 +372,43 @@ begin
   UpdateLastRegData(RegID);
 end;
 
+procedure TCommonCpuContext.FillReg(const RegName, Value: string;
+  NameGlyphCount: Integer);
+begin
+  FillReg(RegName, Value, NameGlyphCount, Length(Value), 0);
+end;
+
+procedure TCommonCpuContext.FillSeparator;
+begin
+  FillReg('', '', 0, 0);
+end;
+
 function TCommonCpuContext.GetViewMode(RegID: Integer): TRegViewMode;
 begin
   Result := KnownRegs[RegID].ViewMode;
 end;
 
-function TCommonCpuContext.RegCount(RowIndex: Integer): Integer;
+function TCommonCpuContext.RegCount(ARowIndex: Integer): Integer;
 begin
-  Result := Map[RowIndex].Count;
+  Result := Map[ARowIndex].Count;
 end;
 
-function TCommonCpuContext.RegData(RowIndex, ColIndex: Integer;
-  NameNeeded: Boolean): string;
+function TCommonCpuContext.RegDescriptor(ARowIndex, ARegIndex: Integer;
+  out ADescriptor: TRegDescriptor): Boolean;
 begin
-  GetRegData(RowIndex, ColIndex);
-  if NameNeeded then
-    Result := LastReg.RegName
-  else
-    Result := LastReg.Value;
+  ADescriptor := Default(TRegDescriptor);
+  Result := Map.CheckRegIndex(ARowIndex, ARegIndex);
+  if Result then
+  begin
+    ADescriptor.RegID := Map[ARowIndex][ARegIndex].RegID;
+    ADescriptor.RowIndex := ARowIndex;
+    ADescriptor.RegIndex := ARegIndex;
+  end;
 end;
 
-function TCommonCpuContext.RegInfo(RowIndex, ColIndex: Integer): TRegister;
+function TCommonCpuContext.RegInfo(ARegID: TRegID): TRegister;
 begin
-  GetRegData(RowIndex, ColIndex);
+  FillRegData(ARegID);
   Result.Modifyed := LastReg.Modifyed;
   Result.RegID := LastReg.RegID;
   Result.RegNameSize := LastReg.NameGlyphCount;
@@ -398,17 +417,32 @@ begin
   Result.ValueType := LastReg.RegType;
 end;
 
-function TCommonCpuContext.RegParam(RegID: Integer;
-  out Param: TRegParam): Boolean;
+function TCommonCpuContext.RegInfo(ARowIndex, AColIndex: Integer): TRegister;
 begin
-  Result := (RegID >= 0) and (RegID < KnownRegs.Count);
-  if Result then
-    Param := KnownRegs[RegID];
+  if Map.CheckRegIndex(ARowIndex, AColIndex) then
+    Result := RegInfo(Map[ARowIndex][AColIndex].RegID)
+  else
+    Result := Default(TRegister);
 end;
 
-function TCommonCpuContext.RegSetValueCount(RegID: Integer): Integer;
+function TCommonCpuContext.RegParam(ARegID: TRegID;
+  out AParam: TRegParam): Boolean;
 begin
-  Result := 0;
+  Result := (ARegID >= 0) and (ARegID < KnownRegs.Count);
+  if Result then
+    AParam := KnownRegs[ARegID];
+end;
+
+function TCommonCpuContext.RegQueryString(ARegID: TRegID;
+  AType: TRegQueryStringType): string;
+begin
+  FillRegData(ARegID);
+  case AType of
+    rqstName: Result := LastReg.RegName;
+    rqstValue: Result := LastReg.Value;
+  else
+    Result := '';
+  end;
 end;
 
 function TCommonCpuContext.RegValue(Value: PByte; ValueLen: Integer;

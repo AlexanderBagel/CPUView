@@ -342,7 +342,7 @@ procedure TCpuViewCore.AsmViewQueryComment(Sender: TObject; AddrVA: UInt64;
   AColumn: TColumnType; var AComment: string);
 begin
   case AColumn of
-    ctWorkSpace: AComment := FDebugger.Context.QueryRegNameAtAddr(AddrVA);
+    ctWorkSpace: AComment := FDebugger.Context.RegQueryNamesAtAddr(AddrVA);
   end;
 end;
 
@@ -786,7 +786,7 @@ var
   AStackValue: Int64;
 begin
   case AColumn of
-    ctWorkSpace: AComment := FDebugger.Context.QueryRegNameAtAddr(AddrVA);
+    ctWorkSpace: AComment := FDebugger.Context.RegQueryNamesAtAddr(AddrVA);
     ctComment:
     begin
       AStackValue := 0;
