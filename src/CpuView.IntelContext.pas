@@ -10,7 +10,7 @@ uses
 {$IFnDEF FPC}
   Windows,
 {$ELSE}
-  LCLIntf, LCLType, LMessages,
+  LCLIntf, LCLType,
 {$ENDIF}
   SysUtils,
   Classes,
@@ -612,7 +612,7 @@ procedure TIntelCpuContext.InitKnownRegs;
     R.ColIndex := -1;
     R.RegType := RegType;
     R.Modifyed := False;
-    case RegType of
+    {%H-}case RegType of
       crtBitValue: ModifyActions := [maToggle];
       crtEnumValue: ModifyActions := [maChange];
     end;
@@ -1088,7 +1088,11 @@ end;
 
 function TIntelCpuContext.RegSetValue(ARegID: TRegID;
   const ANewRegValue: TRegValue): Boolean;
+var
+  ReloadTagWord: Boolean;
+  TagWordCtx: TIntelThreadContext;
 begin
+  ReloadTagWord := False;
   {$IFDEF CPUX64}
   if AddressMode = am32bit then
     FContext := GetIntelWow64Context(ThreadID)
@@ -1136,7 +1140,13 @@ begin
     {$message 'Эти два флага пока не работают'}
     100: FContext.LastError := ANewRegValue.DwordValue;
     101: FContext.LastStatus := ANewRegValue.DwordValue;
-    102..109: SetTagWordSetValue(ARegID - 102, ANewRegValue.ByteValue);
+    102..109:
+    begin
+      SetTagWordSetValue(ARegID - 102, ANewRegValue.ByteValue);
+      {$IFDEF CPUX64}
+      ReloadTagWord := True;
+      {$ENDIF}
+    end;
     110: SetBitValue(FContext.StatusWord, 7, ANewRegValue.ByteValue);   // ES
     111: SetBitValue(FContext.StatusWord, 0, ANewRegValue.ByteValue);   // IE
     112: SetBitValue(FContext.StatusWord, 1, ANewRegValue.ByteValue);   // DE
@@ -1196,6 +1206,12 @@ begin
       124..132: KnownRegs.List[30].Modifyed := True;          // ControlWord
       133..147: KnownRegs.List[57].Modifyed := True;          // MxCsr
     end;
+    // Speсial case for x64 - Reload TagWord
+    if ReloadTagWord then
+    begin
+      TagWordCtx := GetIntelContext(ThreadID);
+      FContext.TagWord := TagWordCtx.TagWord;
+    end;
     // Update LastReg cache...
     UpdateLastRegData(ARegID);
     LastReg.Modifyed := True;
@@ -1207,10 +1223,22 @@ begin
   Result := True;
   ARegValue := Default(TRegValue);
   case ARegID of
+    // defaurt regs
     0..16, 24..29: ARegValue.ValueSize := 8;
+    // segments and flags
     17..23, 57, 100, 101: ARegValue.ValueSize := 4;
+    // ControlWord, StatusWord, TagWord
     30..32: ARegValue.ValueSize := 2;
+    // bit and enum values
     91..99, 102..147: ARegValue.ValueSize := 1;
+    // x87 MM
+    33..40: ARegValue.ValueSize := 8;
+    // x87 ST Rx
+    41..56: ARegValue.ValueSize := 10;
+    // XMM
+    58..73: ARegValue.ValueSize := 16;
+    // YMM
+    74..89: ARegValue.ValueSize := 32;
   else
     ARegValue.ValueSize := 0;
   end;
@@ -1241,7 +1269,17 @@ begin
     30: ARegValue.WordValue := Context.ControlWord;
     31: ARegValue.WordValue := Context.StatusWord;
     32: ARegValue.WordValue := Context.TagWord;
+    33..40:
+      ARegValue.QwordValue := Context.FloatRegisters[ARegID - 33].MM.Value;
+    41..48:
+      Move(Context.FloatRegisters[ARegID - 41], ARegValue.Ext10[0], 10);
+    49..56:
+      Move(Context.FloatRegisters[ARegID - 56], ARegValue.Ext10[0], 10);
     57: ARegValue.DwordValue := Context.MxCsr;
+    58..73:
+      Move(Context.Ymm[ARegID - 58], ARegValue.Ext16[0], 16);
+    74..89:
+      Move(Context.Ymm[ARegID - 74], ARegValue.Ext32[0], 32);
     91: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 0);        // CF
     92: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 2);        // PF
     93: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 4);        // AF
@@ -1299,7 +1337,7 @@ end;
 
 function TIntelCpuContext.RToSt(Index: Integer): Integer;
 begin
-  Result := Index - (Context.StatusWord shr 11) and 7;
+  Result := Index - ExtractStatusWordTopValue;
   if Result < 0 then
     Inc(Result, 8);
 end;
@@ -1308,7 +1346,8 @@ procedure TIntelCpuContext.SetContext(const Value: TIntelThreadContext);
 var
   CtxBittessChanged: Boolean;
 begin
-  UpdateModifyed(Value);
+  if not CompareMem(@FContext, @Value, SizeOf(TIntelThreadContext)) then
+    UpdateModifyed(Value);
   CtxBittessChanged := (FContext.Rip = 0) or
     (Value.x86Context <> FContext.x86Context);
   FContext := Value;
@@ -1469,7 +1508,7 @@ end;
 
 function TIntelCpuContext.StToR(Index: Integer): Integer;
 begin
-  Result := Index + (Context.StatusWord shr 11) and 7;
+  Result := Index + ExtractStatusWordTopValue;
   if Result > 7 then
     Dec(Result, 8);
 end;
@@ -1517,21 +1556,30 @@ procedure TIntelCpuContext.UpdateLastRegData(ARegID: TRegID);
     Ex: PExtended80Support;
     Len, MaxLen: Integer;
   begin
-    Ex := PExtended80Support(@FContext.FloatRegisters[Index * 10]);
+    Ex := PExtended80Support(@FContext.FloatRegisters[Index]);
     Result := RawBufToViewMode(PByte(Ex), SizeOf(TExtended80Support),
       DefValueMetric(bvmFloat80), bvmFloat80, RegFormatModeNoAlign);
+    Result := StringReplace(Result, FormatSettings.DecimalSeparator, '.', [rfReplaceAll]);
     MaxLen := DefValueMetric(bvmFloat80).CharCount;
     Len := Length(Result);
     if Len <> MaxLen then
     begin
       if GetFloatType(Ex^) in [ftNormalized..ftZero] then
       begin
-        if Pos('e', Result) <> 0 then Exit;
-        if Pos('.', Result) = 0 then
-          Result := Result + '.' + StringOfChar('0', MaxLen - Len - 2)
-        else
-          Result := Result + StringOfChar('0', MaxLen - Len - 1);
+        if Pos('e', Result) = 0 then
+        begin
+          if Pos('.', Result) = 0 then
+            Result := Result + '.' + StringOfChar('0', MaxLen - Len - 2)
+          else
+            Result := Result + StringOfChar('0', MaxLen - Len - 1);
+        end;
       end;
+    end;
+    case ExtractTagWordSetValue(StToR(Index)) of
+      0: Result := 'Valid ' + Result;
+      1: Result := 'Zero  ' + Result;
+      2: Result := 'Spec  ' + Result;
+      3: Result := 'Empty ' + Result;
     end;
   end;
 
@@ -1614,19 +1662,19 @@ begin
     begin
       Index := ARegID - 33;
       FillReg('MM' + IntToStr(Index),
-        RegValueFmt(@FContext.FloatRegisters[Index * 10], 8), 4);
+        RegValueFmt(@FContext.FloatRegisters[Index], 8), 4);
     end;
     41..48:
     begin
       Index := RToSt(ARegID - 41);
       FillReg('R' + IntToStr(ARegID - 41),
-        RegValueFmt(@FContext.FloatRegisters[Index * 10], 10), 3, 2);
+        RegValueFmt(@FContext.FloatRegisters[Index], 10), 3, 2);
     end;
     49..56:
     begin
       Index := ARegID - 49;
       FillReg('ST' + IntToStr(Index),
-        RegValueFmt(@FContext.FloatRegisters[Index * 10], 10), 4, 2);
+        RegValueFmt(@FContext.FloatRegisters[Index], 10), 4, 2);
     end;
     57: FillReg('MxCsr', RegValueFmt(@FContext.MxCsr, 4), 6);
     58..73:
@@ -1740,16 +1788,16 @@ procedure TIntelCpuContext.UpdateModifyed(const Value: TIntelThreadContext);
       A and (1 shl Index) <> B and (1 shl Index);
   end;
 
-  procedure CheckDoubleSet(A, B: DWORD; Index: Integer; RegID: Integer);
+    procedure CheckDoubleSet(A, B: DWORD; Index: Integer; RegID: Integer);
   begin
     KnownRegs.List[RegID].Modifyed :=
-      (A shr Index) and 3 <> (A shr Index) and 3;
+      (A shr Index) and 3 <> (B shr Index) and 3;
   end;
 
   procedure CheckTripleSet(A, B: DWORD; Index: Integer; RegID: Integer);
   begin
     KnownRegs.List[RegID].Modifyed :=
-      (A shr Index) and 7 <> (A shr Index) and 7;
+      (A shr Index) and 7 <> (B shr Index) and 7;
   end;
 
   procedure CheckMem(A, B: PByte; Len: Integer; RegID: Integer);
@@ -1806,27 +1854,19 @@ begin
   for I := 0 to 7 do
   begin
     // MMx
-    CheckMem(@FContext.FloatRegisters[I * 10],
-      @Value.FloatRegisters[I * 10], 8, 33 + I);
+    CheckMem(@FContext.FloatRegisters[I],
+      @Value.FloatRegisters[I], 8, 33 + I);
     // Rx
-    CheckMem(@FContext.FloatRegisters[I * 10],
-      @Value.FloatRegisters[I * 10], 10, 41 + I);
+    CheckMem(@FContext.FloatRegisters[I],
+      @Value.FloatRegisters[I], 10, 41 + I);
     // STx
-    CheckMem(@FContext.FloatRegisters[I * 10],
-      @Value.FloatRegisters[I * 10], 10, 49 + I);
+    CheckMem(@FContext.FloatRegisters[I],
+      @Value.FloatRegisters[I], 10, 49 + I);
   end;
 
   if CheckReg(FContext.TagWord, Value.TagWord, 32) then
-  begin
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 0, 102);
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 1, 103);
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 2, 104);
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 3, 105);
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 4, 106);
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 5, 107);
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 6, 108);
-    CheckDoubleSet(FContext.TagWord, Value.TagWord, 7, 109);
-  end;
+    for I := 0 to 7 do
+      CheckDoubleSet(FContext.TagWord, Value.TagWord, I shl 1, 102 + I);
 
   if CheckReg(FContext.StatusWord, Value.StatusWord, 31) then
   begin

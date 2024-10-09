@@ -281,13 +281,13 @@ begin
     Result.R[15] := Ctx.R15;
     Result.ControlWord := Ctx.FltSave.ControlWord;
     Result.StatusWord := Ctx.FltSave.StatusWord;
-    Result.TagWord := Ctx.FltSave.TagWord;
     Result.ErrorOffset := Ctx.FltSave.ErrorOffset;
     Result.ErrorSelector := Ctx.FltSave.ErrorSelector;
     Result.DataOffset := Ctx.FltSave.DataOffset;
     Result.DataSelector := Ctx.FltSave.DataSelector;
     Result.MxCsr := Ctx.MxCsr;
-    Move(Ctx.FltSave.FloatRegisters[0], Result.FloatRegisters[0], SIZE_OF_80387_REGISTERS);
+    Move(Ctx.FltSave.FloatRegisters[0], Result.FloatRegisters[0], SizeOf(TFloatRegisters));
+    Result.TagWord := GetTagWordFromFXSave(Result.StatusWord, Ctx.FltSave.TagWord, Result.FloatRegisters);
     {$ENDIF}
 
     Result.EFlags := Ctx.EFlags;
@@ -429,7 +429,7 @@ begin
     Ctx.R15 := AContext.R[15];
     Ctx.FltSave.ControlWord := AContext.ControlWord;
     Ctx.FltSave.StatusWord := AContext.StatusWord;
-    Ctx.FltSave.TagWord := AContext.TagWord;
+    Ctx.FltSave.TagWord := GetFXSaveTagWordFromTagWord(AContext.TagWord);
     Ctx.MxCsr := AContext.MxCsr;
     {$ENDIF}
     Ctx.EFlags := AContext.EFlags;

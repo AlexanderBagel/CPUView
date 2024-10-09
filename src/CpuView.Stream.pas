@@ -190,7 +190,7 @@ begin
     soCurrent: Inc(FPosition, Offset);
     soEnd: FPosition := FStream.Size + Offset;
   else
-    Assert(False, 'Unknown TSeekOrigin');
+    Assert(False, 'Unknown TSeekOrigin'){%H-};
   end;
   Result := FPosition;
   if not Buffer_Contains(FPosition) then

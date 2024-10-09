@@ -649,7 +649,12 @@ begin
   if NewCacheIndex < 0 then
     NewCacheIndex := GenerateCache(FCacheList[0].AddrVA);
   if NewCacheIndex >= FCacheList.Count - CacheVisibleRows then
-    NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - CacheVisibleRows].AddrVA);
+  begin
+    if NewCacheIndex < FCacheList.Count then
+      NewCacheIndex := GenerateCache(FCacheList[NewCacheIndex].AddrVA)
+    else
+      NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - CacheVisibleRows].AddrVA);
+  end;
   FLockSelChange := True;
   if (NewCacheIndex >= 0) and (NewCacheIndex < FCacheList.Count) then
     BuildAsmWindow(FCacheList[NewCacheIndex].AddrVA)
