@@ -170,6 +170,7 @@ implementation
 
 type
   TDbgProcessAccess = class(TDbgProcess);
+  TFpDebugDebuggerAccess = class(TFpDebugDebugger);
   {$IFDEF MSWINDOWS}
   TDebugThreadAcces = class(TDbgWinThread);
   {$ENDIF}
@@ -972,8 +973,14 @@ begin
 end;
 
 procedure TCpuViewDebugGate.TraceTo(AddrVA: Int64);
+var
+  ALocation: TDBGPtrArray;
 begin
-  {$message 'не реализовано'}
+  if FDbgController = nil then Exit;
+  SetLength(ALocation{%H-}, 1);
+  ALocation[0] := QWord(AddrVA);
+  FDbgController.InitializeCommand(TDbgControllerRunToCmd.Create(FDbgController, ALocation));
+  TFpDebugDebuggerAccess(FDebugger).StartDebugLoop;
 end;
 
 function TCpuViewDebugGate.UpdateRegValue(RegID: Integer; ANewRegValue: UInt64

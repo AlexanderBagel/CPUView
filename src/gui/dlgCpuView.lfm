@@ -922,6 +922,9 @@ object frmCpuView: TfrmCpuView
     object miAsmGoto: TMenuItem
       Action = acViewGoto
     end
+    object miAsmRunTo: TMenuItem
+      Action = acDbgRunTo
+    end
     object miAsmSource: TMenuItem
       Action = acAsmShowSource
     end

@@ -99,6 +99,7 @@ type
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
     MenuItem1: TMenuItem;
+    miAsmRunTo: TMenuItem;
     miStackShowInNewDump: TMenuItem;
     miDumpShowInNewDump: TMenuItem;
     miAsmShowInNewDump: TMenuItem;
@@ -320,6 +321,7 @@ var
 implementation
 
 uses
+  dlgCpuView.TemporaryLocker,
   dlgInputBox,
   IDEImagesIntf,
   BaseDebugManager;
@@ -345,6 +347,7 @@ begin
   tbRunTillRet.ImageIndex := IDEImages.LoadImage('menu_stepout');
   tbStepIn.ImageIndex := IDEImages.LoadImage('menu_stepinto');
   tbStepOut.ImageIndex := IDEImages.LoadImage('menu_stepover');
+  SetHooks;
 end;
 
 procedure TfrmCpuView.FormDeactivate(Sender: TObject);
@@ -358,6 +361,7 @@ end;
 
 procedure TfrmCpuView.FormDestroy(Sender: TObject);
 begin
+  ResetHooks;
   BeforeDbgGateDestroy;
   FDbgGate.Context := nil;
   FCore.Free;
@@ -454,15 +458,15 @@ end;
 
 procedure TfrmCpuView.LockZOrder;
 begin
-  {$message 'Плохой вариант, всеже нужно делать патч, иначе окно так и будет закрываться другими IDE окнами'}
-  //FormStyle := fsStayOnTop;
+  InterceptorOwner := Handle;
+  InterceptorActive := True;
   tmpZOrderLock.Enabled := True;
 end;
 
 procedure TfrmCpuView.UnlockZOrder;
 begin
   tmpZOrderLock.Enabled := False;
-  //FormStyle := fsNormal;
+  InterceptorActive := False;
 end;
 
 procedure TfrmCpuView.ActionRegModifyUpdate(Sender: TObject);

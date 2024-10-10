@@ -1,6 +1,6 @@
 inherited frmCpuViewIntel: TfrmCpuViewIntel
-  Left = 1035
-  Top = 650
+  Left = 1048
+  Top = 549
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   inherited pnDebug: TPanel

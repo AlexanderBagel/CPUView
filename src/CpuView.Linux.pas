@@ -465,13 +465,14 @@ begin
 
   Result.ControlWord := FpRegs.cwd;
   Result.StatusWord := FpRegs.swd;
-  Result.TagWord := FpRegs.ftw;
   Result.MxCsr := FpRegs.mxcsr;
   for I := 0 to 7 do
     Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
   for I := 0 to Result.XmmCount - 1 do
     Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
   Result.YmmPresent := False;
+
+  Result.TagWord := GetTagWordFromFXSave(Result.StatusWord, FpRegs.ftw, Result.FloatRegisters);
   {$ENDIF}
 end;
 
@@ -557,7 +558,7 @@ begin
 
   FpRegs.cwd := AContext.ControlWord;
   FpRegs.swd := AContext.StatusWord;
-  FpRegs.ftw := AContext.TagWord;
+  FpRegs.ftw := GetFXSaveTagWordFromTagWord(AContext.TagWord);
   FpRegs.mxcsr := AContext.MxCsr;
 
   io.iov_base := @FpRegs;
