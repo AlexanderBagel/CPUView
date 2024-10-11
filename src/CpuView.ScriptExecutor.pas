@@ -15,11 +15,14 @@ uses
   CpuView.DebugerGate;
 
 type
+  TExpressionType = (etMem, etReg, etRip, etImm, etSizePfx);
+  TExpressionTypes = set of TExpressionType;
   TExpression = record
     Data: string;
     Value, MemValue: UInt64;
     MemSize: Integer;
     Calculated: Boolean;
+    Types: TExpressionTypes;
   end;
 
   TExpressionList = class(TList<TExpression>);

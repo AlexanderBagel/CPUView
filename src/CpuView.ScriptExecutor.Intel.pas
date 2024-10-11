@@ -45,8 +45,10 @@ function TIntelScriptExecutor.CalculateRegValue(pData: PChar; nSize: Integer;
 var
   pNewData: PChar;
   AExpression: TExpression;
+  PrevIsMemRip: Boolean;
 begin
   Result := False;
+  PrevIsMemRip := False;
   ExecuteResult := '';
   CalculatedList.Clear;
   while nSize > 0 do
@@ -59,7 +61,17 @@ begin
       Exit;
     end;
     pData := pNewData;
+
+    // fix previos rip size
+    if CalculatedList.Count > 0 then
+    begin
+      if (AExpression.Types = [etImm]) and PrevIsMemRip then
+        CalculatedList.List[CalculatedList.Count - 1].MemSize := 4;
+    end;
+
     CalculatedList.Add(AExpression);
+    PrevIsMemRip := (AExpression.Types * [etMem, etRip] = [etMem, etRip]) and
+      not (etSizePfx in AExpression.Types);
   end;
   Result := True;
 end;
@@ -84,7 +96,7 @@ begin
     Multiply := False;
     Mem := False;
     WaitState := [wsInstruction, wsSizePfx, wsMem, wsRegImm];
-    MemSize := Debugger.PointerSize;
+    MemSize := 0;
     RegPresent := False;
     AExpression := Default(TExpression);
     while nSize > 0 do
@@ -121,6 +133,7 @@ begin
               if not (wsMem in WaitState) then
                 Exit;
               Mem := True;
+              Include(AExpression.Types, etMem);
             end;
             ']':
             begin
@@ -163,6 +176,7 @@ begin
             if not TryStrToUInt64(TokenStr, Token.Value) then
               Exit;
             Token.Decrement := Sign;
+            Include(AExpression.Types, etImm);
             Sign := False;
             if Multiply then
             begin
@@ -195,9 +209,14 @@ begin
           if wsRegImm in WaitState then
           begin
             if (TokenStr = 'RIP') and Mem then
-              Token.Value := CurrentRIPOffset
+            begin
+              RegValue.QwordValue := CurrentRIPOffset;
+              Include(AExpression.Types, etRip);
+            end
             else
-              if not Context.RegQueryValue(TokenStr, RegValue) then
+              if Context.RegQueryValue(TokenStr, RegValue) then
+                Include(AExpression.Types, etReg)
+              else
                 Exit;
             RegPresent := True;
             Token.Value := RegValue.QwordValue;
@@ -230,6 +249,7 @@ begin
             else
               Exit(False);
             end;
+            Include(AExpression.Types, etSizePfx);
           end
           else
             Exit(False);
@@ -246,8 +266,13 @@ begin
       else
         Inc(AExpression.Value, Tokens.List[I].Value);
 
-    if Mem and Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize) then
-      AExpression.MemSize := MemSize;
+    if Mem then
+    begin
+      if MemSize = 0 then
+        MemSize := Debugger.PointerSize;
+      if Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize) then
+        AExpression.MemSize := MemSize;
+    end;
 
     AExpression.Calculated := RegPresent or (Mem and (AExpression.MemSize > 0));
     Result := True;

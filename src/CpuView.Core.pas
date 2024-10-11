@@ -152,6 +152,7 @@ type
     procedure LoadFromCache(AIndex: Integer);
     procedure RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
       AColumn: TColumnType; var AComment: string);
+    procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
     procedure RefreshAsmView(Forced: Boolean);
     procedure ResetCache;
@@ -588,6 +589,22 @@ begin
   AComment := GetKnownFunctionAtAddr(AddrVA);
 end;
 
+procedure TCpuViewCore.RefreshBreakPoints;
+var
+  I: Integer;
+  BP: TBasicBreakPoint;
+begin
+  if AsmView = nil then Exit;
+  AsmView.BreakPoints.Clear;
+  if (FDebugger = nil) or not FDebugger.IsActive then Exit;
+  for I := 0 to FDebugger.BreakPointList.Count - 1 do
+  begin
+    BP := FDebugger.BreakPointList[I];
+    AsmView.BreakPoints.Add(Int64(BP.AddrVA), BP.Active);
+  end;
+  AsmView.Invalidate;
+end;
+
 function TCpuViewCore.CanWork: Boolean;
 begin
   Result := Assigned(FDebugger) and (FDebugger.DebugState = adsPaused);
@@ -683,17 +700,8 @@ begin
 end;
 
 procedure TCpuViewCore.OnBreakPointsChange(Sender: TObject);
-var
-  I: Integer;
-  BP: TBasicBreakPoint;
 begin
-  AsmView.BreakPoints.Clear;
-  for I := 0 to FDebugger.BreakPointList.Count - 1 do
-  begin
-    BP := FDebugger.BreakPointList[I];
-    AsmView.BreakPoints.Add(Int64(BP.AddrVA), BP.Active);
-  end;
-  AsmView.Invalidate;
+  RefreshBreakPoints;
 end;
 
 procedure TCpuViewCore.OnDebugerChage(Sender: TObject);
@@ -824,6 +832,7 @@ begin
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;
     FAsmView.FitColumnsToBestSize;
+    RefreshBreakPoints;
     RefreshView;
   end;
 end;
@@ -849,6 +858,7 @@ begin
     FStackStream.Stream.OnUpdated := nil;
   end;
   UpdateStreamsProcessID;
+  RefreshBreakPoints;
 end;
 
 procedure TCpuViewCore.SetRegView(const Value: TRegView);
