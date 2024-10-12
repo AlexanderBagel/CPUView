@@ -68,7 +68,6 @@ type
     ModifyActions: TModifyActions;
     SupportedViewMode: TRegViewModes;
     ViewMode: TRegViewMode;
-    function Customizable: Boolean;
     procedure Reset;
     procedure SetRowParam(RowIndex, ColIndex: Integer);
     function Valid: Boolean;
@@ -140,7 +139,6 @@ type
 
   // Служебный тип для кэширования данных последнего запрошенного регистра
   TCustomRegData = record
-    Customizable: Boolean;
     RegID: Integer; // link to KnownRegs
     RegType: TContextRegType;
     RegName, Value: string;
@@ -227,11 +225,6 @@ type
 implementation
 
 { TRegParam }
-
-function TRegParam.Customizable: Boolean;
-begin
-  Result := (Self.RegType = crtValue) and (Self.SupportedViewMode <> vmDefOnly);
-end;
 
 procedure TRegParam.Reset;
 begin
@@ -364,7 +357,6 @@ begin
   LastReg.RegID := RegID;
 
   RegParam := KnownRegs[RegID];
-  LastReg.Customizable := RegParam.Customizable;
   LastReg.RegType := RegParam.RegType;
   LastReg.Modifyed := RegParam.Modifyed;
 

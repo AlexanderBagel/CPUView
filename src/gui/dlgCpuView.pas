@@ -347,6 +347,9 @@ begin
   tbRunTillRet.ImageIndex := IDEImages.LoadImage('menu_stepout');
   tbStepIn.ImageIndex := IDEImages.LoadImage('menu_stepinto');
   tbStepOut.ImageIndex := IDEImages.LoadImage('menu_stepover');
+  pmAsm.Images := IDEImages.Images_16;
+  miAsmRunTo.ImageIndex := tbRunTo.ImageIndex;
+  miAsmCurrentIP.ImageIndex := IDEImages.LoadImage('debugger_show_execution_point');
   SetHooks;
 end;
 

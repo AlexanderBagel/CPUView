@@ -1274,7 +1274,7 @@ begin
     41..48:
       Move(Context.FloatRegisters[ARegID - 41], ARegValue.Ext10[0], 10);
     49..56:
-      Move(Context.FloatRegisters[ARegID - 56], ARegValue.Ext10[0], 10);
+      Move(Context.FloatRegisters[ARegID - 49], ARegValue.Ext10[0], 10);
     57: ARegValue.DwordValue := Context.MxCsr;
     58..73:
       Move(Context.Ymm[ARegID - 58], ARegValue.Ext16[0], 16);

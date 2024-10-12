@@ -678,6 +678,7 @@ object frmCpuView: TfrmCpuView
     object acViewGoto: TAction
       Category = 'View Actions'
       Caption = 'Go to Address...'
+      ShortCut = 16455
       OnExecute = acViewGotoExecute
       OnUpdate = DefaultActionUpdate
     end
@@ -913,23 +914,23 @@ object frmCpuView: TfrmCpuView
     object miAsmShowInStack: TMenuItem
       Action = acShowInStack
     end
+    object miAsmSource: TMenuItem
+      Action = acAsmShowSource
+    end
     object miAsmSep0: TMenuItem
       Caption = '-'
-    end
-    object miAsmCurrentIP: TMenuItem
-      Action = acAsmReturnToIP
-    end
-    object miAsmGoto: TMenuItem
-      Action = acViewGoto
     end
     object miAsmRunTo: TMenuItem
       Action = acDbgRunTo
     end
-    object miAsmSource: TMenuItem
-      Action = acAsmShowSource
+    object miAsmGoto: TMenuItem
+      Action = acViewGoto
     end
     object miAsmSep1: TMenuItem
       Caption = '-'
+    end
+    object miAsmCurrentIP: TMenuItem
+      Action = acAsmReturnToIP
     end
     object miAsmSetNewIP: TMenuItem
       Action = acAsmSetNewIP

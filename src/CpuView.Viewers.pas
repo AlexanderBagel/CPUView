@@ -612,6 +612,7 @@ type
     procedure UpdateCursor(const HitTest: TMouseHitInfo); override;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure CopySelected(CopyStyle: TCopyStyle); override;
     procedure FitColumnToBestSize(Value: TColumnType); override;
     function RawData: TRegistersRawData;
     function ReadDataAtSelStart(var pBuffer; nSize: Integer): Integer; override;
@@ -2079,7 +2080,8 @@ function TCustomRegView.CopyCommandEnabled(Value: TCopyStyle): Boolean;
 begin
   case Value of
     csAsText: Result := True;
-    csBytes: Result := (SelStart > 0) and (SelStart = SelEnd);
+    csBytes: Result := (SelStart > 0) and (SelStart = SelEnd) and
+      (FSelectedRegister.ValueType in [crtValue, crtExtra]);
   else
     Result := False;
   end;
@@ -2090,6 +2092,29 @@ begin
   inherited;
   ScrollBars := TScrollStyle.ssVertical;
   FActiveRegParam.Reset;
+end;
+
+procedure TCustomRegView.CopySelected(CopyStyle: TCopyStyle);
+var
+  AParam: TRegParam;
+  NeedCopyAsRawBuff: Boolean;
+begin
+  case CopyStyle of
+    csAsText, csAddress: inherited;
+    csBytes:
+    begin
+      if not (FSelectedRegister.ValueType in [crtValue, crtExtra]) then Exit;
+      if not Context.RegParam(FSelectedRegister.RegID, AParam) then Exit;
+      NeedCopyAsRawBuff := (FSelectedRegValue.ValueSize >= 8) and
+        ((AParam.SupportedViewMode = vmX87Reg64) or
+        (AParam.SupportedViewMode = vmX87Reg80) or
+        (AParam.SupportedViewMode = vmSimdReg));
+      if NeedCopyAsRawBuff then
+        Clipboard.AsText := RawBufToHex(@FSelectedRegValue.Ext32[0], FSelectedRegValue.ValueSize, True)
+      else
+        Clipboard.AsText := IntToHex(FSelectedRegValue.QwordValue, 1);
+    end;
+  end;
 end;
 
 procedure TCustomRegView.DoContextPopup(MousePos: TPoint;
