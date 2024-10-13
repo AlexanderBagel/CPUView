@@ -92,14 +92,10 @@ type
   TThreadWorkerChangeThreadContext = class(TFpDbgDebggerThreadWorkerItem)
   private
     FDbgIntf: TCpuViewDebugGate;
-    FRegID: Integer;
-    FNewRegValue: TRegValue;
-    FThreadResult: Boolean;
   protected
     procedure DoExecute; override;
   public
-    constructor Create(ADbgIntf: TCpuViewDebugGate; ARegID: Integer; ANewRegValue: TRegValue);
-    property ThreadResult: Boolean read FThreadResult;
+    constructor Create(ADbgIntf: TCpuViewDebugGate);
   end;
 
   { TCpuViewDebugGate }
@@ -120,7 +116,6 @@ type
     FTemporaryIP: TDictionary<Integer, UInt64>;
     FThreadsMonitor: TIdeThreadsMonitor;
     FThreadsNotification: TThreadsNotification;
-    FUtils: TCommonUtils;
     procedure BreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
     procedure CallStackCtxChanged(Sender: TObject);
@@ -134,6 +129,8 @@ type
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
+  protected
+    function GetUtilsClass: TCommonAbstractUtilsClass; override;
   public
     constructor Create(ACpuViewForm: TCustomForm); override;
     destructor Destroy; override;
@@ -198,27 +195,15 @@ procedure TThreadWorkerChangeThreadContext.DoExecute;
 var
   DebugThread: TDbgThread;
 begin
-  if FDbgIntf.Debugger = nil then Exit;
-  if FDbgIntf.Debugger.State <> dsPause then Exit;
-
   FDbgIntf.DbgController.CurrentProcess.GetThread(FDbgIntf.ThreadID, DebugThread);
   if DebugThread <> nil then
     DebugThread.BeforeContinue;
-
-  FDbgIntf.Context.ThreadID := FDbgIntf.ThreadID;
-  FThreadResult := FDbgIntf.Context.RegSetValue(FRegID, FNewRegValue);
-
-  //if DebugThread <> nil then
-  //  TDebugThreadAcces(DebugThread).ReadThreadState;
 end;
 
-constructor TThreadWorkerChangeThreadContext.Create(
-  ADbgIntf: TCpuViewDebugGate; ARegID: Integer; ANewRegValue: TRegValue);
+constructor TThreadWorkerChangeThreadContext.Create(ADbgIntf: TCpuViewDebugGate);
 begin
   inherited Create((ADbgIntf.Debugger as TFpDebugDebugger), twpContinue);
   FDbgIntf := ADbgIntf;
-  FRegID := ARegID;
-  FNewRegValue := ANewRegValue;
 end;
 
 { TCpuViewDebugGate }
@@ -487,7 +472,7 @@ begin
   {$ENDIF}
   FDbgController := nil;
   FProcess := nil;
-  FUtils.ProcessID := 0;
+  Utils.ProcessID := 0;
   //if Assigned(IDEWindowCreators) then
     //IDEWindowCreators.OnActivateIDEForm := nil;
   if Assigned(FBreakPoints) then
@@ -536,7 +521,7 @@ begin
         if Assigned(DebugBoss.Snapshots) then
           FSnapshotManager := DebugBoss.Snapshots;
       end;
-      FUtils.ProcessID := ProcessID;
+      Utils.ProcessID := ProcessID;
       if ADebugger.State = dsPause then
         UpdateContext;
       Exit;
@@ -545,12 +530,16 @@ begin
   Reset;
 end;
 
+function TCpuViewDebugGate.GetUtilsClass: TCommonAbstractUtilsClass;
+begin
+  Result := TCommonUtils;
+end;
+
 constructor TCpuViewDebugGate.Create(ACpuViewForm: TCustomForm);
 begin
   inherited;
   FTemporaryIP := TDictionary<Integer, UInt64>.Create;
-  FUtils := TCommonUtils.Create;
-  FSupportStream := TRemoteStream.Create(FUtils);
+  FSupportStream := TRemoteStream.Create(Utils);
   FSupportStream.OnUpdated := UpdateRemoteStream;
   FBreakpointsNotification := TIDEBreakPointsNotification.Create;
   FBreakpointsNotification.AddReference;
@@ -574,7 +563,6 @@ begin
     DebugBoss.UnregisterStateChangeHandler(OnState);
   Reset;
   FSupportStream.Free;
-  FUtils.Free;
   FBreakpointsNotification.OnAdd := nil;
   FBreakpointsNotification.OnRemove := nil;
   FBreakpointsNotification.OnUpdate := nil;
@@ -928,7 +916,7 @@ end;
 
 function TCpuViewDebugGate.ThreadStackLimit: TStackLimit;
 begin
-  Result := FUtils.GetThreadStackLimit(ThreadId, PointerSize = 4);
+  Result := Utils.GetThreadStackLimit(ThreadId, PointerSize = 4);
 end;
 
 function TCpuViewDebugGate.ThreadID: Cardinal;
@@ -992,19 +980,28 @@ var
 begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
+
   WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
     RegValue := Default(TRegValue);
     RegValue.QwordValue := ANewRegValue;
-    WorkItem := TThreadWorkerChangeThreadContext.Create(
-      Self, RegID, RegValue);
+    WorkItem := TThreadWorkerChangeThreadContext.Create(Self);
     WorkQueue.PushItem(WorkItem);
     WorkQueue.WaitForItem(WorkItem, True);
-    Result := WorkItem.ThreadResult;
     WorkItem.DecRef;
+  end;
+
+  RegValue := Default(TRegValue);
+  RegValue.QwordValue := ANewRegValue;
+  Context.ThreadID := ThreadID;
+  Context.BeginUpdate;
+  try
+    Result := Context.RegSetValue(RegID, RegValue);
     if Result and (RegID = Context.InstructonPointID) then
       FTemporaryIP.AddOrSetValue(ThreadID, ANewRegValue);
+  finally
+    Context.EndUpdate;
   end;
 end;
 

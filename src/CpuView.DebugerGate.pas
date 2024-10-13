@@ -44,13 +44,16 @@ type
     FBreakPointList: TList<TBasicBreakPoint>;
     FCpuViewForm: TCustomForm;
     FCtx: TCommonCpuContext;
+    FUtils: TCommonAbstractUtils;
     FChange: TNotifyEvent;
-    FBreakPointsChange, FStateChange: TNotifyEvent;
+    FBreakPointsChange, FCtxChange, FStateChange: TNotifyEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
+    procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
     procedure DoBreakPointsChange;
     procedure DoChange;
     procedure DoStateChange;
+    function GetUtilsClass: TCommonAbstractUtilsClass; virtual; abstract;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure UpdateContext; virtual;
   public
@@ -87,7 +90,9 @@ type
     property BreakPointList: TList<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
     property CpuViewForm: TCustomForm read FCpuViewForm;
+    property Utils: TCommonAbstractUtils read FUtils;
     property OnChange: TNotifyEvent read FChange write FChange;
+    property OnContextChange: TNotifyEvent read FCtxChange write FCtxChange;
     property OnStateChange: TNotifyEvent read FStateChange write FStateChange;
     property OnBreakPointsChange: TNotifyEvent read FBreakPointsChange write FBreakPointsChange;
   end;
@@ -103,16 +108,30 @@ procedure TAbstractDebugger.SetCtx(AValue: TCommonCpuContext);
 begin
   if FCtx = AValue then Exit;
   if Assigned(FCtx) then
-    RemoveFreeNotification(FCtx);
+  begin
+    FCtx.UnRegisterChangeNotification(ContextUpdate);
+    FCtx.RemoveFreeNotification(Self);
+  end;
   FCtx := AValue;
   if Assigned(FCtx) then
-    FreeNotification(FCtx);
+  begin
+    FCtx.RegisterChangeNotification(ContextUpdate);
+    FCtx.FreeNotification(Self);
+  end;
   UpdateContext;
+end;
+
+procedure TAbstractDebugger.ContextUpdate(Sender: TObject;
+  AChangeType: TContextChangeType);
+begin
+  if Assigned(FCtxChange) and (AChangeType = cctDataChange) then
+    FCtxChange(Self);
 end;
 
 destructor TAbstractDebugger.Destroy;
 begin
   FBreakPointList.Free;
+  FUtils.Free;
   inherited;
 end;
 
@@ -181,6 +200,7 @@ begin
   if Assigned(Context) then
   begin
     Context.ThreadID := ThreadID;
+    Context.Utils := Utils;
     case PointerSize of
       4: Context.AddressMode := am32bit;
       8: Context.AddressMode := am64bit;
@@ -194,6 +214,7 @@ end;
 constructor TAbstractDebugger.Create(ACpuViewForm: TCustomForm);
 begin
   inherited Create(ACpuViewForm);
+  FUtils := GetUtilsClass.Create;
   FCpuViewForm := ACpuViewForm;
   FBreakPointList := TList<TBasicBreakPoint>.Create;
 end;

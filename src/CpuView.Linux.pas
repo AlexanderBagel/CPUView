@@ -45,14 +45,14 @@ type
   protected
     function VirtualQueryMBI(AQueryAddr: UInt64; out
       MBI: TMemoryBasicInformation): Boolean;
-    procedure SetProcessID(const Value: Integer); override;
   public
-    constructor Create;
     destructor Destroy; override;
+    function GetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
     function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function NeedUpdateReadData: Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
+    function SetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
     procedure Update; override;
   end;
 
@@ -97,9 +97,6 @@ var
   LinuxDebugger: TFpDebugDebuggerBase;
 
 implementation
-
-var
-  MainThreadID: TThreadID;
 
 type
   user_fpregs_struct32 = record
@@ -334,32 +331,23 @@ begin
   end;
 end;
 
-function IsMainThread: Boolean;
-begin
-  Result := MainThreadID = GetCurrentThreadId;
-end;
-
 function Do_fpPTrace(ptrace_request: cint; pid: TPid; addr: Pointer; data: pointer): PtrInt;
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerFpTrace;
 begin
-  if IsMainThread then
+  Result := -1;
+  if LinuxDebugger = nil then Exit;
+  WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
+  if Assigned(WorkQueue) then
   begin
-    if LinuxDebugger = nil then Exit(-1);
-    WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
-    if Assigned(WorkQueue) then
-    begin
-      WorkItem := TThreadWorkerFpTrace.Create(
-        TFpDebugDebugger(LinuxDebugger), ptrace_request, pid, addr, data);
-      WorkQueue.PushItem(WorkItem);
-      WorkQueue.WaitForItem(WorkItem, True);
-      Result := WorkItem.ThreadResult;
-      WorkItem.DecRef;
-    end;
-  end
-  else
-    Result := fpPTrace(ptrace_request, pid, addr, data);
+    WorkItem := TThreadWorkerFpTrace.Create(
+      TFpDebugDebugger(LinuxDebugger), ptrace_request, pid, addr, data);
+    WorkQueue.PushItem(WorkItem);
+    WorkQueue.WaitForItem(WorkItem, True);
+    Result := WorkItem.ThreadResult;
+    WorkItem.DecRef;
+  end;
 end;
 
 function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
@@ -410,7 +398,7 @@ begin
   Result.StatusWord := FpRegs.swd;
   Result.TagWord := FpRegs.twd;
   for I := 0 to 7 do
-    Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I * 10], 10);
+    Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I], 10);
 
   Result.XmmCount := 0;
   Result.YmmPresent := False;
@@ -423,7 +411,7 @@ begin
   Result.XmmCount := 8;
   Result.MxCsr := xmm.mxcsr;
   for I := 0 to 7 do
-    Move(xmm.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
+    Move(xmm.st_space[I * 4], Result.FloatRegisters[I], 10);
   for I := 0 to Result.XmmCount - 1 do
     Move(xmm.xmm_space[I * 4], Result.Ymm[I].Low, 16);
 
@@ -467,7 +455,7 @@ begin
   Result.StatusWord := FpRegs.swd;
   Result.MxCsr := FpRegs.mxcsr;
   for I := 0 to 7 do
-    Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
+    Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I], 10);
   for I := 0 to Result.XmmCount - 1 do
     Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
   Result.YmmPresent := False;
@@ -612,7 +600,7 @@ begin
   Result.StatusWord := FpRegs.swd;
   Result.TagWord := FpRegs.twd;
   for I := 0 to 7 do
-    Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I * 10], 10);
+    Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I], 10);
 
   Result.XmmCount := 0;
   Result.YmmPresent := False;
@@ -625,7 +613,7 @@ begin
   Result.XmmCount := 8;
   Result.MxCsr := xmm.mxcsr;
   for I := 0 to 7 do
-    Move(xmm.st_space[I * 4], Result.FloatRegisters[I * 10], 10);
+    Move(xmm.st_space[I * 4], Result.FloatRegisters[I], 10);
   for I := 0 to Result.XmmCount - 1 do
     Move(xmm.xmm_space[I * 4], Result.Ymm[I].Low, 16);
 
@@ -709,20 +697,16 @@ begin
   end;
 end;
 
-procedure TCommonUtils.SetProcessID(const Value: Integer);
-begin
-  inherited SetProcessID(Value);
-end;
-
-constructor TCommonUtils.Create;
-begin
-  MainThreadID := GetCurrentThreadId;
-end;
-
 destructor TCommonUtils.Destroy;
 begin
   FMemList.Free;
   inherited Destroy;
+end;
+
+function TCommonUtils.GetThreadExtendedData(ThreadID: Integer;
+  ThreadIs32: Boolean): TThreadExtendedData;
+begin
+  Result := Default(TThreadExtendedData);
 end;
 
 function TCommonUtils.GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean
@@ -802,6 +786,12 @@ begin
     FillChar(RemainingBuff^, RemainingBytes, 0);
     Result := ASize;
   end;
+end;
+
+function TCommonUtils.SetThreadExtendedData(ThreadID: Integer;
+  ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean;
+begin
+  Result := False;
 end;
 
 procedure TCommonUtils.Update;

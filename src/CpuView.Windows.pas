@@ -2,6 +2,8 @@
 
 {$IFDEF FPC}
   {$MODE Delphi}
+  {$WARN 5028 off : Local $1 "$2" is not used}
+  {$WARN 4082 off : Converting pointers to signed integers may result in wrong comparison results and range errors, use an unsigned type instead.}
 {$ENDIF}
 
 interface
@@ -14,6 +16,33 @@ uses
   Windows,
   CpuView.Common,
   CpuView.IntelContext.Types;
+
+type
+
+  { TCommonUtils }
+
+  TCommonUtils = class(TCommonAbstractUtils)
+  private
+    FProcessHandle: THandle;
+  protected
+    procedure SetProcessID(const Value: Integer); override;
+  public
+    destructor Destroy; override;
+    function GetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
+    function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
+    function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
+    function SetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
+    procedure Update; override;
+  end;
+
+  function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
+  function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
+  function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+
+implementation
+
 
 const
   SIZE_OF_80387_REGISTERS = 80;
@@ -137,18 +166,20 @@ type
     ExtendedRegisters: array[0..MAXIMUM_SUPPORTED_EXTENSION-1] of Byte;
   end;
 
-  TCommonUtils = class(TCommonAbstractUtils)
-  private
-    FProcessHandle: THandle;
-  protected
-    procedure SetProcessID(const Value: Integer); override;
-  public
-    destructor Destroy; override;
-    function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
-    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
-    function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
-    procedure Update; override;
-  end;
+const
+  ThreadBasicInformation = 0;
+  THREAD_GET_CONTEXT = 8;
+  THREAD_SET_CONTEXT = 16;
+  THREAD_SUSPEND_RESUME = 2;
+  THREAD_QUERY_INFORMATION = $40;
+
+  CONTEXT_i386 = $10000;
+  CONTEXT_EXTENDED_REGISTERS = $20;
+
+  XSTATE_LEGACY_SSE = 1;
+  XSTATE_AVX = 2;
+  XSTATE_MASK_AVX = 4;
+  CONTEXT_ALL = CONTEXT_FULL or CONTEXT_FLOATING_POINT or CONTEXT_DEBUG_REGISTERS;
 
   function OpenThread(dwDesiredAccess: DWORD; bInheritHandle: BOOL;
     dwThreadId: DWORD): THandle; stdcall; external kernel32;
@@ -172,31 +203,10 @@ type
   function Wow64SetThreadContext(hThread: THandle; const lpContext: TWow64Context): BOOL;
     stdcall; external kernel32;
 
-  function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-  function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-
-implementation
-
-const
-  THREAD_GET_CONTEXT = 8;
-  THREAD_SET_CONTEXT = 16;
-  THREAD_SUSPEND_RESUME = 2;
-  THREAD_QUERY_INFORMATION = $40;
-
-  CONTEXT_i386 = $10000;
-  CONTEXT_EXTENDED_REGISTERS = $20;
-
-  XSTATE_LEGACY_SSE = 1;
-  XSTATE_AVX = 2;
-  XSTATE_MASK_AVX = 4;
-  CONTEXT_ALL = CONTEXT_FULL or CONTEXT_FLOATING_POINT or CONTEXT_DEBUG_REGISTERS;
-
 // CONTEXT structure for AMD64 needs to be aligned on a 16-byte boundary
 function Amd64Align(Src: Pointer): Pointer;
 begin
-  Result := Pointer((NativeUInt(Src) + 15) and not NativeUInt(15));
+  Result := {%H-}Pointer(({%H-}NativeUInt(Src) + 15) and not NativeUInt(15));
 end;
 
 function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
@@ -216,7 +226,7 @@ var
   SimdReg: PXMMRegister;
   I: Integer;
 begin
-  FillChar(Result, SizeOf(Result), 0);
+  Result := Default(TIntelThreadContext);
   if ThreadID = 0 then Exit;
   hThread := OpenThread(THREAD_GET_CONTEXT or
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
@@ -232,7 +242,7 @@ begin
 
     {$IFDEF CPUX64}
     ContextFlags := ContextFlags and not CONTEXT_i386 or $100000;
-    SetLength(ContextBuff, SizeOf(TContext) + $10);
+    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
     Ctx := Amd64Align(@ContextBuff[0]);
     {$ENDIF}
 
@@ -371,7 +381,6 @@ var
   ContextFlags: DWORD;
 begin
   Result := False;
-  FillChar(Result, SizeOf(Result), 0);
   hThread := OpenThread(THREAD_GET_CONTEXT or THREAD_SET_CONTEXT or
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
   if hThread = 0 then Exit;
@@ -380,13 +389,13 @@ begin
 
     {$IFDEF CPUX86}
     ContextFlags := ContextFlags or CONTEXT_EXTENDED_REGISTERS;
-    SetLength(ContextBuff, SizeOf(TContext) + $10);
+    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
     Ctx := Amd64Align(@ContextBuff[0]);
     {$ENDIF}
 
     {$IFDEF CPUX64}
     ContextFlags := ContextFlags and not CONTEXT_i386 or $100000;
-    SetLength(ContextBuff, SizeOf(TContext) + $10);
+    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
     Ctx := Amd64Align(@ContextBuff[0]);
     {$ENDIF}
 
@@ -442,8 +451,6 @@ begin
 end;
 
 function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
-const
-  CONTEXT_XSTATE = $00010040;
 var
   hThread: THandle;
   Ctx: PWow64Context;
@@ -453,13 +460,13 @@ var
   I: Integer;
   ExtentedDisabled: Boolean;
 begin
-  FillChar(Result, SizeOf(Result), 0);
+  Result := Default(TIntelThreadContext);
   if ThreadID = 0 then Exit;
   hThread := OpenThread(THREAD_GET_CONTEXT or
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
   if hThread = 0 then Exit;
   try
-    SetLength(ContextBuff, SizeOf(TContext) + $10);
+    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
     Ctx := Amd64Align(@ContextBuff[0]);
     Ctx.ContextFlags := WOW64_CONTEXT_ALL;
     ExtentedDisabled := False;
@@ -541,12 +548,11 @@ var
   ContextBuff: array of Byte;
 begin
   Result := False;
-  FillChar(Result, SizeOf(Result), 0);
   hThread := OpenThread(THREAD_GET_CONTEXT or THREAD_SET_CONTEXT or
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
   if hThread = 0 then Exit;
   try
-    SetLength(ContextBuff, SizeOf(TContext) + $10);
+    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
     Ctx := Amd64Align(@ContextBuff[0]);
     Ctx.ContextFlags := WOW64_CONTEXT_WITHOUT_EXTENDED;
     if not Wow64GetThreadContext(hThread, Ctx) then Exit;
@@ -574,8 +580,6 @@ begin
 end;
 
 function GetThreadNativeStackLimit(ProcessHandle: THandle; ThreadID: DWORD): TStackLimit;
-const
-  ThreadBasicInformation = 0;
 var
   hThread: THandle;
   TBI: TThreadBasicInformation;
@@ -583,7 +587,6 @@ var
   lpNumberOfBytesRead: SIZE_T;
 begin
   Result := Default(TStackLimit);
-  FillChar(Result, SizeOf(Result), 0);
   hThread := OpenThread(THREAD_GET_CONTEXT or
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
   if hThread = 0 then Exit;
@@ -591,11 +594,12 @@ begin
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
       SizeOf(TBI), nil) <> 0 then
       Exit;
+    lpNumberOfBytesRead := 0;
     if not ReadProcessMemory(ProcessHandle,
       TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
       lpNumberOfBytesRead) then Exit;
-    Result.Base := Int64(TIB.StackBase);
-    Result.Limit := Int64(TIB.StackLimit);
+    Result.Base := {%H-}NativeUInt(TIB.StackBase);
+    Result.Limit := {%H-}NativeUInt(TIB.StackLimit);
   finally
     CloseHandle(hThread);
   end;
@@ -619,6 +623,7 @@ begin
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
       SizeOf(TBI), nil) <> 0 then
       Exit;
+    lpNumberOfBytesRead := 0;
     if not ReadProcessMemory(ProcessHandle,
       TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
       lpNumberOfBytesRead) then Exit;
@@ -632,12 +637,143 @@ begin
   end;
 end;
 
+function GetThreadNativeExtendedData(ProcessHandle: THandle; ThreadID: DWORD): TThreadExtendedData;
+var
+  hThread: THandle;
+  TBI: TThreadBasicInformation;
+  lpNumberOfBytesRead: SIZE_T;
+begin
+  Result := Default(TThreadExtendedData);
+  hThread := OpenThread(THREAD_GET_CONTEXT or
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+  if hThread = 0 then Exit;
+  try
+    if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
+      SizeOf(TBI), nil) <> 0 then
+      Exit;
+    lpNumberOfBytesRead := 0;
+    ReadProcessMemory(ProcessHandle,
+      PByte(TBI.TebBaseAddress) + $68, @Result.LastError, SizeOf(Result.LastError),
+      lpNumberOfBytesRead);
+    ReadProcessMemory(ProcessHandle,
+      PByte(TBI.TebBaseAddress) + $1250, @Result.LastStatus, SizeOf(Result.LastStatus),
+      lpNumberOfBytesRead);
+  finally
+    CloseHandle(hThread);
+  end;
+end;
+
+function GetThreadWow64ExtendedData(ProcessHandle: THandle; ThreadID: DWORD): TThreadExtendedData;
+var
+  hThread: THandle;
+  TBI: TThreadBasicInformation;
+  TIB: NT_TIB;
+  lpNumberOfBytesRead: SIZE_T;
+begin
+  Result := Default(TThreadExtendedData);
+  hThread := OpenThread(THREAD_GET_CONTEXT or
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+  if hThread = 0 then Exit;
+  try
+    if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
+      SizeOf(TBI), nil) <> 0 then
+      Exit;
+    lpNumberOfBytesRead := 0;
+    if not ReadProcessMemory(ProcessHandle,
+      TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
+      lpNumberOfBytesRead) then Exit;
+    ReadProcessMemory(ProcessHandle,
+      PByte(TIB.ExceptionList) + $34, @Result.LastError, SizeOf(Result.LastError),
+      lpNumberOfBytesRead);
+    ReadProcessMemory(ProcessHandle,
+      PByte(TIB.ExceptionList) + $BF4, @Result.LastStatus, SizeOf(Result.LastStatus),
+      lpNumberOfBytesRead);
+  finally
+    CloseHandle(hThread);
+  end;
+end;
+
+function SetThreadNativeExtendedData(ProcessHandle: THandle; ThreadID: Integer;
+  const AData: TThreadExtendedData): Boolean;
+var
+  hThread: THandle;
+  TBI: TThreadBasicInformation;
+  lpNumberOfBytesWritten: SIZE_T;
+begin
+  Result := False;
+  hThread := OpenThread(THREAD_GET_CONTEXT or
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+  if hThread = 0 then Exit;
+  try
+    if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
+      SizeOf(TBI), nil) <> 0 then
+      Exit;
+    lpNumberOfBytesWritten := 0;
+    Result := WriteProcessMemory(ProcessHandle,
+      PByte(TBI.TebBaseAddress) + $68, @AData.LastError, SizeOf(AData.LastError),
+      lpNumberOfBytesWritten);
+    if Result then
+      Result := WriteProcessMemory(ProcessHandle,
+      PByte(TBI.TebBaseAddress) + $1250, @AData.LastStatus, SizeOf(AData.LastStatus),
+      lpNumberOfBytesWritten);
+  finally
+    CloseHandle(hThread);
+  end;
+end;
+
+function SetThreadWow64ExtendedData(ProcessHandle: THandle; ThreadID: Integer;
+  const AData: TThreadExtendedData): Boolean;
+var
+  hThread: THandle;
+  TBI: TThreadBasicInformation;
+  TIB: NT_TIB;
+  lpNumberOfBytesWritten: SIZE_T;
+begin
+  Result := False;
+  hThread := OpenThread(THREAD_GET_CONTEXT or
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+  if hThread = 0 then Exit;
+  try
+    if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
+      SizeOf(TBI), nil) <> 0 then
+      Exit;
+    lpNumberOfBytesWritten := 0;
+    if not ReadProcessMemory(ProcessHandle,
+      TBI.TebBaseAddress, @TIB, SizeOf(NT_TIB),
+      lpNumberOfBytesWritten) then Exit;
+    Result := WriteProcessMemory(ProcessHandle,
+      PByte(TIB.ExceptionList) + $34, @AData.LastError, SizeOf(AData.LastError),
+      lpNumberOfBytesWritten);
+    if Result then
+      Result := WriteProcessMemory(ProcessHandle,
+        PByte(TIB.ExceptionList) + $BF4, @AData.LastStatus, SizeOf(AData.LastStatus),
+        lpNumberOfBytesWritten);
+  finally
+    CloseHandle(hThread);
+  end;
+end;
+
 { TCommonUtils }
 
 destructor TCommonUtils.Destroy;
 begin
   ProcessID := 0;
   inherited;
+end;
+
+function TCommonUtils.GetThreadExtendedData(ThreadID: Integer;
+  ThreadIs32: Boolean): TThreadExtendedData;
+begin
+  if FProcessHandle = 0 then Exit(Default(TThreadExtendedData));
+  {$IFDEF CPUX86}
+  Result := GetThreadNativeExtendedData(FProcessHandle, ThreadID);
+  {$ENDIF}
+  {$IFDEF CPUX64}
+  if ThreadIs32 then
+    Result := GetThreadWow64ExtendedData(FProcessHandle, ThreadID)
+  else
+    Result := GetThreadNativeExtendedData(FProcessHandle, ThreadID);
+  {$ENDIF}
 end;
 
 function TCommonUtils.GetThreadStackLimit(ThreadID: Integer;
@@ -732,6 +868,21 @@ begin
     Result := Longint(ReadCount);
 end;
 
+function TCommonUtils.SetThreadExtendedData(ThreadID: Integer;
+  ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean;
+begin
+  if FProcessHandle = 0 then Exit(False);
+  {$IFDEF CPUX86}
+  Result := SetThreadNativeExtendedData(FProcessHandle, ThreadID, AData);
+  {$ENDIF}
+  {$IFDEF CPUX64}
+  if ThreadIs32 then
+    Result := SetThreadWow64ExtendedData(FProcessHandle, ThreadID, AData)
+  else
+    Result := SetThreadNativeExtendedData(FProcessHandle, ThreadID, AData);
+  {$ENDIF}
+end;
+
 procedure TCommonUtils.SetProcessID(const Value: Integer);
 begin
   if ProcessID = Value then Exit;
@@ -743,7 +894,7 @@ begin
   inherited;
   if ProcessID <> 0 then
     FProcessHandle := OpenProcess(
-      PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, False, ProcessID);
+      PROCESS_QUERY_INFORMATION or PROCESS_VM_READ or PROCESS_VM_WRITE, False, ProcessID);
 end;
 
 procedure TCommonUtils.Update;

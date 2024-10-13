@@ -72,11 +72,11 @@ type
     function ExtractJmpConditions: string;
     function ExtractStatusWordTop: string;
     function ExtractStatusWordTopValue: Byte;
-    function ExtractTagWordSet(Index: Integer): string;
-    function ExtractTagWordSetValue(Index: Integer): Byte;
+    function ExtractTagWord(Index: Integer): string;
+    function ExtractTagWordValue(Index: Integer): Byte;
     function ExtractMxCsrRounding: string;
     function ExtractMxCsrRoundingValue: Byte;
-    procedure SetTagWordSetValue(Index: Integer; AValue: Byte);
+    procedure SetTagWordValue(Index: Integer; AValue: Byte);
     procedure SetStatusWordTopValue(AValue: Byte);
     procedure SetControlWordPrecisionValue(AValue: Byte);
     procedure SetControlWordRoundingValue(AValue: Byte);
@@ -233,10 +233,11 @@ begin
     Add(Row, 98);         // DF
     Add(Row, 99);         // OF
 
+    {$IFDEF WINDOWS}
     AddSeparator;
-
     Add(Map, 100);        // LastError
     Add(Map, 101);        // LastStatus
+    {$ENDIF}
 
     AddSeparator;
 
@@ -562,12 +563,12 @@ begin
   Result := (Context.StatusWord shr 11) and 7;
 end;
 
-function TIntelCpuContext.ExtractTagWordSet(Index: Integer): string;
+function TIntelCpuContext.ExtractTagWord(Index: Integer): string;
 begin
-  Result := RegQueryEnumString(102, ExtractTagWordSetValue(Index));
+  Result := RegQueryEnumString(102, ExtractTagWordValue(Index));
 end;
 
-function TIntelCpuContext.ExtractTagWordSetValue(Index: Integer): Byte;
+function TIntelCpuContext.ExtractTagWordValue(Index: Integer): Byte;
 begin
   Index := Index shl 1;
   Result := (Context.TagWord shr Index) and 3;
@@ -1068,6 +1069,7 @@ begin
   if (Idx >= 0) and RegQueryValue(ExtendedRegIndex[Idx], FullRegValue) then
   begin
     case ValueType[Idx] of
+      0: ARegValue := FullRegValue;
       1: ARegValue.DwordValue := FullRegValue.DwordValue;
       2: ARegValue.WordValue := FullRegValue.WordValue;
       3: ARegValue.ByteValue := Byte(FullRegValue.WordValue shr 8);
@@ -1091,15 +1093,42 @@ function TIntelCpuContext.RegSetValue(ARegID: TRegID;
 var
   ReloadTagWord: Boolean;
   TagWordCtx: TIntelThreadContext;
+  ExtendedData: TThreadExtendedData;
+  OriginalRIP: UInt64;
 begin
+  if ARegID in [100, 101] then
+  begin
+    ExtendedData.LastError := FContext.LastError;
+    ExtendedData.LastStatus := FContext.LastStatus;
+    case ARegID of
+      100: ExtendedData.LastError := ANewRegValue.DwordValue;
+      101: ExtendedData.LastStatus := ANewRegValue.DwordValue;
+    end;
+    Result := Utils.SetThreadExtendedData(ThreadID, AddressMode = am32bit, ExtendedData);
+    if Result then
+    begin
+      case ARegID of
+        100: FContext.LastError := ANewRegValue.DwordValue;
+        101: FContext.LastStatus := ANewRegValue.DwordValue;
+      end;
+      KnownRegs.List[ARegID].Modifyed := True;
+      UpdateLastRegData(ARegID);
+      LastReg.Modifyed := True;
+      UpdateQueryRegs;
+      DoChange(cctDataChange);
+    end;
+    Exit;
+  end;
+
   ReloadTagWord := False;
+  OriginalRIP := FContext.Rip;
   {$IFDEF CPUX64}
   if AddressMode = am32bit then
     FContext := GetIntelWow64Context(ThreadID)
   else
   {$ENDIF}
     FContext := GetIntelContext(ThreadID);
-
+  FContext.Rip := OriginalRIP;
   case ARegID of
     0: FContext.Rax := ANewRegValue.QwordValue;
     1: FContext.Rbx := ANewRegValue.QwordValue;
@@ -1137,12 +1166,9 @@ begin
     97: SetBitValue(FContext.EFlags, 9, ANewRegValue.ByteValue);        // IF
     98: SetBitValue(FContext.EFlags, 10, ANewRegValue.ByteValue);       // DF
     99: SetBitValue(FContext.EFlags, 11, ANewRegValue.ByteValue);       // OF
-    {$message 'Эти два флага пока не работают'}
-    100: FContext.LastError := ANewRegValue.DwordValue;
-    101: FContext.LastStatus := ANewRegValue.DwordValue;
     102..109:
     begin
-      SetTagWordSetValue(ARegID - 102, ANewRegValue.ByteValue);
+      SetTagWordValue(ARegID - 102, ANewRegValue.ByteValue);
       {$IFDEF CPUX64}
       ReloadTagWord := True;
       {$ENDIF}
@@ -1215,6 +1241,8 @@ begin
     // Update LastReg cache...
     UpdateLastRegData(ARegID);
     LastReg.Modifyed := True;
+    UpdateQueryRegs;
+    DoChange(cctDataChange);
   end;
 end;
 
@@ -1291,7 +1319,7 @@ begin
     99: ARegValue.ByteValue := ExtractBitValue(Context.EFlags, 11);       // OF
     100: ARegValue.DwordValue := Context.LastError;
     101: ARegValue.DwordValue := Context.LastStatus;
-    102..109: ARegValue.ByteValue := ExtractTagWordSetValue(ARegID - 102);// TW enum
+    102..109: ARegValue.ByteValue := ExtractTagWordValue(ARegID - 102);// TW enum
     110: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 7);   // ES
     111: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 0);   // IE
     112: ARegValue.ByteValue := ExtractBitValue(Context.StatusWord, 1);   // DE
@@ -1351,10 +1379,11 @@ begin
   CtxBittessChanged := (FContext.Rip = 0) or
     (Value.x86Context <> FContext.x86Context);
   FContext := Value;
+  UpdateQueryRegs;
   if CtxBittessChanged then
     UpdateMap(True)
   else
-    DoUpdate(cctDataChange);
+    DoChange(cctContextUpdated);
 end;
 
 procedure TIntelCpuContext.SetControlWordPrecisionValue(AValue: Byte);
@@ -1485,7 +1514,7 @@ begin
   FContext.StatusWord := (FContext.StatusWord and Mask) or NewStatusWord;
 end;
 
-procedure TIntelCpuContext.SetTagWordSetValue(Index: Integer; AValue: Byte);
+procedure TIntelCpuContext.SetTagWordValue(Index: Integer; AValue: Byte);
 var
   Mask: Integer;
   NewTagWord: Word;
@@ -1516,6 +1545,7 @@ end;
 function TIntelCpuContext.Update(ANewInstructionPoint: UInt64): Boolean;
 var
   ACtx: TIntelThreadContext;
+  ExtendedData: TThreadExtendedData;
 begin
   if ThreadID = 0 then
     Exit(False)
@@ -1526,27 +1556,32 @@ begin
   if AddressMode = am32bit then
   begin
     if ANewInstructionPoint = 0 then
-      Context := GetIntelWow64Context(ThreadID)
+      ACtx := GetIntelWow64Context(ThreadID)
     else
     begin
       ACtx := GetIntelWow64Context(ThreadID);
       ACtx.Rip := ANewInstructionPoint;
-      Context := ACtx;
     end;
-    UpdateQueryRegs;
-    Exit;
-  end;
-  {$ENDIF}
-
-  if ANewInstructionPoint = 0 then
-    Context := GetIntelContext(ThreadID)
+  end
   else
+  {$ENDIF}
   begin
-    ACtx := GetIntelContext(ThreadID);
-    ACtx.Rip := ANewInstructionPoint;
-    Context := ACtx;
+    if ANewInstructionPoint = 0 then
+      ACtx := GetIntelContext(ThreadID)
+    else
+    begin
+      ACtx := GetIntelContext(ThreadID);
+      ACtx.Rip := ANewInstructionPoint;
+    end;
   end;
-  UpdateQueryRegs;
+
+  if Assigned(Utils) then
+  begin
+    ExtendedData := Utils.GetThreadExtendedData(ThreadID, AddressMode = am32bit);
+    ACtx.LastError := ExtendedData.LastError;
+    ACtx.LastStatus := ExtendedData.LastStatus;
+  end;
+  Context := ACtx;
 end;
 
 procedure TIntelCpuContext.UpdateLastRegData(ARegID: TRegID);
@@ -1575,7 +1610,7 @@ procedure TIntelCpuContext.UpdateLastRegData(ARegID: TRegID);
         end;
       end;
     end;
-    case ExtractTagWordSetValue(StToR(Index)) of
+    case ExtractTagWordValue(StToR(Index)) of
       0: Result := 'Valid ' + Result;
       1: Result := 'Zero  ' + Result;
       2: Result := 'Spec  ' + Result;
@@ -1701,14 +1736,14 @@ begin
     99: FillReg('OF', ExtractBit(FContext.EFlags, 11), 3, 2);
     100: FillReg('LastError', RegValueFmt(@FContext.LastError, 4), 11);
     101: FillReg('LastStatus', RegValueFmt(@FContext.LastStatus, 4), 11);
-    102: FillReg(' TW_0', ExtractTagWordSet(0), 6, 9, 2);
-    103: FillReg('TW_1', ExtractTagWordSet(1), 5, 9);
-    104: FillReg(' TW_2', ExtractTagWordSet(2), 6, 9, 2);
-    105: FillReg('TW_3', ExtractTagWordSet(3), 5, 9);
-    106: FillReg(' TW_4', ExtractTagWordSet(4), 6, 9, 2);
-    107: FillReg('TW_5', ExtractTagWordSet(5), 5, 9);
-    108: FillReg(' TW_6', ExtractTagWordSet(6), 6, 9, 2);
-    109: FillReg('TW_7', ExtractTagWordSet(7), 5, 9);
+    102: FillReg(' TW_0', ExtractTagWord(0), 6, 9, 2);
+    103: FillReg('TW_1', ExtractTagWord(1), 5, 9);
+    104: FillReg(' TW_2', ExtractTagWord(2), 6, 9, 2);
+    105: FillReg('TW_3', ExtractTagWord(3), 5, 9);
+    106: FillReg(' TW_4', ExtractTagWord(4), 6, 9, 2);
+    107: FillReg('TW_5', ExtractTagWord(5), 5, 9);
+    108: FillReg(' TW_6', ExtractTagWord(6), 6, 9, 2);
+    109: FillReg('TW_7', ExtractTagWord(7), 5, 9);
     110: FillReg(_MM('ES', 'Err'), ExtractBit(FContext.StatusWord, 7), _MM(3, 4), 1);
     111: FillReg(_MM(' IE', ''), ExtractBit(FContext.StatusWord, 0), _MM(4, 0), _MM(2, 1));
     112: FillReg(_MM('DE', ''), ExtractBit(FContext.StatusWord, 1), _MM(3, 0), _MM(2, 1));

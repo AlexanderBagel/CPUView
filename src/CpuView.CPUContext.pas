@@ -73,7 +73,7 @@ type
     function Valid: Boolean;
   end;
 
-  TContextChangeType = (cctRemaped, cctDataChange);
+  TContextChangeType = (cctRemaped, cctContextUpdated, cctDataChange);
   TContextChangeEvent = procedure(Sender: TObject;
     AChangeType: TContextChangeType) of object;
   TContextQueryRegHintEvent = procedure(Sender: TObject; AddrVA: UInt64;
@@ -101,15 +101,22 @@ type
   private
     FAddressMode: TAddressMode;
     FChange: TContextChangeEvent;
+    FChangeList: TList<TContextChangeEvent>;
     FQueryHint: TContextQueryRegHintEvent;
+    FUpdateCount: Integer;
+    FUtils: TCommonAbstractUtils;
   protected
+    procedure DoChange(AChangeType: TContextChangeType);
     procedure DoQueryRegHint(AddrVA: UInt64; var AHint: string);
-    procedure DoUpdate(AChangeType: TContextChangeType);
     function GetViewMode(RegID: TRegID): TRegViewMode; virtual; abstract;
     procedure SetViewMode(RegID: TRegID; const Value: TRegViewMode); virtual; abstract;
   public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure BeginUpdate;
     function Count: Integer; virtual; abstract;
     function EmptyRow(ARowIndex: Integer): Boolean; virtual; abstract;
+    procedure EndUpdate;
     procedure InitDefault; virtual; abstract;
     function InstructonPoint: UInt64; virtual; abstract;
     function InstructonPointID: TRegID; virtual; abstract;
@@ -117,8 +124,8 @@ type
     function PointerSize: Integer; virtual; abstract;
     function RegCount(ARowIndex: Integer): Integer; virtual; abstract;
     function RegDescriptor(ARegID: TRegID; out ADescriptor: TRegDescriptor): Boolean; overload;
-    function RegDescriptor(ARowIndex, ARegIndex: Integer; out ADescriptor: TRegDescriptor): Boolean; overload; virtual; abstract;
     function RegDescriptor(const ARegName: string; out ADescriptor: TRegDescriptor): Boolean; overload; virtual; abstract;
+    procedure RegisterChangeNotification(Value: TContextChangeEvent);
     function RegInfo(ARegID: TRegID): TRegister; overload; virtual; abstract;
     function RegInfo(ARowIndex, ARegIndex: Integer): TRegister; overload; virtual; abstract;
     function RegParam(ARegID: TRegID; out AParam: TRegParam): Boolean; virtual; abstract;
@@ -129,11 +136,12 @@ type
     function RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
     function RegQueryValue(const ARegName: string; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
     function RegSetValue(ARegID: TRegID; const ANewRegValue: TRegValue): Boolean; virtual; abstract;
+    procedure UnRegisterChangeNotification(Value: TContextChangeEvent);
     function Update(ANewInstructionPoint: UInt64 = 0): Boolean; virtual; abstract;
   public
     property AddressMode: TAddressMode read FAddressMode write FAddressMode;
+    property Utils: TCommonAbstractUtils read FUtils write FUtils;
     property ViewMode[RegID: TRegID]: TRegViewMode read GetViewMode write SetViewMode;
-    property OnChange: TContextChangeEvent read FChange write FChange;
     property OnQueryRegHint: TContextQueryRegHintEvent read FQueryHint write FQueryHint;
   end;
 
@@ -170,7 +178,6 @@ type
     property RegID: Integer read FRegID write FRegID; // link to KnownRegs
   end;
 
-  {$message 'У контекста должно быть событие по которому Core должно отрефрешить вьювер'}
   TCommonCpuContext = class(TAbstractCPUContext)
   strict private
     FMap: TRegMap;
@@ -210,7 +217,6 @@ type
     function Count: Integer; override;
     function EmptyRow(ARowIndex: Integer): Boolean; override;
     function RegCount(ARowIndex: Integer): Integer; override;
-    function RegDescriptor(ARowIndex, ARegIndex: Integer; out ADescriptor: TRegDescriptor): Boolean; overload; override; deprecated;
     function RegInfo(ARegID: TRegID): TRegister; overload; override;
     function RegInfo(ARowIndex, AColIndex: Integer): TRegister; overload; override;
     function RegParam(ARegID: TRegID; out AParam: TRegParam): Boolean; override;
@@ -245,16 +251,43 @@ end;
 
 { TAbstractCPUContext }
 
+procedure TAbstractCPUContext.DoChange(AChangeType: TContextChangeType);
+var
+  I: Integer;
+begin
+  if FUpdateCount <> 0 then Exit;
+  for I := 0 to FChangeList.Count - 1 do
+    FChangeList[I](Self, AChangeType);
+end;
+
 procedure TAbstractCPUContext.DoQueryRegHint(AddrVA: UInt64; var AHint: string);
 begin
   if Assigned(FQueryHint) then
     FQueryHint(Self, AddrVA, ctComment, AHint);
 end;
 
-procedure TAbstractCPUContext.DoUpdate(AChangeType: TContextChangeType);
+constructor TAbstractCPUContext.Create(AOwner: TComponent);
 begin
-  if Assigned(FChange) then
-    FChange(Self, AChangeType);
+  inherited Create(AOwner);
+  FChangeList := TList<TContextChangeEvent>.Create;
+end;
+
+destructor TAbstractCPUContext.Destroy;
+begin
+  FreeAndNil(FChangeList);
+  inherited Destroy;
+end;
+
+procedure TAbstractCPUContext.BeginUpdate;
+begin
+  Inc(FUpdateCount);
+end;
+
+procedure TAbstractCPUContext.EndUpdate;
+begin
+  Dec(FUpdateCount);
+  if FUpdateCount = 0 then
+    DoChange(cctDataChange);
 end;
 
 function TAbstractCPUContext.RegDescriptor(ARegID: TRegID;
@@ -270,6 +303,23 @@ begin
     ADescriptor.RowIndex := Param.RowIndex;
     ADescriptor.RegIndex := Param.ColIndex;
   end;
+end;
+
+procedure TAbstractCPUContext.RegisterChangeNotification(
+  Value: TContextChangeEvent);
+begin
+  FChangeList.Add(Value);
+end;
+
+procedure TAbstractCPUContext.UnRegisterChangeNotification(
+  Value: TContextChangeEvent);
+var
+  Index: Integer;
+begin
+  if FChangeList = nil then Exit;
+  Index := FChangeList.IndexOf(Value);
+  if Index >= 0 then
+    FChangeList.Delete(Index);
 end;
 
 { TCommonCpuContext }
@@ -385,19 +435,6 @@ begin
   Result := Map[ARowIndex].Count;
 end;
 
-function TCommonCpuContext.RegDescriptor(ARowIndex, ARegIndex: Integer;
-  out ADescriptor: TRegDescriptor): Boolean;
-begin
-  ADescriptor := Default(TRegDescriptor);
-  Result := Map.CheckRegIndex(ARowIndex, ARegIndex);
-  if Result then
-  begin
-    ADescriptor.RegID := Map[ARowIndex][ARegIndex].RegID;
-    ADescriptor.RowIndex := ARowIndex;
-    ADescriptor.RegIndex := ARegIndex;
-  end;
-end;
-
 function TCommonCpuContext.RegInfo(ARegID: TRegID): TRegister;
 begin
   FillRegData(ARegID);
@@ -505,7 +542,7 @@ begin
   if Value in KnownRegs.List[RegID].SupportedViewMode then
   begin
     DoChangeViewMode(RegID, Value);
-    DoUpdate(cctRemaped);
+    DoChange(cctRemaped);
   end;
 end;
 
@@ -530,7 +567,7 @@ begin
     InitKnownRegs;
   BuildMap;
   SynhronizeMapToKnownRegs;
-  DoUpdate(cctRemaped);
+  DoChange(cctRemaped);
 end;
 
 { TRegMap }

@@ -616,7 +616,6 @@ type
     procedure FitColumnToBestSize(Value: TColumnType); override;
     function RawData: TRegistersRawData;
     function ReadDataAtSelStart(var pBuffer; nSize: Integer): Integer; override;
-    procedure RefreshSelected;
     property Context: TAbstractCPUContext read FContext write SetContext;
     property SelectedRegister: TRegister read FSelectedRegister;
     property SelectedRegName: string read FSelectedRegName;
@@ -2049,7 +2048,10 @@ begin
     FitColumnsToBestSize;
   end
   else
+  begin
+    DoSelectionChage(SelStart, SelEnd);
     Invalidate;
+  end;
 end;
 
 function TCustomRegView.ContextViewModeCommandEnabled(
@@ -2269,22 +2271,19 @@ begin
   end;
 end;
 
-procedure TCustomRegView.RefreshSelected;
-begin
-  DoSelectionChage(SelStart, SelEnd);
-  Invalidate;
-end;
-
 procedure TCustomRegView.SetContext(const Value: TAbstractCPUContext);
 begin
   if Context <> Value then
   begin
     if Assigned(FContext) then
+    begin
+      FContext.UnRegisterChangeNotification(ContextUpdate);
       FContext.RemoveFreeNotification(Self);
+    end;
     FContext := Value;
     if Assigned(FContext) then
     begin
-      FContext.OnChange := ContextUpdate;
+      FContext.RegisterChangeNotification(ContextUpdate);
       FContext.OnQueryRegHint := OnQueryComment;
       FContext.FreeNotification(Self);
     end;

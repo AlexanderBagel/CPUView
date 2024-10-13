@@ -16,11 +16,9 @@ interface
 показывать строки исходоного кода
 }
 
-{$message 'При изменении регистров происходит рефреш Asm с возвратом на IP а не на текущую позицию'}
 {$message 'При скроле Asm сбрасывается выделение'}
 {$message 'Подключить все 10 букмарков на AsmView'}
 {$message 'x87/SIMD регистры не редактируются'}
-{$message 'Не подключен GetLastError/GetLastStatus в контексте'}
 
 uses
   {$IFDEF FPC}
@@ -133,6 +131,7 @@ type
     procedure OnAsmScroll(Sender: TObject; AStep: TScrollStepDirection);
     procedure OnAsmSelectionChange(Sender: TObject);
     procedure OnBreakPointsChange(Sender: TObject);
+    procedure OnContextChange(Sender: TObject);
     procedure OnDebugerChage(Sender: TObject);
     procedure OnDebugerStateChange(Sender: TObject);
     procedure SetAsmView(const Value: TAsmView);
@@ -140,6 +139,7 @@ type
     procedure SetRegView(const Value: TRegView);
     procedure SetShowCallFuncName(AValue: Boolean);
     procedure SetStackView(const Value: TStackView);
+    procedure SynhronizeViewersWithContext;
   protected
     procedure AsmViewQueryComment(Sender: TObject; AddrVA: UInt64;
       AColumn: TColumnType; var AComment: string);
@@ -152,6 +152,8 @@ type
       AColumn: TColumnType; var AComment: string);
     procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
+    // Forced - означает принудительную перестройку вьювера
+    // Необходимо при изменении настроек онображения
     procedure RefreshAsmView(Forced: Boolean);
     procedure ResetCache;
     procedure StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
@@ -611,7 +613,7 @@ end;
 procedure TCpuViewCore.DoReset;
 begin
   if Assigned(FReset) then
-    FReset(Self);;
+    FReset(Self);
 end;
 
 function TCpuViewCore.GetAddrMode: TAddressMode;
@@ -702,6 +704,11 @@ begin
   RefreshBreakPoints;
 end;
 
+procedure TCpuViewCore.OnContextChange(Sender: TObject);
+begin
+  SynhronizeViewersWithContext;
+end;
+
 procedure TCpuViewCore.OnDebugerChage(Sender: TObject);
 begin
   FUtils.Update;
@@ -779,9 +786,7 @@ procedure TCpuViewCore.RefreshAsmView(Forced: Boolean);
 begin
   if Assigned(FAsmView) then
   begin
-    FAsmView.AddressMode := GetAddrMode;
-    FAsmView.InstructionPoint := FDebugger.CurrentInstructionPoint;
-    FAsmView.CurrentIPIsActiveJmp := FDebugger.IsActiveJmp;
+    SynhronizeViewersWithContext;
     if Forced or not FAsmView.IsAddrVisible(FAsmView.InstructionPoint) then
       BuildAsmWindow(FAsmView.InstructionPoint);
     FAsmView.FocusOnAddress(FAsmView.InstructionPoint, ccmSelectRow);
@@ -841,6 +846,7 @@ begin
   if Assigned(Value) then
   begin
     FDebugger.OnChange := OnDebugerChage;
+    FDebugger.OnContextChange := OnContextChange;
     FDebugger.OnStateChange := OnDebugerStateChange;
     FDebugger.OnBreakPointsChange := OnBreakPointsChange;
     FAsmStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
@@ -892,6 +898,19 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.SynhronizeViewersWithContext;
+begin
+  if Assigned(FAsmView) then
+  begin
+    FAsmView.AddressMode := GetAddrMode;
+    FAsmView.InstructionPoint := FDebugger.CurrentInstructionPoint;
+    FAsmView.CurrentIPIsActiveJmp := FDebugger.IsActiveJmp;
+    FAsmView.Invalidate;
+  end;
+  if Assigned(FStackView) then
+    FStackView.Invalidate;
+end;
+
 procedure TCpuViewCore.ShowDisasmAtAddr(AddrVA: Int64);
 begin
   if Assigned(FAsmView) then
@@ -933,12 +952,7 @@ function TCpuViewCore.UpdateRegValue(RegID: Integer;
 begin
   Result := False;
   if CanWork then
-  begin
     Result := FDebugger.UpdateRegValue(RegID, ANewRegValue);
-    if Result and Assigned(FRegView) then
-      FRegView.RefreshSelected;
-    RefreshAsmView(False);
-  end;
 end;
 
 procedure TCpuViewCore.UpdateStreamsProcessID;
