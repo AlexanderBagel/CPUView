@@ -27,7 +27,7 @@ begin
 end;
 {$ENDIF}
 
-{$IFDEF WINDOWS}
+{$IFDEF MSWINDOWS}
 
 uses
   Windows;

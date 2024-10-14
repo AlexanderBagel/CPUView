@@ -46,7 +46,7 @@ uses
   FpDbgClasses,
   FpDbgInfo,
   FpDbgUtil,
-  {$IFDEF WINDOWS}
+  {$IFDEF MSWINDOWS}
   FpDbgWinClasses,
   {$ENDIF}
 

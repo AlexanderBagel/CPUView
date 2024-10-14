@@ -84,12 +84,17 @@ type
     case Integer of
       1: (ByteValue: Byte);
       2: (WordValue: Word);
+      3: (IntValue: Integer);
       4: (DwordValue: Cardinal);
       8: (QwordValue: UInt64);
       10: (Ext10: array [0..9] of Byte);
       16: (Ext16: array [0..15] of Byte);
       32: (Ext32: array [0..31] of Byte);
   end;
+
+  TExternalRegType = (ertLastError, ertLastStatus);
+  TContextQueryExternalRegHintEvent = procedure(Sender: TObject;
+    const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string) of object;
 
   TRegQueryStringType = (rqstName, rqstValue);
 
@@ -103,11 +108,13 @@ type
     FChange: TContextChangeEvent;
     FChangeList: TList<TContextChangeEvent>;
     FQueryHint: TContextQueryRegHintEvent;
+    FQueryExternalHint: TContextQueryExternalRegHintEvent;
     FUpdateCount: Integer;
     FUtils: TCommonAbstractUtils;
   protected
     procedure DoChange(AChangeType: TContextChangeType);
     procedure DoQueryRegHint(AddrVA: UInt64; var AHint: string);
+    procedure DoQueryExternalRegHint(const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string);
     function GetViewMode(RegID: TRegID): TRegViewMode; virtual; abstract;
     procedure SetViewMode(RegID: TRegID; const Value: TRegViewMode); virtual; abstract;
   public
@@ -142,6 +149,7 @@ type
     property AddressMode: TAddressMode read FAddressMode write FAddressMode;
     property Utils: TCommonAbstractUtils read FUtils write FUtils;
     property ViewMode[RegID: TRegID]: TRegViewMode read GetViewMode write SetViewMode;
+    property OnQueryExternalHint: TContextQueryExternalRegHintEvent read FQueryExternalHint write FQueryExternalHint;
     property OnQueryRegHint: TContextQueryRegHintEvent read FQueryHint write FQueryHint;
   end;
 
@@ -264,6 +272,13 @@ procedure TAbstractCPUContext.DoQueryRegHint(AddrVA: UInt64; var AHint: string);
 begin
   if Assigned(FQueryHint) then
     FQueryHint(Self, AddrVA, ctComment, AHint);
+end;
+
+procedure TAbstractCPUContext.DoQueryExternalRegHint(const AValue: TRegValue;
+  ARegType: TExternalRegType; var AHint: string);
+begin
+  if Assigned(FQueryExternalHint) then
+    FQueryExternalHint(Self, AValue, ARegType, AHint);
 end;
 
 constructor TAbstractCPUContext.Create(AOwner: TComponent);

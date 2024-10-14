@@ -588,6 +588,7 @@ type
     FSelectedRegName: string;
     FSelectedRegValue: TRegValue;
     FSelectedRegister: TRegister;
+    FQueryExternalHint: TContextQueryExternalRegHintEvent;
     procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
     function GetColorMap: TRegistersColorMap;
     procedure SetContext(const Value: TAbstractCPUContext);
@@ -621,6 +622,7 @@ type
     property SelectedRegName: string read FSelectedRegName;
   protected
     property ColorMap: TRegistersColorMap read GetColorMap;
+    property OnQueryExternalHint: TContextQueryExternalRegHintEvent read FQueryExternalHint write FQueryExternalHint;
     property OnSelectedContextPopup: TOnSelectedContextPopupEvent read FPopup write FPopup;
   end;
 
@@ -678,6 +680,7 @@ type
     property OnMouseMove;
     property OnMouseUp;
     property OnQueryComment;
+    property OnQueryExternalHint;
     property OnSelectedContextPopup;
     property OnSelectionChange;
     property OnStartDock;
@@ -2285,6 +2288,7 @@ begin
     begin
       FContext.RegisterChangeNotification(ContextUpdate);
       FContext.OnQueryRegHint := OnQueryComment;
+      FContext.OnQueryExternalHint := OnQueryExternalHint;
       FContext.FreeNotification(Self);
     end;
     ContextUpdate(Value, cctRemaped);

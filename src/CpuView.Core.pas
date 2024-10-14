@@ -44,7 +44,8 @@ uses
   CpuView.Linux,
   {$ENDIF}
   CpuView.DebugerGate,
-  CpuView.CPUContext;
+  CpuView.CPUContext,
+  CpuView.DBase;
 
 type
   TAsmLine = record
@@ -106,6 +107,7 @@ type
     FAsmStream: TBufferedROStream;
     FCacheList: TList<TAsmLine>;
     FCacheListIndex: Integer;
+    FDBase: TCpuViewDBase;
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
@@ -150,6 +152,8 @@ type
     procedure LoadFromCache(AIndex: Integer);
     procedure RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
       AColumn: TColumnType; var AComment: string);
+    procedure RegViewQueryExternalComment(Sender: TObject;
+      const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
     // Forced - означает принудительную перестройку вьювера
@@ -175,6 +179,7 @@ type
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
   public
+    property DBase: TCpuViewDBase read FDBase;
     property ShowCallFuncName: Boolean read FShowCallFuncName write SetShowCallFuncName;
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
@@ -416,10 +421,12 @@ begin
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
   FShowCallFuncName := True;
   FJmpStack := TStack<Int64>.Create;
+  FDBase := TCpuViewDBase.Create;
 end;
 
 destructor TCpuViewCore.Destroy;
 begin
+  FDBase.Free;
   FCacheList.Free;
   FDumpViewList.Free;
   FAddrIndex.Free;
@@ -587,6 +594,18 @@ procedure TCpuViewCore.RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
   AColumn: TColumnType; var AComment: string);
 begin
   AComment := GetKnownFunctionAtAddr(AddrVA);
+end;
+
+procedure TCpuViewCore.RegViewQueryExternalComment(Sender: TObject;
+  const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
+begin
+  AComment := '';
+  case ARegType of
+    ertLastError: AComment := DBase.GetLastErrorStr(AValue.IntValue);
+    ertLastStatus: AComment := DBase.GetLastStatusStr(AValue.DwordValue);
+  end;
+  if AComment <> '' then
+    AComment := '(' + AComment + ')';
 end;
 
 procedure TCpuViewCore.RefreshBreakPoints;
@@ -872,6 +891,7 @@ begin
     FRegView := Value;
     if Value = nil then Exit;
     FRegView.OnQueryComment := RegViewQueryComment;
+    FRegView.OnQueryExternalHint := RegViewQueryExternalComment;
     RefreshView;
   end;
 end;

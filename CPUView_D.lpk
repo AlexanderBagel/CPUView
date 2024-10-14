@@ -23,6 +23,10 @@
         <UnitName Value="CpuView.Actions"/>
       </Item>
       <Item>
+        <Filename Value="src\CpuView.DBase.pas"/>
+        <UnitName Value="CpuView.DBase"/>
+      </Item>	  
+      <Item>
         <Filename Value="src\CpuView.Common.pas"/>
         <UnitName Value="CpuView.Common"/>
       </Item>

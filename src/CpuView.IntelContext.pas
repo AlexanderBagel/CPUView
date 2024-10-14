@@ -233,10 +233,12 @@ begin
     Add(Row, 98);         // DF
     Add(Row, 99);         // OF
 
-    {$IFDEF WINDOWS}
+    {$IFDEF MSWINDOWS}
     AddSeparator;
-    Add(Map, 100);        // LastError
-    Add(Map, 101);        // LastStatus
+    Row := Add(Map, 100); // LastError
+    Add(Row, 175);        // LastError hint
+    Row := Add(Map, 101); // LastStatus
+    Add(Row, 176);        // LastStatus hint
     {$ENDIF}
 
     AddSeparator;
@@ -857,6 +859,9 @@ begin
   Add(crtSelectableHint, vmDefOnly);   // 172 - R13 hint
   Add(crtSelectableHint, vmDefOnly);   // 173 - R14 hint
   Add(crtSelectableHint, vmDefOnly);   // 174 - R15 hint
+
+  Add(crtSelectableHint, vmDefOnly);   // 175 - LastError hint
+  Add(crtSelectableHint, vmDefOnly);   // 176 - LastStatus hint
 end;
 
 function TIntelCpuContext.InstructonPoint: UInt64;
@@ -1734,8 +1739,8 @@ begin
     97: FillReg(_MM(' IF'), ExtractBit(FContext.EFlags, 9), _MM(4, 3), 2);
     98: FillReg('DF', ExtractBit(FContext.EFlags, 10), 3, 2);
     99: FillReg('OF', ExtractBit(FContext.EFlags, 11), 3, 2);
-    100: FillReg('LastError', RegValueFmt(@FContext.LastError, 4), 11);
-    101: FillReg('LastStatus', RegValueFmt(@FContext.LastStatus, 4), 11);
+    100: FillReg('LastError', RegValueFmt(@FContext.LastError, 4), 11, 2);
+    101: FillReg('LastStatus', RegValueFmt(@FContext.LastStatus, 4), 11, 2);
     102: FillReg(' TW_0', ExtractTagWord(0), 6, 9, 2);
     103: FillReg('TW_1', ExtractTagWord(1), 5, 9);
     104: FillReg(' TW_2', ExtractTagWord(2), 6, 9, 2);
@@ -1804,6 +1809,13 @@ begin
         DoQueryRegHint(ARegValue.QwordValue, AHint);
       FillReg('', AHint, 0, Length(AHint));
     end;
+    175, 176:
+    begin
+      AHint := '';
+      if RegQueryValue(ARegID - 75 {yes 75, cos 100..101 is real reg}, ARegValue) then
+        DoQueryExternalRegHint(ARegValue, TExternalRegType(ARegID - 175), AHint);
+      FillReg('', AHint, 0, Length(AHint));
+    end
   else
     FillSeparator;
   end;
