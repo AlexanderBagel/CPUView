@@ -2,6 +2,7 @@
 
 {$IFDEF FPC}
   {$MODE Delphi}
+  {$ASMMODE INTEL}
 {$ENDIF}
 
 interface
@@ -109,6 +110,9 @@ type
       fos : longint;
       st_space : array[0..79] of Byte;
     end;
+
+  puser_fpxregs_struct32 = ^user_fpxregs_struct32;
+  puser_fpregs_struct64 = ^user_fpregs_struct64;
 
 function ReadVirtualFile(const FilePath: string): TMemoryStream;
 var
@@ -350,17 +354,74 @@ begin
   end;
 end;
 
+function IsAVXSupport: Boolean; assembler;
+asm
+  {$IFDEF CPUX64}
+  push rbx
+  {$ELSE}
+  push ebx
+  {$ENDIF}
+  mov eax, 1
+  cpuid
+  test ecx, $10000000
+  setnz al
+  {$IFDEF CPUX64}
+  pop rbx
+  {$ELSE}
+  pop ebx
+  {$ENDIF}
+end;
+
+function GetXSaveArea: Cardinal; assembler;
+asm
+  {$IFDEF CPUX64}
+  push rbx
+  {$ELSE}
+  push ebx
+  {$ENDIF}
+  mov eax, $D
+  xor ecx, ecx
+  cpuid
+  mov eax, ebx
+  {$IFDEF CPUX64}
+  pop rbx
+  {$ELSE}
+  pop ebx
+  {$ENDIF}
+end;
+
+function GetAVXOffset: Cardinal; assembler;
+asm
+  {$IFDEF CPUX64}
+  push rbx
+  {$ELSE}
+  push ebx
+  {$ENDIF}
+  mov eax, $D
+  mov ecx, 2
+  cpuid
+  mov eax, ebx
+  {$IFDEF CPUX64}
+  pop rbx
+  {$ELSE}
+  pop ebx
+  {$ENDIF}
+end;
+
 function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
 var
   I: Integer;
   io: iovec;
   Regs: TUserRegs;
+  XSaveArea, AVXOffset: Cardinal;
+  fpregbuf: array of byte;
   {$IFDEF CPUX86}
   FpRegs: user_fpxregs_struct32;
-  xmm: user_fpxregs_struct32;
+  xmm: puser_fpxregs_struct32;
   {$ENDIF}
   {$IFDEF CPUX64}
-  FpRegs: user_fpregs_struct64;
+  FpRegs: puser_fpregs_struct64;
+  PTraceParam: Integer;
   {$ENDIF}
 begin
   Result := Default(TIntelThreadContext);
@@ -400,22 +461,31 @@ begin
   for I := 0 to 7 do
     Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I], 10);
 
-  Result.XmmCount := 0;
-  Result.YmmPresent := False;
+  if IsAVXSupport then
+  begin
+    XSaveArea := GetXSaveArea;
+    AVXOffset := GetAVXOffset;
+    Result.XmmCount := Min(8, (XSaveArea - AVXOffset) div SizeOf(TXMMRegister));
+  end
+  else
+  begin
+    XSaveArea := SizeOf(user_fpxregs_struct32);
+    AVXOffset := 0;
+    Result.XmmCount := 8;
+  end;
+  SetLength(fpregbuf, XSaveArea);
+  xmm := @fpregbuf[0];
 
-  io.iov_base := @xmm;
-  io.iov_len := SizeOf(xmm);
+  io.iov_base := xmm;
+  io.iov_len := XSaveArea;
   if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
     Exit;
 
-  Result.XmmCount := 8;
   Result.MxCsr := xmm.mxcsr;
   for I := 0 to 7 do
     Move(xmm.st_space[I * 4], Result.FloatRegisters[I], 10);
   for I := 0 to Result.XmmCount - 1 do
     Move(xmm.xmm_space[I * 4], Result.Ymm[I].Low, 16);
-
-  Result.YmmPresent := False;
   {$ENDIF}
 
   {$IFDEF CPUX64}
@@ -445,10 +515,30 @@ begin
   Result.SegCs := Regs.regs64[CS];
   Result.SegSs := Regs.regs64[SS];
 
-  Result.XmmCount := 16;
-  io.iov_base := @FpRegs;
-  io.iov_len := SizeOf(FpRegs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+  AVXOffset := 0;
+  if IsAVXSupport then
+  begin
+    XSaveArea := GetXSaveArea;
+    AVXOffset := GetAVXOffset;
+    Result.XmmCount := Min(16, (XSaveArea - AVXOffset) div SizeOf(TXMMRegister));
+    PTraceParam := NT_X86_XSTATE;
+    if AVXOffset + Result.XmmCount * SizeOf(TXMMRegister) > XSaveArea then
+      AVXOffset := 0;
+  end;
+
+  if AVXOffset = 0 then
+  begin
+    XSaveArea := SizeOf(user_fpregs_struct64);
+    AVXOffset := 0;
+    Result.XmmCount := 16;
+    PTraceParam := NT_PRFPREG;
+  end;
+  SetLength(fpregbuf, XSaveArea);
+  FpRegs := @fpregbuf[0];
+
+  io.iov_base := FpRegs;
+  io.iov_len := XSaveArea;
+  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(PTraceParam)), @io) <> 0 then
     Exit;
 
   Result.ControlWord := FpRegs.cwd;
@@ -458,10 +548,13 @@ begin
     Move(FpRegs.st_space[I * 4], Result.FloatRegisters[I], 10);
   for I := 0 to Result.XmmCount - 1 do
     Move(FpRegs.xmm_space[I * 4], Result.Ymm[I].Low, 16);
-  Result.YmmPresent := False;
-
   Result.TagWord := GetTagWordFromFXSave(Result.StatusWord, FpRegs.ftw, Result.FloatRegisters);
   {$ENDIF}
+
+  Result.YmmPresent := AVXOffset > 0;
+  if Result.YmmPresent then
+    for I := 0 to Result.XmmCount - 1 do
+      Move(fpregbuf[AVXOffset + I * SizeOf(TXMMRegister)], Result.Ymm[I].High, SizeOf(TXMMRegister));
 end;
 
 function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
@@ -564,7 +657,9 @@ var
   io: iovec;
   Regs: TUserRegs;
   FpRegs: user_fpregs_struct32;
-  xmm: user_fpxregs_struct32;
+  xmm: puser_fpxregs_struct32;
+  XSaveArea, AVXOffset: Cardinal;
+  fpregbuf: array of byte;
 begin
   Result := Default(TIntelThreadContext);
   io.iov_base := @(Regs.regs32[0]);
@@ -602,22 +697,37 @@ begin
   for I := 0 to 7 do
     Move(FpRegs.st_space[I * 10], Result.FloatRegisters[I], 10);
 
-  Result.XmmCount := 0;
-  Result.YmmPresent := False;
+  if IsAVXSupport then
+  begin
+    XSaveArea := GetXSaveArea;
+    AVXOffset := GetAVXOffset;
+    Result.XmmCount := Min(8, (XSaveArea - AVXOffset) div SizeOf(TXMMRegister));
+    if AVXOffset + Result.XmmCount * SizeOf(TXMMRegister) > XSaveArea then
+      AVXOffset := 0;
+  end
+  else
+  begin
+    XSaveArea := SizeOf(user_fpxregs_struct32);
+    AVXOffset := 0;
+    Result.XmmCount := 8;
+  end;
+  SetLength(fpregbuf, XSaveArea);
+  xmm := @fpregbuf[0];
 
-  io.iov_base := @xmm;
-  io.iov_len := SizeOf(xmm);
+  io.iov_base := xmm;
+  io.iov_len := XSaveArea;
   if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
     Exit;
 
-  Result.XmmCount := 8;
   Result.MxCsr := xmm.mxcsr;
   for I := 0 to 7 do
     Move(xmm.st_space[I * 4], Result.FloatRegisters[I], 10);
   for I := 0 to Result.XmmCount - 1 do
     Move(xmm.xmm_space[I * 4], Result.Ymm[I].Low, 16);
-
-  Result.YmmPresent := False;
+  Result.YmmPresent := AVXOffset > 0;
+  if Result.YmmPresent then
+    for I := 0 to Result.XmmCount - 1 do
+      Move(fpregbuf[AVXOffset + I * SizeOf(TXMMRegister)], Result.Ymm[I].High, SizeOf(TXMMRegister));
 end;
 
 function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
