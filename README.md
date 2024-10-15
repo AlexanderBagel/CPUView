@@ -20,6 +20,7 @@ Attention - BETA, version!!!
 Common features:
 * OS: Windows and Linux support via Gtk2 (Qt not tested)
 * Proc: Intel x86_64 (ARM not yet implemented)
+* Thread context (Basic, x87 and SIMD register) full support on Windows and Linux
 * Light and dark display themes
 * Crosscompiling support
 * Supports thread switching with instantaneous change of displayed information about the active thread
@@ -41,6 +42,7 @@ Register window:
 * Change register value and fast flag switching
 * Two display modes (full and compact)
 * Three display modes for x87 registers (ST-R-M)
+* Display SIMD registers (XMM and YMM)
 * Quick hint on active jump instructions
 
 Stack supports:
