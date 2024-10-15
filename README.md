@@ -55,6 +55,7 @@ Dump supports:
 * Offsets
 * Multiple dump windows
 * Selections (not yet implemented)
+* Address recognition and highlighting (not yet implemented)
 
 ### Appearance:
 
