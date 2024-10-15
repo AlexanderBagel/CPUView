@@ -30,20 +30,24 @@ The disassembler supports:
 * Output debugging information
 * Jump direction display
 * Active jump highlighting
-* Highlighting of the selected register (in the register window)
+* Highlighting of the selected register
 * Displays the names of called functions instead of their addresses
 * Offsets
 * Hinting on the selected instruction with a menu to jump to each block of the received information
 * Instruction coloring for easy code reading
+* Breakpoints (display and modify)
+* Bookmarks synchronization (not yet implemented)
 
 Register window:
 * Contains debugging information for each register (RAX..R15)
-* Bitwise representation of EFLAGS, TagWord, StatusWord, ControlWord, MxCsr flag registers
-* Change register value and fast flag switching
-* Two display modes (full and compact)
+* Display SIMD registers (XMM and YMM) with 12 display mode
 * Three display modes for x87 registers (ST-R-M)
-* Display SIMD registers (XMM and YMM)
+* Bitwise representation of EFLAGS, TagWord, StatusWord, ControlWord, MxCsr flag registers (include decoded TagWord on x64)
+* Change ALL register value and fast flag switching (x87/SIMD change not yet implemented)
+* Two display modes (full and compact)
 * Quick hint on active jump instructions
+* LastError and LastStatus code with description (Windows only)
+* Highlight of changed registers
 
 Stack supports:
 * Debug information
@@ -54,6 +58,9 @@ Stack supports:
 Dump supports:
 * Offsets
 * Multiple dump windows
+* 17 display mode (include Long Double 80 bit)
+* 6 text encoding mode
+* 5 Copy mode (include pascal array)
 * Selections (not yet implemented)
 * Address recognition and highlighting (not yet implemented)
 
