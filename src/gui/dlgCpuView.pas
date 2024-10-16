@@ -14,6 +14,7 @@ uses
   FWHexView.MappedView,
 
   CpuView.Core,
+  CpuView.Common,
   CpuView.CPUContext,
   CpuView.Viewers,
   CpuView.DebugerGate,
@@ -302,6 +303,7 @@ type
     FSourceLine: Integer;
     function ActiveViewerSelectedValue: UInt64;
     procedure InternalShowInDump(AddrVA: Int64);
+    procedure UpdateStatusBar;
   protected
     function ActiveDumpView: TDumpView;
     function ActiveViewIndex: Integer;
@@ -399,12 +401,14 @@ begin
   FContextRegName := RegView.SelectedRegName;
   FContextRegValue := 0;
   RegView.ReadDataAtSelStart(FContextRegValue, FDbgGate.PointerSize);
+  UpdateStatusBar;
 end;
 
 procedure TfrmCpuView.StackViewSelectionChange(Sender: TObject);
 begin
   FStackSelectedValue := 0;
   StackView.ReadDataAtSelStart(FStackSelectedValue, FDbgGate.PointerSize);
+  UpdateStatusBar;
 end;
 
 procedure TfrmCpuView.tmpZOrderLockTimer(Sender: TObject);
@@ -439,6 +443,35 @@ begin
   else
     ActiveDumpView.SelEnd := AddrVA + FDbgGate.PointerSize - 1;
   ActiveControl := ActiveDumpView;
+end;
+
+procedure TfrmCpuView.UpdateStatusBar;
+const
+  DbgStates: array [TAbstractDebugState] of string = (
+    'Stoped', 'Start', 'Paused', 'Running', 'Finished'
+  );
+var
+  AddrVA: UInt64;
+  RegionData: TRegionData;
+  AccessStr: string;
+begin
+  StatusBar.Panels[0].Text := 'State: ' + DbgStates[DbgGate.DebugState];
+  AddrVA := ActiveViewerSelectedValue;
+  AccessStr := 'No access';
+  if DbgGate.Utils.QueryRegion(AddrVA, RegionData) then
+  begin
+    if (RegionData.Access <> []) and not (raProtect in RegionData.Access) then
+    begin
+      AccessStr := '...';
+      if raRead in RegionData.Access then
+        AccessStr[1] := 'R';
+      if raWrite in RegionData.Access then
+        AccessStr[2] := 'W';
+      if raExecute in RegionData.Access then
+        AccessStr[3] := 'E';
+    end;
+  end;
+  StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s)', [AddrVA, AccessStr]) ;
 end;
 
 function TfrmCpuView.ActiveDumpView: TDumpView;
@@ -538,6 +571,7 @@ procedure TfrmCpuView.DumpViewSelectionChange(Sender: TObject);
 begin
   FDumpSelectedValue := 0;
   ActiveDumpView.ReadDataAtSelStart(FDumpSelectedValue, FDbgGate.PointerSize);
+  UpdateStatusBar;
 end;
 
 procedure TfrmCpuView.acShowInDumpUpdate(Sender: TObject);
@@ -612,6 +646,7 @@ end;
 procedure TfrmCpuView.AsmViewSelectionChange(Sender: TObject);
 begin
   FAsmViewSelectedAddr := AsmView.SelectedInstructionAddr;
+  UpdateStatusBar;
 end;
 
 procedure TfrmCpuView.acShowInDumpExecute(Sender: TObject);

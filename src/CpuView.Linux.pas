@@ -865,8 +865,12 @@ begin
     RegionData.AllocationBase := MBI.AllocationBase;
     RegionData.BaseAddr := MBI.BaseAddress;
     RegionData.RegionSize := MBI.RegionSize;
-    RegionData.Executable := MBI.Execute;
-    RegionData.Readable := MBI.Read;
+    if MBI.Read then
+      Include(RegionData.Access, raRead);
+    if MBI.Write then
+      Include(RegionData.Access, raWrite);
+    if MBI.Execute then
+      Include(RegionData.Access, raExecute);
   end;
 end;
 

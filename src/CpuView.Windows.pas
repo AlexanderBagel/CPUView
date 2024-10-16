@@ -808,10 +808,22 @@ begin
     RegionData.RegionSize := Int64(MBI.RegionSize);
     if MBI.State = MEM_COMMIT then
     begin
-      RegionData.Executable := MBI.Protect and (
-        PAGE_EXECUTE_READ or PAGE_EXECUTE_READWRITE) <> 0;
-      RegionData.Readable := RegionData.Executable or
-        (MBI.Protect and (PAGE_READONLY or PAGE_READWRITE) <> 0);
+      if MBI.Protect and (PAGE_NOACCESS or PAGE_GUARD) <> 0 then
+      begin
+        Include(RegionData.Access, raProtect);
+        Exit;
+      end;
+      if MBI.Protect and (PAGE_EXECUTE_READ or PAGE_EXECUTE_READWRITE) <> 0 then
+      begin
+        Include(RegionData.Access, raExecute);
+        Include(RegionData.Access, raRead);
+      end;
+      if MBI.Protect and (PAGE_READONLY or PAGE_READWRITE) <> 0 then
+        Include(RegionData.Access, raRead);
+      if MBI.Protect and (
+        PAGE_READWRITE or PAGE_EXECUTE_READWRITE or
+        PAGE_WRITECOPY or PAGE_EXECUTE_WRITECOPY) <> 0 then
+        Include(RegionData.Access, raWrite);
     end;
   end;
 end;

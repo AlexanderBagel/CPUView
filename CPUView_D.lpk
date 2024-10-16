@@ -5,11 +5,12 @@
     <Name Value="CPUView_D"/>
     <Type Value="RunAndDesignTime"/>
     <Author Value="Alexander (Rouse_) Bagel"/>
+    <AutoUpdate Value="Manually"/>
     <CompilerOptions>
       <Version Value="11"/>
       <PathDelim Value="\"/>
       <SearchPaths>
-        <IncludeFiles Value="src;src\gui"/>
+        <IncludeFiles Value="src"/>
         <OtherUnitFiles Value="src;src\gui"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
@@ -25,7 +26,7 @@
       <Item>
         <Filename Value="src\CpuView.DBase.pas"/>
         <UnitName Value="CpuView.DBase"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="src\CpuView.Common.pas"/>
         <UnitName Value="CpuView.Common"/>

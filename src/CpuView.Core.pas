@@ -16,14 +16,10 @@ interface
 показывать строки исходоного кода
 }
 
-{$message 'При скроле Asm сбрасывается выделение'}
+{$message 'Подключить доп клавиши мышки к джампстеку'}
 {$message 'Подключить все 10 букмарков на AsmView'}
-{$message 'Все прыжки во вьюверах должны идти через кэш, и соответвенно должен работать откат по ESC'}
-{$message 'Подключить статусбар к активному дампу на отработку выделения'}
 {$message 'Анализ дампа с валидацией адресов. Найденые адреса выделять подчеркиванием и добавить хинт'}
 {$message 'В дамп добавить возможность выделения, чтобы можно было следить за несколькими рядом стоящими буферами'}
-{$message 'В диалоге ввода адреса выводить инфу RWE по введенному чтобы было понятно что это за адрес, а для LastErr/Stat расшифровку кода'}
-{$message 'В статусбаре и эдите с хинтом тоже выводить RWE по адресу из активного вьювера'}
 {$message 'x87/SIMD регистры не редактируются'}
 
 uses
@@ -454,7 +450,7 @@ begin
     Assigned(AsmView) and
     Assigned(AsmView.DataStream) and
     FUtils.QueryRegion(AddrVA, RegionData) and
-    RegionData.Readable and RegionData.Executable;
+    (raExecute in RegionData.Access);
 end;
 
 function TCpuViewCore.AddrInDump(AddrVA: Int64): Boolean;
@@ -466,7 +462,7 @@ begin
   if AddrVA < FInvalidReg.RegionSize then
     Result := False
   else
-    Result := FUtils.QueryRegion(AddrVA, RegData) and RegData.Readable;
+    Result := FUtils.QueryRegion(AddrVA, RegData) and (raRead in RegData.Access);
 end;
 
 function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
@@ -778,6 +774,7 @@ begin
       if Assigned(FStackView) then
         FStackView.SetDataStream(nil, 0);
       FDumpViewList.Reset;
+      FJmpStack.Clear;
       UpdateStreamsProcessID;
       DoReset;
     end;
@@ -827,7 +824,6 @@ begin
   FAsmSelEnd := 0;
   FCacheListIndex := 0;
   FKnownFunctionAddrVA.Clear;
-  FJmpStack.Clear;
 end;
 
 procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: UInt64;

@@ -26,12 +26,14 @@ type
     AddrPC: UInt64;
   end;
 
+  TRegionAccess = (raRead, raWrite, raExecute, raProtect);
+  TRegionAccessSet = set of TRegionAccess;
+
   TRegionData = record
     AllocationBase,
     BaseAddr,
     RegionSize: Int64;
-    Executable: Boolean;
-    Readable: Boolean;
+    Access: TRegionAccessSet;
   end;
 
   // Расширеная информация по потоку (если присутствует)

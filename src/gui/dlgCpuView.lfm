@@ -7,7 +7,7 @@ object frmCpuView: TfrmCpuView
   ClientHeight = 1304
   ClientWidth = 2096
   DesignTimePPI = 144
-  LCLVersion = '3.99.0.0'
+  LCLVersion = '4.99.0.0'
   OnClose = FormClose
   OnCreate = FormCreate
   OnDeactivate = FormDeactivate
@@ -38,6 +38,14 @@ object frmCpuView: TfrmCpuView
       Top = 42
       Width = 2094
       Panels = <      
+        item
+          Text = 'State: Unknown'
+          Width = 150
+        end      
+        item
+          Text = 'Addr: 0x0 (No access)'
+          Width = 350
+        end      
         item
           Width = 50
         end>

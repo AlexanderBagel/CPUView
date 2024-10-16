@@ -3,6 +3,7 @@ unit dlgCpuViewIntel;
 {$mode Delphi}
 {$WARN 5024 off : Parameter "$1" not used}
 {$WARN 6060 off : Case statement does not handle all possible cases}
+
 interface
 
 uses
@@ -225,7 +226,7 @@ begin
     else
       ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
   end;
-  StatusBar.Panels[0].Text := ExecuteResult;
+  StatusBar.Panels[2].Text := ExecuteResult;
 end;
 
 procedure TfrmCpuViewIntel.pmHintPopup(Sender: TObject);
