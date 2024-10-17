@@ -342,6 +342,7 @@ var
 begin
   Result := -1;
   if LinuxDebugger = nil then Exit;
+  if LinuxDebugger.State <> dsPause then Exit;
   WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
@@ -882,7 +883,13 @@ var
   RemainingBytes: Longint;
   RemainingBuff: PByte;
 begin
-  if LinuxDebugger = nil then Exit;
+  Result := ASize;
+  // Если нельзя читать, возвращаем пустой буфер
+  if (LinuxDebugger = nil) or (LinuxDebugger.State <> dsPause) then
+  begin
+    FillChar(Buff, ASize, 0);
+    Exit;
+  end;
   WorkQueue := TFpDebugDebugger(LinuxDebugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
