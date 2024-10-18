@@ -17,7 +17,6 @@ interface
 }
 
 {$message 'В Linux есть проблемы со стеком, он периодически попадает на невалидную страницу и не отображается'}
-{$message 'Подключить доп клавиши мышки к джампстеку'}
 {$message 'Подключить все 10 букмарков на AsmView'}
 {$message 'Анализ дампа с валидацией адресов. Найденые адреса выделять подчеркиванием и добавить хинт'}
 {$message 'В дамп добавить возможность выделения, чтобы можно было следить за несколькими рядом стоящими буферами'}
@@ -115,7 +114,8 @@ type
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
     FInvalidReg: TRegionData;
-    FJmpStack: TStack<Int64>;
+    FJmpStack: TList<Int64>;
+    FJmpStackIdx: Integer;
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
     FLockPushToJmpStack: Boolean;
     FLockSelChange: Boolean;
@@ -131,6 +131,7 @@ type
     function CanWork: Boolean;
     procedure DoReset;
     function GetAddrMode: TAddressMode;
+    procedure OnAsmCacheEnd(Sender: TObject);
     procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
       AJmpState: TJmpState; var Handled: Boolean);
     procedure OnAsmScroll(Sender: TObject; AStep: TScrollStepDirection);
@@ -423,7 +424,7 @@ begin
   FStackStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
   FShowCallFuncName := True;
-  FJmpStack := TStack<Int64>.Create;
+  FJmpStack := TList<Int64>.Create;
   FDBase := TCpuViewDBase.Create;
 end;
 
@@ -649,6 +650,11 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.OnAsmCacheEnd(Sender: TObject);
+begin
+  OnAsmScroll(Sender, ssdNone);
+end;
+
 procedure TCpuViewCore.OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
   AJmpState: TJmpState; var Handled: Boolean);
 var
@@ -664,16 +670,28 @@ begin
     jsPopFromUndo:
     begin
       Handled := True;
-      if FJmpStack.Count = 0 then Exit;
-      NewJmpAddr := FJmpStack.Pop;
+      if FJmpStackIdx = 0 then Exit;
+      NewJmpAddr := FJmpStack[FJmpStackIdx - 2];
       FLockPushToJmpStack := True;
       try
         ShowDisasmAtAddr(NewJmpAddr);
       finally
         FLockPushToJmpStack := False;
       end;
-      NewJmpAddr := FJmpStack.Pop;
+      NewJmpAddr := FJmpStack[FJmpStackIdx - 3];
+      Dec(FJmpStackIdx, 3);
       AsmView.FocusOnAddress(NewJmpAddr, ccmSelectRow);
+    end;
+    jsRestorePopFromUndo:
+    begin
+      if FJmpStackIdx >= FJmpStack.Count then Exit;
+      Inc(FJmpStackIdx, 3);
+      FLockPushToJmpStack := True;
+      try
+        ShowDisasmAtAddr(FJmpStack[FJmpStackIdx - 1]);
+      finally
+        FLockPushToJmpStack := False;
+      end;
     end;
   end;
 end;
@@ -775,6 +793,7 @@ begin
         FStackView.SetDataStream(nil, 0);
       FDumpViewList.Reset;
       FJmpStack.Clear;
+      FJmpStackIdx := 0;
       UpdateStreamsProcessID;
       DoReset;
     end;
@@ -851,6 +870,7 @@ begin
     FAsmView := Value;
     if Value = nil then Exit;
     FOldAsmSelect := FAsmView.OnSelectionChange;
+    FAsmView.OnCacheEnd := OnAsmCacheEnd;
     FAsmView.OnJmpTo := OnAsmJmpTo;
     FAsmView.OnSelectionChange := OnAsmSelectionChange;
     FAsmView.OnQueryComment := AsmViewQueryComment;
@@ -941,8 +961,11 @@ begin
     try
       if not FLockPushToJmpStack then
       begin
-        FJmpStack.Push(FAsmView.SelectedInstructionAddr);
-        FJmpStack.Push(FAsmView.RowToAddress(FAsmView.CurrentVisibleRow, 0));
+        FJmpStack.Count := FJmpStackIdx;
+        FJmpStack.Add(FAsmView.SelectedInstructionAddr);
+        FJmpStack.Add(FAsmView.RowToAddress(FAsmView.CurrentVisibleRow, 0));
+        FJmpStack.Add(AddrVA);
+        Inc(FJmpStackIdx, 3);
       end;
       FAsmSelStart := 0;
       FAsmSelEnd := 0;

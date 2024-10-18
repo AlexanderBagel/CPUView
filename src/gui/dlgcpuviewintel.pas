@@ -152,7 +152,7 @@ end;
 
 procedure TfrmCpuViewIntel.AsmViewSelectionChange(Sender: TObject);
 var
-  ExecuteResult: string;
+  ExecuteResult, ValueAccess, MemValueAccess: string;
   I, Idx: Integer;
   Expression: TExpression;
   HintParam: THintMenuParam;
@@ -184,11 +184,15 @@ begin
         HintParam.MemSize := DbgGate.PointerSize;
       end;
       HintParam.AddrVA := Expression.Value;
+      ValueAccess := QweryAccessStr(HintParam.AddrVA);
       if Core.AddrInDump(HintParam.AddrVA) then
         FHintMenuData.Add(HintParam);
       if Expression.MemSize > 0 then
       begin
-        ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue]);
+        MemValueAccess := QweryAccessStr(Expression.MemValue);
+        ExecuteResult := Format('%s = [%x (%s)] -> %x (%s)',
+          [Expression.Data, Expression.Value, ValueAccess,
+          Expression.MemValue, MemValueAccess]);
         HintParam.AddrVA := Expression.MemValue;
         HintParam.Caption := Expression.Data;
         HintParam.MemSize := DbgGate.PointerSize;
@@ -196,7 +200,8 @@ begin
           FHintMenuData.Add(HintParam);
       end
       else
-        ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
+        ExecuteResult := Format('%s = %x (%s)',
+          [Expression.Data, Expression.Value, ValueAccess]);
       memHints.Lines.Add(ExecuteResult);
     end;
     HintParam.MenuType := hmtSeparator;

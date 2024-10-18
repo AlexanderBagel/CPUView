@@ -1,7 +1,7 @@
 object frmCpuView: TfrmCpuView
-  Left = 1370
+  Left = 919
   Height = 1304
-  Top = 467
+  Top = 365
   Width = 2096
   Caption = 'Cpu-View'
   ClientHeight = 1304
@@ -39,8 +39,8 @@ object frmCpuView: TfrmCpuView
       Width = 2094
       Panels = <      
         item
-          Text = 'State: Unknown'
-          Width = 150
+          Text = 'Pid: 0, Tid: 0, State: Unknown'
+          Width = 300
         end      
         item
           Text = 'Addr: 0x0 (No access)'

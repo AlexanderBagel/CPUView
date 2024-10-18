@@ -311,6 +311,7 @@ type
     procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
     procedure LockZOrder;
+    function QweryAccessStr(AddrVA: UInt64): string;
     procedure UnlockZOrder;
   public
     property Core: TCpuViewCore read FCore;
@@ -452,25 +453,12 @@ const
   );
 var
   AddrVA: UInt64;
-  RegionData: TRegionData;
   AccessStr: string;
 begin
-  StatusBar.Panels[0].Text := 'State: ' + DbgStates[DbgGate.DebugState];
+  StatusBar.Panels[0].Text := Format('Pid: %d, Tid: %d, State: %s',
+    [DbgGate.ProcessID, DbgGate.ThreadID, DbgStates[DbgGate.DebugState]]);
   AddrVA := ActiveViewerSelectedValue;
-  AccessStr := 'No access';
-  if DbgGate.Utils.QueryRegion(AddrVA, RegionData) then
-  begin
-    if (RegionData.Access <> []) and not (raProtect in RegionData.Access) then
-    begin
-      AccessStr := '...';
-      if raRead in RegionData.Access then
-        AccessStr[1] := 'R';
-      if raWrite in RegionData.Access then
-        AccessStr[2] := 'W';
-      if raExecute in RegionData.Access then
-        AccessStr[3] := 'E';
-    end;
-  end;
+  AccessStr := QweryAccessStr(AddrVA);
   StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s)', [AddrVA, AccessStr]) ;
 end;
 
@@ -497,6 +485,26 @@ begin
   InterceptorOwner := Handle;
   InterceptorActive := True;
   tmpZOrderLock.Enabled := True;
+end;
+
+function TfrmCpuView.QweryAccessStr(AddrVA: UInt64): string;
+var
+  RegionData: TRegionData;
+begin
+  Result := 'No access';
+  if DbgGate.Utils.QueryRegion(AddrVA, RegionData) then
+  begin
+    if (RegionData.Access <> []) and not (raProtect in RegionData.Access) then
+    begin
+      Result := '...';
+      if raRead in RegionData.Access then
+        Result[1] := 'R';
+      if raWrite in RegionData.Access then
+        Result[2] := 'W';
+      if raExecute in RegionData.Access then
+        Result[3] := 'E';
+    end;
+  end;
 end;
 
 procedure TfrmCpuView.UnlockZOrder;

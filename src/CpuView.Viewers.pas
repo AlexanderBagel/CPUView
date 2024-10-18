@@ -168,6 +168,7 @@ type
     FInstructionPoint: Int64;
     FCurrentIPIsActiveJmp: Boolean;
     FHighlightReg: string;
+    FCacheEnd: TNotifyEvent;
     procedure DoScrollStep(AStep: TScrollStepDirection);
     function GetColorMap: TAsmColorMap;
     procedure SetCurrentIPIsActiveJmp(const Value: Boolean);
@@ -176,6 +177,8 @@ type
   protected
     function CalculateJmpToRow(JmpFromRow: Int64): Int64; override;
     function CopyCommandEnabled(Value: TCopyStyle): Boolean; override;
+    procedure DoBeforePaint(const ADiapason: TVisibleRowDiapason); override;
+    procedure DoCacheEnd;
     procedure DoDrawToken(ACanvas: TCanvas; ATokenParam: TDrawParam;
       const ARect: TRect; AToken: PChar; var ATokenLen: Integer); override;
     function GetCaretPreviosRowIndex(FromIndex: Int64;
@@ -204,6 +207,7 @@ type
     property HighlightReg: string read FHighlightReg write SetHighlightReg;
   protected
     property ColorMap: TAsmColorMap read GetColorMap;
+    property OnCacheEnd: TNotifyEvent read FCacheEnd write FCacheEnd;
     property OnVerticalScroll: TOnVerticalScrollEvent read FOnScroll write FOnScroll;
   end;
 
@@ -240,6 +244,7 @@ type
     property TabStop;
     property Visible;
     property WheelMultiplyer;
+    property OnCacheEnd;
     property OnClick;
     property OnContextPopup;
     property OnDblClick;
@@ -1083,6 +1088,24 @@ end;
 function TCustomAsmView.CopyCommandEnabled(Value: TCopyStyle): Boolean;
 begin
   Result := Value in [csAsText, csAddress];
+end;
+
+procedure TCustomAsmView.DoBeforePaint(const ADiapason: TVisibleRowDiapason);
+var
+  APainter: TAbstractPrimaryRowPainter;
+  IsAsmPainter: Boolean;
+begin
+  APainter := InternalGetRowPainter(ADiapason.EndRow);
+  IsAsmPainter := Assigned(APainter) and
+    ((APainter is TAsmViewDefRow) or (APainter is TAsmViewSrcLineRow));
+  if not IsAsmPainter then
+    DoCacheEnd;
+end;
+
+procedure TCustomAsmView.DoCacheEnd;
+begin
+  if Assigned(FCacheEnd) then
+    FCacheEnd(Self);
 end;
 
 constructor TCustomAsmView.Create(AOwner: TComponent);
