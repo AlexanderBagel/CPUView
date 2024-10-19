@@ -18,7 +18,7 @@ Attention - BETA, version!!!
 5. Script and Hint
 
 Common features:
-* OS: Windows and Linux support via Gtk2 (Qt not tested)
+* OS: Windows and Linux support via Gtk2 or Qt5
 * Proc: Intel x86_64 (ARM not yet implemented)
 * Thread context (Basic, x87 and SIMD register) full support on Windows and Linux
 * Light and dark display themes

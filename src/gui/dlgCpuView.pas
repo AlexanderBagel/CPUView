@@ -99,7 +99,7 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
-    MenuItem1: TMenuItem;
+    miDumpsCloseRight: TMenuItem;
     miAsmRunTo: TMenuItem;
     miStackShowInNewDump: TMenuItem;
     miDumpShowInNewDump: TMenuItem;
