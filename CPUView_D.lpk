@@ -10,8 +10,8 @@
       <Version Value="11"/>
       <PathDelim Value="\"/>
       <SearchPaths>
-        <IncludeFiles Value="src"/>
-        <OtherUnitFiles Value="src;src\gui"/>
+        <IncludeFiles Value="src;dsgn\gui"/>
+        <OtherUnitFiles Value="src;src\core;dsgn;dsgn\gui"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
@@ -24,49 +24,16 @@
         <UnitName Value="CpuView.Actions"/>
       </Item>
       <Item>
-        <Filename Value="src\CpuView.DBase.pas"/>
-        <UnitName Value="CpuView.DBase"/>
-      </Item>
-      <Item>
         <Filename Value="src\CpuView.Common.pas"/>
         <UnitName Value="CpuView.Common"/>
-      </Item>
-      <Item>
-        <Filename Value="src\CpuView.Core.pas"/>
-        <UnitName Value="CpuView.Core"/>
       </Item>
       <Item>
         <Filename Value="src\CpuView.CPUContext.pas"/>
         <UnitName Value="CpuView.CPUContext"/>
       </Item>
       <Item>
-        <Filename Value="src\CpuView.DebugerGate.pas"/>
-        <UnitName Value="CpuView.DebugerGate"/>
-      </Item>
-      <Item>
-        <Filename Value="src\CpuView.FpDebug.pas"/>
-        <UnitName Value="CpuView.FpDebug"/>
-      </Item>
-      <Item>
-        <Filename Value="src\CpuView.Reg.LCL.pas"/>
-        <UnitName Value="CpuView.Reg.LCL"/>
-      </Item>
-      <Item>
-        <Filename Value="src\CpuView.Reg.pas"/>
-        <HasRegisterProc Value="True"/>
-        <UnitName Value="CpuView.Reg"/>
-      </Item>
-      <Item>
-        <Filename Value="src\CpuView.ScriptExecutor.pas"/>
-        <UnitName Value="CpuView.ScriptExecutor"/>
-      </Item>
-      <Item>
         <Filename Value="src\CpuView.Settings.pas"/>
         <UnitName Value="CpuView.Settings"/>
-      </Item>
-      <Item>
-        <Filename Value="src\CpuView.Stream.pas"/>
-        <UnitName Value="CpuView.Stream"/>
       </Item>
       <Item>
         <Filename Value="src\CpuView.Viewers.pas"/>
@@ -77,11 +44,40 @@
         <Type Value="Include"/>
       </Item>
       <Item>
-        <Filename Value="src\gui\dlgCpuView.lfm"/>
+        <Filename Value="src\core\CpuView.Core.pas"/>
+        <UnitName Value="CpuView.Core"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.DBase.pas"/>
+        <UnitName Value="CpuView.DBase"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.DebugerGate.pas"/>
+        <UnitName Value="CpuView.DebugerGate"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.FpDebug.pas"/>
+        <UnitName Value="CpuView.FpDebug"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.ScriptExecutor.pas"/>
+        <UnitName Value="CpuView.ScriptExecutor"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.Stream.pas"/>
+        <UnitName Value="CpuView.Stream"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\CpuView.Reg.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="CpuView.Reg"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgCpuView.lfm"/>
         <Type Value="LFM"/>
       </Item>
       <Item>
-        <Filename Value="src\gui\dlgCpuView.pas"/>
+        <Filename Value="dsgn\gui\dlgCpuView.pas"/>
         <UnitName Value="dlgCpuView"/>
       </Item>
     </Files>

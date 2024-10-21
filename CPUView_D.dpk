@@ -34,9 +34,9 @@ requires
 
 contains
   CpuView.Actions in 'src\CpuView.Actions.pas',
-  CpuView.Reg in 'src\CpuView.Reg.pas',
   CpuView.Viewers in 'src\CpuView.Viewers.pas',
   CpuView.Common in 'src\CpuView.Common.pas',
-  CpuView.CPUContext in 'src\CpuView.CPUContext.pas';
+  CpuView.CPUContext in 'src\CpuView.CPUContext.pas',
+  CpuView.Reg in 'dsgn\CpuView.Reg.pas';
 
 end.

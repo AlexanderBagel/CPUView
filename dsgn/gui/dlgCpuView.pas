@@ -310,7 +310,9 @@ type
     procedure AfterDbgGateCreate; virtual; abstract;
     procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
+    function ToDpi(Value: Integer): Integer;
     procedure LockZOrder;
+    function MeasureCanvas: TBitmap;
     function QweryAccessStr(AddrVA: UInt64): string;
     procedure UnlockZOrder;
   public
@@ -454,12 +456,20 @@ const
 var
   AddrVA: UInt64;
   AccessStr: string;
+  AMeasureCanvas: TBitmap;
 begin
   StatusBar.Panels[0].Text := Format('Pid: %d, Tid: %d, State: %s',
     [DbgGate.ProcessID, DbgGate.ThreadID, DbgStates[DbgGate.DebugState]]);
   AddrVA := ActiveViewerSelectedValue;
   AccessStr := QweryAccessStr(AddrVA);
-  StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s)', [AddrVA, AccessStr]) ;
+  StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s)', [AddrVA, AccessStr]);
+  AMeasureCanvas := MeasureCanvas;
+  try
+    StatusBar.Panels[0].Width :=
+      AMeasureCanvas.Canvas.TextWidth(StatusBar.Panels[0].Text) + ToDpi(16);
+  finally
+    AMeasureCanvas.Free;
+  end;
 end;
 
 function TfrmCpuView.ActiveDumpView: TDumpView;
@@ -480,11 +490,23 @@ begin
     Exit(3);
 end;
 
+function TfrmCpuView.ToDpi(Value: Integer): Integer;
+begin
+  Result := MulDiv(Value, PixelsPerInch, 96);
+end;
+
 procedure TfrmCpuView.LockZOrder;
 begin
   InterceptorOwner := Handle;
   InterceptorActive := True;
   tmpZOrderLock.Enabled := True;
+end;
+
+function TfrmCpuView.MeasureCanvas: TBitmap;
+begin
+  Result := TBitmap.Create;
+  Result.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
+  Result.Canvas.Font := Font;
 end;
 
 function TfrmCpuView.QweryAccessStr(AddrVA: UInt64): string;
