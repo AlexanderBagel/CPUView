@@ -10,6 +10,12 @@ Attention - BETA, version!!!
 4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
 5. Enjoy
 
+### Known issues:
+If during rebuild Lazarus writes "Fatal: Can't find unit dlgCpuViewIntel used by CpuView.Reg", is necessary:
+1. Compile the CPUView_D package again
+2. Rebuild the IDE again
+The reasons for this error are not yet clear.
+
 ### Five active editors:
 1. Disassembler
 2. Registers

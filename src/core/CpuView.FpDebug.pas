@@ -128,6 +128,7 @@ type
     procedure OnActivateSourceEditor(Sender: TObject; var AHandled: Boolean);
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
+    procedure StopAllWorkers;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
   protected
     function GetUtilsClass: TCommonAbstractUtilsClass; override;
@@ -225,6 +226,7 @@ begin
     for I := 0 to FBreakPoints.Count - 1 do
     begin
       // вот тут идут дубли - надо их контролировать!!!
+      // this is where the duplicates come in - we need to control them!!!!
       BP := FBreakPoints.Items[I];
       case BP.Kind of
         bpkAddress:
@@ -466,7 +468,7 @@ begin
     end;
     FDebugger := nil;
   end;
-  {$message 'Плохой подход, утилитарка должна быть самостоятельной'}
+  {$message 'Bad approach, utilitarianism should stand alone'}
   {$IFDEF LINUX}
   LinuxDebugger := nil;
   {$ENDIF}
@@ -486,6 +488,12 @@ begin
     FThreadsMonitor := nil;
   end;
   FSnapshotManager := nil;
+end;
+
+procedure TCpuViewDebugGate.StopAllWorkers;
+begin
+  if Assigned(FDebugger) then
+    TFpDebugDebuggerAccess(FDebugger).StopAllWorkers(True)
 end;
 
 procedure TCpuViewDebugGate.UpdateDebugger(ADebugger: TDebuggerIntf);
@@ -623,7 +631,7 @@ begin
       dsInit: Result := adsStart;
       dsPause: Result := adsPaused;
       dsRun: Result := adsRunning;
-      {$message 'отладочное'}
+      {$message 'for debug'}
       dsInternalPause: Result := adsRunning;
       dsStop: Result := adsStoped;
     else
@@ -965,6 +973,11 @@ var
   ALocation: TDBGPtrArray;
 begin
   if FDbgController = nil then Exit;
+  if FDebugger = nil then Exit;
+  if FDebugger.State <> dsPause then Exit;
+
+  StopAllWorkers;
+
   SetLength(ALocation{%H-}, 1);
   ALocation[0] := QWord(AddrVA);
   FDbgController.InitializeCommand(TDbgControllerRunToCmd.Create(FDbgController, ALocation));
@@ -980,6 +993,8 @@ var
 begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
+
+  StopAllWorkers;
 
   WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
   if Assigned(WorkQueue) then
@@ -1013,6 +1028,9 @@ var
 begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
+
+  StopAllWorkers;
+
   WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin

@@ -865,11 +865,16 @@ begin
   end
   else
     // принудительно отключаем все что не можем прочитать
+    // forcibly disable anything we can't read.
     MBI.Protect := MBI.Protect or PAGE_GUARD;
 
   // не будем вмешиваться в память удаленного процесса
   // меняя атрибуты страницы, поэтому если стоит запрет на чтение
   // то просто возвращаем нулевой буфер заданного размера
+
+  // we will not interfere with the memory of the remote process
+  // by changing the page attributes, so if there is a read ban,
+  // we just return a zero buffer of the specified size.
   if not CanRead(MBI) then
   begin
     FillChar(Buff, ASize, 0);

@@ -13,9 +13,13 @@ interface
 Настройки:
 отображать имена функций вместо адресов
 показывать опкоды инструкций
-показывать строки исходоного кода
+показывать строки исходного кода
+показывать данные из символов в подсказках к адресу (включая информацию в статусбаре)
+включить отладочный лог
+включить сбор информации для крашдампа
 }
 
+{$message 'При Run не чистятся данные стека, висит return остаток от фрейма'}
 {$message 'В Linux есть проблемы со стеком, он периодически попадает на невалидную страницу и не отображается'}
 {$message 'Подключить все 10 букмарков на AsmView'}
 {$message 'Анализ дампа с валидацией адресов. Найденые адреса выделять подчеркиванием и добавить хинт'}
@@ -152,7 +156,6 @@ type
     procedure BuildAsmWindow(AAddress: Int64);
     function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
-    function GetKnownFunctionAtAddr(AddrVA: Uint64): string;
     procedure LoadFromCache(AIndex: Integer);
     procedure RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
       AColumn: TColumnType; var AComment: string);
@@ -162,6 +165,8 @@ type
     procedure RefreshView(Forced: Boolean = False);
     // Forced - означает принудительную перестройку вьювера
     // Необходимо при изменении настроек онображения
+    // Forced - means forced rebuilding of the viewer
+    // Necessary when changing Viewer settings
     procedure RefreshAsmView(Forced: Boolean);
     procedure ResetCache;
     procedure StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
@@ -173,6 +178,7 @@ type
     function AddrInAsm(AddrVA: Int64): Boolean;
     function AddrInDump(AddrVA: Int64): Boolean;
     function AddrInStack(AddrVA: Int64): Boolean;
+    function QuerySymbolAtAddr(AddrVA: UInt64): string;
     procedure ShowDisasmAtAddr(AddrVA: Int64);
     procedure ShowDumpAtAddr(AddrVA: Int64);
     procedure ShowStackAtAddr(AddrVA: Int64);
@@ -354,6 +360,20 @@ var
 begin
   StackLim := FDebugger.ThreadStackLimit;
   Result := (AddrVA <= StackLim.Base) and (AddrVA >= StackLim.Limit);
+end;
+
+function TCpuViewCore.QuerySymbolAtAddr(AddrVA: UInt64): string;
+begin
+  Result := '';
+  if not FKnownFunctionAddrVA.TryGetValue(AddrVA, Result) then
+  begin
+    Result := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
+    // держим кэш на 1024 адреса, этого будет достаточно
+    // keep the cache for 1024 addresses, this will be enough
+    if FKnownFunctionAddrVA.Count > 1024 then
+      FKnownFunctionAddrVA.Clear;
+    FKnownFunctionAddrVA.Add(AddrVA, Result);
+  end;
 end;
 
 procedure TCpuViewCore.AsmViewQueryComment(Sender: TObject; AddrVA: UInt64;
@@ -547,19 +567,6 @@ begin
   end;
 end;
 
-function TCpuViewCore.GetKnownFunctionAtAddr(AddrVA: Uint64): string;
-begin
-  Result := '';
-  if not FKnownFunctionAddrVA.TryGetValue(AddrVA, Result) then
-  begin
-    Result := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
-    // держим кэш на 1024 адреса, этого будет достаточно
-    if FKnownFunctionAddrVA.Count > 1024 then
-      FKnownFunctionAddrVA.Clear;
-    FKnownFunctionAddrVA.Add(AddrVA, Result);
-  end;
-end;
-
 procedure TCpuViewCore.LoadFromCache(AIndex: Integer);
 var
   I: Integer;
@@ -597,7 +604,7 @@ end;
 procedure TCpuViewCore.RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
   AColumn: TColumnType; var AComment: string);
 begin
-  AComment := GetKnownFunctionAtAddr(AddrVA);
+  AComment := QuerySymbolAtAddr(AddrVA);
 end;
 
 procedure TCpuViewCore.RegViewQueryExternalComment(Sender: TObject;
@@ -858,7 +865,7 @@ begin
       if not CanWork then Exit;
       FStackStream.Stream.Position := AddrVA;
       FStackStream.Stream.ReadBuffer(AStackValue, Debugger.PointerSize);
-      AComment := GetKnownFunctionAtAddr(AStackValue);
+      AComment := QuerySymbolAtAddr(AStackValue);
     end;
   end;
 end;

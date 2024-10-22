@@ -18,13 +18,16 @@ uses
   CpuView.Viewers;
 
 type
+
   // минимальный абстрактный интерфейс под разные отладчики
+  // minimal abstract interface for different debuggers
+
   TAbstractDebugState = (adsStoped, adsStart, adsPaused, adsRunning, adsFinished);
   TInterfaceDebugCommand = (idcRun, idcRunTo, idcPause, idcStepInto, idcStepOver, idcStepOut, idcBreakPoint);
 
   TQuerySymbol = (qsName, qsSourceLine);
 
-  {$message 'Адреса не могут быть Int64 - переделать на UInt64'}
+  {$message 'Addresses cannot be Int64 - convert to UInt64'}
   TInstruction = record
     AddrVA: Int64;
     AsString, Hint: string;

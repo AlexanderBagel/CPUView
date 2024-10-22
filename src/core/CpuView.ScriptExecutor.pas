@@ -64,8 +64,8 @@ function TAbstractScriptExecutor.Execute(const Script: string;
   out ExecuteResult: string): Boolean;
 begin
   // TODO:
-  // сначала обработка установки брякпойнтов по имени библиотеки + функция
-  // и только после неё DoExecute
+  // first the processing of setting up the breakpoints by library
+  // name + function and only after that DoExecute.
   try
     Result := DoExecute(Script, ExecuteResult);
   except

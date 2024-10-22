@@ -152,7 +152,7 @@ end;
 
 procedure TfrmCpuViewIntel.AsmViewSelectionChange(Sender: TObject);
 var
-  ExecuteResult, ValueAccess, MemValueAccess: string;
+  ExecuteResult, ValueAccess, MemValueAccess, Symbol, MemSymbol: string;
   I, Idx: Integer;
   Expression: TExpression;
   HintParam: THintMenuParam;
@@ -170,6 +170,7 @@ begin
     begin
       Expression := FScript.CalculatedList[I];
       if not Expression.Calculated then Continue;
+      Symbol := '';
       HintParam.MenuType := hmtAddrVA;
       HintParam.MemSize := Expression.MemSize;
       if Expression.MemSize > 0 then
@@ -185,14 +186,18 @@ begin
       end;
       HintParam.AddrVA := Expression.Value;
       ValueAccess := QweryAccessStr(HintParam.AddrVA);
+      Symbol := Core.QuerySymbolAtAddr(HintParam.AddrVA);
+      if Symbol <> '' then
+        Symbol := ' ' + Symbol;
       if Core.AddrInDump(HintParam.AddrVA) then
         FHintMenuData.Add(HintParam);
       if Expression.MemSize > 0 then
       begin
+        MemSymbol := Core.QuerySymbolAtAddr(Expression.MemValue);
         MemValueAccess := QweryAccessStr(Expression.MemValue);
-        ExecuteResult := Format('%s = [%x (%s)] -> %x (%s)',
-          [Expression.Data, Expression.Value, ValueAccess,
-          Expression.MemValue, MemValueAccess]);
+        ExecuteResult := Format('%s = [%x (%s)%s] -> %x (%s) %s',
+          [Expression.Data, Expression.Value, ValueAccess, Symbol,
+          Expression.MemValue, MemValueAccess, MemSymbol]);
         HintParam.AddrVA := Expression.MemValue;
         HintParam.Caption := Expression.Data;
         HintParam.MemSize := DbgGate.PointerSize;
@@ -200,8 +205,8 @@ begin
           FHintMenuData.Add(HintParam);
       end
       else
-        ExecuteResult := Format('%s = %x (%s)',
-          [Expression.Data, Expression.Value, ValueAccess]);
+        ExecuteResult := Format('%s = %x (%s)%s',
+          [Expression.Data, Expression.Value, ValueAccess, Symbol]);
       memHints.Lines.Add(ExecuteResult);
     end;
     HintParam.MenuType := hmtSeparator;

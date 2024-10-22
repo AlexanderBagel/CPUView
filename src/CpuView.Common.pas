@@ -7,7 +7,6 @@
 interface
 
 type
-  // режимы отображения регистров
   TRegViewMode = (
     rvmHex, rvmHexW, rvmHexD, rvmHexQ,
     rvmOct, rvmBin, rvmIntB, rvmUIntB,
@@ -36,7 +35,7 @@ type
     Access: TRegionAccessSet;
   end;
 
-  // Расширеная информация по потоку (если присутствует)
+  // Extended thread information (if present)
   TThreadExtendedData = record
     LastError, LastStatus: Cardinal;
   end;

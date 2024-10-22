@@ -33,6 +33,7 @@ uses
   Windows;
 
 // обвес под блокирование переключения на другие окна отладки
+// dodger for blocking switching to other debugging windows
 
 function FindIATEntry(AddrVA: Pointer): Pointer;
 begin

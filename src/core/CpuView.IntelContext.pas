@@ -881,7 +881,7 @@ var
 begin
   Result := False;
 
-  if Value.StartsWith('CALL') or Value.StartsWith('JMP') then
+  if Value.StartsWith('CALL ') or Value.StartsWith('JMP ') then
     Exit(True);
 
   EFlags := FContext.EFlags;
@@ -892,60 +892,60 @@ begin
 
   if ZF then
   begin
-    if Value.StartsWith('JE') then Exit(True);
-    if Value.StartsWith('JZ') then Exit(True);
+    if Value.StartsWith('JE ') then Exit(True);
+    if Value.StartsWith('JZ ') then Exit(True);
   end
   else
   begin
-    if Value.StartsWith('JNE') then Exit(True);
-    if Value.StartsWith('JNZ') then Exit(True);
+    if Value.StartsWith('JNE ') then Exit(True);
+    if Value.StartsWith('JNZ ') then Exit(True);
   end;
 
   if CF or ZF then
   begin
-    if Value.StartsWith('JBE') then Exit(True);
-    if Value.StartsWith('JNA') then Exit(True);
+    if Value.StartsWith('JBE ') then Exit(True);
+    if Value.StartsWith('JNA ') then Exit(True);
   end
   else
   begin
-    if Value.StartsWith('JA') then Exit(True);
-    if Value.StartsWith('JNBE') then Exit(True);
+    if Value.StartsWith('JA ') then Exit(True);
+    if Value.StartsWith('JNBE ') then Exit(True);
   end;
 
   if CF then
   begin
-    if Value.StartsWith('JB') then Exit(True);
-    if Value.StartsWith('JNAE') then Exit(True);
-    if Value.StartsWith('JC') then Exit(True);
+    if Value.StartsWith('JB ') then Exit(True);
+    if Value.StartsWith('JNAE ') then Exit(True);
+    if Value.StartsWith('JC ') then Exit(True);
   end
   else
   begin
-    if Value.StartsWith('JAE') then Exit(True);
-    if Value.StartsWith('JNB') then Exit(True);
-    if Value.StartsWith('JNC') then Exit(True);
+    if Value.StartsWith('JAE ') then Exit(True);
+    if Value.StartsWith('JNB ') then Exit(True);
+    if Value.StartsWith('JNC ') then Exit(True);
   end;
 
   if not (SF or ZF) then
   begin
-    if Value.StartsWith('JG') then Exit(True);
-    if Value.StartsWith('JNLE') then Exit(True);
+    if Value.StartsWith('JG ') then Exit(True);
+    if Value.StartsWith('JNLE ') then Exit(True);
   end;
 
   if SF = _OF then
   begin
-    if Value.StartsWith('JGE') then Exit(True);
-    if Value.StartsWith('JNL') then Exit(True);
+    if Value.StartsWith('JGE ') then Exit(True);
+    if Value.StartsWith('JNL ') then Exit(True);
   end
   else
   begin
-    if Value.StartsWith('JL') then Exit(True);
-    if Value.StartsWith('JNGE') then Exit(True);
+    if Value.StartsWith('JL ') then Exit(True);
+    if Value.StartsWith('JNGE ') then Exit(True);
   end;
 
   if (SF <> _OF) or ZF then
   begin
-    if Value.StartsWith('JLE') then Exit(True);
-    if Value.StartsWith('JNG') then Exit(True);
+    if Value.StartsWith('JLE ') then Exit(True);
+    if Value.StartsWith('JNG ') then Exit(True);
   end;
 end;
 

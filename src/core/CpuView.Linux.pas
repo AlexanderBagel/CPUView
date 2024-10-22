@@ -186,8 +186,10 @@ begin
   while True do
   begin
     Digit := PByte(Result)^;
-    {$message 'Если не сделать каст к байту то Digit пойдет в RAX и вычитание с компарацией будет из RAX и все поплывет'}
+    {$message 'If you do not make a cast to byte, Digit will go to RAX and subtraction with comparation will be from RAX and everything will be floating'}
+    {.$message 'Если не сделать каст к байту то Digit пойдет в RAX и вычитание с компарацией будет из RAX и все поплывет'}
     // т.к. должно быть в EAX который после MOVZX чистится
+    // because it must be in EAX which is cleared after MOVZX.
     if Byte(Digit - Byte('0')) <= 9 then
       Dec(Digit, Byte('0'))
     else if Byte(Digit - Byte('a')) < 6 then
@@ -885,6 +887,7 @@ var
 begin
   Result := ASize;
   // Если нельзя читать, возвращаем пустой буфер
+  // If it cannot be read, return an empty buffer
   if (LinuxDebugger = nil) or (LinuxDebugger.State <> dsPause) then
   begin
     FillChar(Buff, ASize, 0);

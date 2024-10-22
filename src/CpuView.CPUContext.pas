@@ -19,7 +19,7 @@ uses
   CpuView.Common;
 
 const
-  // поддерживаемые виды отображения каждым типом регистра
+  // supported display types by each register type
   vmDefOnly: TRegViewModes = [rvmHex];
   vmReg8: TRegViewModes = [rvmHex, rvmOct, rvmBin, rvmIntB, rvmUIntB];
   vmReg16: TRegViewModes = [rvmHex, rvmOct, rvmBin, rvmIntW, rvmUIntW];
@@ -31,15 +31,15 @@ const
 
 type
   TContextRegType = (
-    crtValue,           // обычный регистр
-    crtExtra,           // специальный регистр EFlags, MSRCX etc...
-    crtBitValue,        // флаг содержащий битовое значение регистра
-    crtEnumValue,       // флаг являющий составной частью энума
-    crtSelectableHint,  // подсказка доступная для копирования пользователем (например текущие активные типы JMP)
-    crtHint             // обычная "декоративная" подсказка
+    crtValue,           // ordinary register
+    crtExtra,           // special register EFlags, MSRCX etc...
+    crtBitValue,        // flag containing the bit value of the register
+    crtEnumValue,       // register part of several bits (enum)
+    crtSelectableHint,  // hint available for user copying (e.g. current active JMP types)
+    crtHint             // the usual “decorative” hint
     );
 
-  // Типы поддерживаемых операций с регистром при изменении
+  // Types of supported operations with the register during a change
   TModifyAction = (maToggle, maIncrement, maZero, maChange);
   TModifyActions = set of TModifyAction;
 
@@ -50,17 +50,17 @@ type
     RowIndex, RegIndex: Integer;   // link to Map
   end;
 
-  // Тип используемый при отрисовке каждого регистра в TRegView
+  // Type used when drawing each register in TRegView
   TRegister = record
-    Modifyed: Boolean;             // флаг того что регистр был изменен (для изменения цвета)
-    RegID,                         // уникальный ID регистра (для запроса TRegParam)
-    RegNameSize,                   // размер имени в символах
-    ValueSize,                     // размер значения в символах
-    ValueSeparatorSize: Integer;   // размер разделителя в символах
-    ValueType: TContextRegType;    // тип регистра
+    Modifyed: Boolean;             // flag that the register has been changed (to change the color)
+    RegID,                         // unique register ID (for TRegParam request)
+    RegNameSize,                   // name size in characters
+    ValueSize,                     // value size in characters
+    ValueSeparatorSize: Integer;   // delimiter size in characters
+    ValueType: TContextRegType;    // register type
   end;
 
-  // Расширенные настройки каждого регистра
+  // Advanced settings for each register
   TRegParam = record
     RowIndex, ColIndex: Integer; // link to Map
     RegType: TContextRegType;
@@ -100,7 +100,7 @@ type
 
   { TAbstractCPUContext }
 
-  // Минимальный класс с которым работает StackView
+  // Minimum class with which TRegView works
 
   TAbstractCPUContext = class(TComponent)
   private
@@ -153,7 +153,7 @@ type
     property OnQueryRegHint: TContextQueryRegHintEvent read FQueryHint write FQueryHint;
   end;
 
-  // Служебный тип для кэширования данных последнего запрошенного регистра
+  // Service type for caching data of the last requested register
   TCustomRegData = record
     RegID: Integer; // link to KnownRegs
     RegType: TContextRegType;
@@ -168,6 +168,11 @@ type
   // для хранения карты отображения регистров вводится промежуточный
   // класс, где каждая реализация контекста назначит свой уникальный
   // идентификатор каждому регистру, который она может обработать,
+
+  // Since for each type of processor the set of registers will be different,
+  // an intermediate class is introduced to store the register mapping map,
+  // where each context implementation will assign a unique identifier
+  // to each register it can process
   TRegMap = class
   strict private
     FRoot: Boolean;

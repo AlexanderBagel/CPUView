@@ -455,18 +455,21 @@ const
   );
 var
   AddrVA: UInt64;
-  AccessStr: string;
+  AccessStr, Symbol: string;
   AMeasureCanvas: TBitmap;
 begin
   StatusBar.Panels[0].Text := Format('Pid: %d, Tid: %d, State: %s',
     [DbgGate.ProcessID, DbgGate.ThreadID, DbgStates[DbgGate.DebugState]]);
   AddrVA := ActiveViewerSelectedValue;
   AccessStr := QweryAccessStr(AddrVA);
-  StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s)', [AddrVA, AccessStr]);
+  Symbol := FCore.QuerySymbolAtAddr(AddrVA);
+  StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s) %s', [AddrVA, AccessStr, Symbol]);
   AMeasureCanvas := MeasureCanvas;
   try
     StatusBar.Panels[0].Width :=
       AMeasureCanvas.Canvas.TextWidth(StatusBar.Panels[0].Text) + ToDpi(16);
+    StatusBar.Panels[1].Width :=
+      AMeasureCanvas.Canvas.TextWidth(StatusBar.Panels[1].Text) + ToDpi(16);
   finally
     AMeasureCanvas.Free;
   end;

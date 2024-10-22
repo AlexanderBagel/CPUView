@@ -1078,6 +1078,12 @@ begin
   // как маркер для обновления данных. Поэтому если адрес прыжка
   // выходит за диапазон кэша, корректируем номер строчки на которую будет
   // ссылаться прыжок, используя для этого первую и последнюю строку.
+
+  // TCustomAsmView works with a cache where the first and last few lines
+  // should never be displayed and are used as a marker to update the data.
+  // Therefore, if the jump address is out of the cache range,
+  // adjust the line number to which the jump will be referenced
+  // using the first and last lines.
   if Result < 0 then
   begin
     if RawData[JmpFromRow].JmpToAddr > RawData[JmpFromRow].Address then
@@ -1370,6 +1376,8 @@ end;
 procedure TFixedColumnView.RestoreViewParam;
 begin
   // колонки пересчитываются автоматически
+
+  // columns are recalculated automatically
 end;
 
 { TDumpPainter }
@@ -1573,6 +1581,8 @@ begin
     if I = 0 then
     begin
       // если фрейм еще не сформирован, пропускаем отрисовку нижней части.
+
+      // if the frame is not formed yet, skip drawing of the bottom part.
       if Param.RowTo <= Param.RowFrom then
         Continue;
       Param.LineColor := TStackColorMap(StackView.ColorMap).FrameActiveColor
@@ -1747,7 +1757,7 @@ begin
   Header.Columns := [ctWorkSpace, ctAddress, ctOpcode, ctComment];
   Header.Visible := False;
   SeparateGroupByColor := False;
-  // для автоматического пересчета ширины колонки при изменении шрифта
+  // for automatic recalculation of column widths when font changes are made
   Header.ColumnCaption[ctWorkSpace] := 'REG';
 end;
 
@@ -1826,6 +1836,7 @@ var
 begin
   RowStr := '';
   // селекшен не учитывается - строка копируется целиком!
+  // selections are not taken into account - the string is copied as a whole!
   if not FContext.EmptyRow(RowIndex) then
   begin
     for I := 0 to FContext.RegCount(RowIndex) - 1 do
@@ -1916,6 +1927,7 @@ var
   Info: TRegister;
 begin
   // контекста может еще не быть, а вот GetHitInfo уже может прийти!
+  // The context may not be there yet, but GetHitInfo may already be called!
   if FContext = nil then Exit;
   LeftOffset := AMouseHitInfo.ColumnStart;
   Inc(LeftOffset, TextMargin);
@@ -2176,6 +2188,8 @@ begin
   begin
     // проверка типа поля для подсветки
     // работать можно только с реальными регистрами, флаги и прочее игнорируются
+    // field type check, for selection
+    // you can work only with real registers, flags and other things are ignored
     FSelectedRegister := Context.RegInfo(RegID);
     if not (FSelectedRegister.ValueType in [crtValue..crtEnumValue]) then
       RegID := -1;

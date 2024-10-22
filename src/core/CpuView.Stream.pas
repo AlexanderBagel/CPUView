@@ -55,10 +55,15 @@ type
     function Read(var Buffer; Count: Longint): Longint; override;
     function Write(const Buffer; Count: Longint): Longint; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
-    /// <summary>
+
     ///  HexView всегда отображает данные с нулевой позиции стрима,
     ///  т.е. от Position = 0, поэтому для стрима выставляется "окно"
     ///  в котором нулевая позиция будет означать какой-то конкретный адрес
+
+    /// <summary>
+    ///  HexView always displays data from the zero stream position,
+    ///  i.e. from Position = 0, so a “window” is set up for the stream
+    ///  in which zero position will mean some specific address
     /// </summary>
     procedure SetAddrWindow(AStartAddrVA, AEndAddrVA: Int64);
     property BufferSize: Integer read FBuffSize write SetBufferSize;

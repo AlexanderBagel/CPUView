@@ -373,6 +373,9 @@ begin
   if AAsmView = nil then Exit;
   // от вьювера загружаются только сессионные настройки
   // остальные хранятся сами по себе
+
+  // only session settings are loaded from the viewer
+  // the rest are kept on their own
   FillChar(FAsmSettings.ColumnWidth, SizeOf(FAsmSettings.ColumnWidth), 0);
   for I := Low(TColumnType) to High(TColumnType) do
     if I in AAsmView.Header.Columns then
@@ -396,6 +399,8 @@ end;
 procedure TCpuViewSettins.GetSessionFromStackView(AStackView: TStackView);
 begin
   // у стека пока что нет сессионных настроек
+
+  // the stack doesn't have session settings yet.
 end;
 
 procedure TCpuViewSettins.InitDefault;
