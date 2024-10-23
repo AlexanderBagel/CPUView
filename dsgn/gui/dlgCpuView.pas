@@ -300,8 +300,11 @@ type
     FContextRegName, FSourcePath: string;
     FContextRegister: TRegister;
     FContextRegisterParam: TRegParam;
+    FQweryAddrViewerIndex: Integer;
     FSourceLine: Integer;
     function ActiveViewerSelectedValue: UInt64;
+    function CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
+    function CheckRegCallback(ANewAddrVA: UInt64): Boolean;
     procedure InternalShowInDump(AddrVA: Int64);
     procedure UpdateStatusBar;
   protected
@@ -437,6 +440,22 @@ begin
     Result := FStackSelectedValue;
 end;
 
+function TfrmCpuView.CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
+begin
+  case FQweryAddrViewerIndex of
+    0: Result := FCore.AddrInAsm(ANewAddrVA);
+    2: Result := FCore.AddrInStack(ANewAddrVA);
+    3: Result := FCore.AddrInDump(ANewAddrVA);
+  else
+    Result := False;
+  end
+end;
+
+function TfrmCpuView.CheckRegCallback(ANewAddrVA: UInt64): Boolean;
+begin
+  Result := True;
+end;
+
 procedure TfrmCpuView.InternalShowInDump(AddrVA: Int64);
 begin
   Core.ShowDumpAtAddr(AddrVA);
@@ -558,40 +577,29 @@ end;
 
 procedure TfrmCpuView.acViewGotoExecute(Sender: TObject);
 var
-  AViewIndex: Integer;
   NewAddress: UInt64;
 begin
-  AViewIndex := ActiveViewIndex;
-  if (AViewIndex < 0) or (AViewIndex = 1) then Exit;
+  FQweryAddrViewerIndex := ActiveViewIndex;
+  if (FQweryAddrViewerIndex < 0) or (FQweryAddrViewerIndex = 1) then Exit;
   NewAddress := 0;
-  if QueryAddress('Go to Address', 'Address:', NewAddress,
-    function({%H-}ANewAddrVA: UInt64): Boolean
-    begin
-      case AViewIndex of
-        0: Result := FCore.AddrInAsm(ANewAddrVA);
-        2: Result := FCore.AddrInStack(ANewAddrVA);
-        3: Result := FCore.AddrInDump(ANewAddrVA);
-      else
-        Result := False;
-      end
-    end) then
-      case AViewIndex of
-        0:
-        begin
-          FCore.ShowDisasmAtAddr(NewAddress);
-          AsmView.FocusOnAddress(NewAddress, ccmSelectRow);
-        end;
-        2:
-        begin
-          FCore.ShowStackAtAddr(NewAddress);
-          StackView.FocusOnAddress(NewAddress, ccmSelectRow);
-        end;
-        3:
-        begin
-          FCore.ShowDumpAtAddr(NewAddress);
-          ActiveDumpView.FocusOnAddress(NewAddress, ccmSetNewSelection);
-        end;
+  if QueryAddress('Go to Address', 'Address:', NewAddress, CheckAddressCallback) then
+    case FQweryAddrViewerIndex of
+      0:
+      begin
+        FCore.ShowDisasmAtAddr(NewAddress);
+        AsmView.FocusOnAddress(NewAddress, ccmSelectRow);
       end;
+      2:
+      begin
+        FCore.ShowStackAtAddr(NewAddress);
+        StackView.FocusOnAddress(NewAddress, ccmSelectRow);
+      end;
+      3:
+      begin
+        FCore.ShowDumpAtAddr(NewAddress);
+        ActiveDumpView.FocusOnAddress(NewAddress, ccmSetNewSelection);
+      end;
+    end;
 end;
 
 procedure TfrmCpuView.FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -725,14 +733,8 @@ var
 begin
   {%H-}case FContextRegister.ValueType of
     crtValue, crtExtra:
-    begin
-      if QueryAddress('Edit ' + FContextRegName, 'New value:', FContextRegValue,
-        function({%H-}ANewAddrVA: UInt64): Boolean
-        begin
-          Result := True;
-        end) then
-          FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
-    end;
+      if QueryAddress('Edit ' + FContextRegName, 'New value:', FContextRegValue, CheckRegCallback) then
+        FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
     crtEnumValue:
     begin
       ACount := FDbgGate.Context.RegQueryEnumValuesCount(FContextRegister.RegID);

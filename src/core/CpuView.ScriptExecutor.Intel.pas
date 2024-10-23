@@ -10,9 +10,10 @@ uses
   SysUtils,
   StrUtils,
   Generics.Collections,
+  FWHexView.Common,
+  FWHexView.AsmTokenizer,
   CpuView.CPUContext,
-  CpuView.ScriptExecutor,
-  FWHexView.AsmTokenizer;
+  CpuView.ScriptExecutor;
 
 type
   TIntelScriptExecutor = class(TAbstractScriptExecutor)
@@ -79,7 +80,7 @@ end;
 function TIntelScriptExecutor.CalculateSingleExpression(var pData: PChar;
   var nSize: Integer; out AExpression: TExpression): Boolean;
 var
-  Tokens: TList<TToken>;
+  Tokens: TListEx<TToken>;
   TokenStr: string;
   TokenLen, I: Integer;
   Token: TToken;
@@ -90,7 +91,7 @@ var
 begin
   Result := False;
   if (Context = nil) or (Debugger = nil) then Exit;
-  Tokens := TList<TToken>.Create;
+  Tokens := TListEx<TToken>.Create;
   try
     Sign := False;
     Multiply := False;

@@ -431,7 +431,7 @@ type
 
   TCustomStackView = class(TFixedColumnView)
   strict private
-    FFrames: TList<TStackFrame>;
+    FFrames: TListEx<TStackFrame>;
     FAddrPCDict: TDictionary<Int64, UInt64>;
     function GetColorMap: TStackColorMap;
     procedure UpdateFrameDescriptions;
@@ -450,7 +450,7 @@ type
     procedure FitColumnToBestSize(Value: TColumnType); override;
     procedure FramesUpdated;
     function IsAddrPCRow(AIndex: Int64; out AddrVA: UInt64): Boolean;
-    property Frames: TList<TStackFrame> read FFrames;
+    property Frames: TListEx<TStackFrame> read FFrames;
   protected
     property ColorMap: TStackColorMap read GetColorMap;
   end;
@@ -1702,7 +1702,7 @@ constructor TCustomStackView.Create(AOwner: TComponent);
 begin
   inherited;
   ScrollBars := TScrollStyle.ssVertical;
-  FFrames := TList<TStackFrame>.Create;
+  FFrames := TListEx<TStackFrame>.Create;
   FAddrPCDict := TDictionary<Int64, UInt64>.Create;
   UpdateFrameDescriptions;
 end;

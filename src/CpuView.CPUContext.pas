@@ -194,7 +194,7 @@ type
   TCommonCpuContext = class(TAbstractCPUContext)
   strict private
     FMap: TRegMap;
-    FKnownRegs: TList<TRegParam>;
+    FKnownRegs: TListEx<TRegParam>;
     FThreadID: Cardinal;
     procedure SynhronizeMapToKnownRegs;
   protected
@@ -206,7 +206,7 @@ type
     procedure SetViewMode(RegID: Integer; const Value: TRegViewMode); override;
     procedure UpdateLastRegData(RegID: Integer); virtual; abstract;
     procedure UpdateMap(RebuildRegList: Boolean = False);
-    property KnownRegs: TList<TRegParam> read FKnownRegs;
+    property KnownRegs: TListEx<TRegParam> read FKnownRegs;
     property Map: TRegMap read FMap;
   protected
     function ExtractBit(Value: DWORD; Index: Integer): string;
@@ -354,7 +354,7 @@ begin
   inherited;
   LastReg.RegID := -1;
   FMap := TRegMap.Create(True);
-  FKnownRegs := TList<TRegParam>.Create;
+  FKnownRegs := TListEx<TRegParam>.Create;
   UpdateMap(True);
 end;
 
@@ -507,7 +507,7 @@ begin
       Result := RawBufToViewMode(Value, ValueLen, DefValueMetric(bvmHex32), bvmHex32, RegFormatMode);
     rvmHexQ:
       Result := RawBufToViewMode(Value, ValueLen, DefValueMetric(bvmHex64), bvmHex64, RegFormatMode);
-      {$message 'Не реализовано'}
+      {$message 'Not yet implemented'}
     rvmOct: ;
     rvmBin:;
     rvmIntW:

@@ -11,6 +11,7 @@ interface
 uses
   SysUtils,
   Generics.Collections,
+  FWHexView.Common,
   CpuView.CPUContext,
   CpuView.DebugerGate;
 
@@ -25,7 +26,7 @@ type
     Types: TExpressionTypes;
   end;
 
-  TExpressionList = class(TList<TExpression>);
+  TExpressionList = class(TListEx<TExpression>);
 
   TAbstractScriptExecutor = class
   private

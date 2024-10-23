@@ -9,7 +9,7 @@ uses
 
 type
 
-  TQueryAddrCallback = reference to function(ANewAddrVA: UInt64): Boolean;
+  TQueryAddrCallback = function(ANewAddrVA: UInt64): Boolean of object;
 
   { TfrmInputBox }
 

@@ -74,7 +74,7 @@ type
   private
     FAddressMode: TAddressMode;
     FItemIndex: Integer;
-    FItems: TList<TDumpViewRec>;
+    FItems: TListEx<TDumpViewRec>;
     FOnUpdated: TOnCacheUpdated;
     FUtils: TCommonUtils;
     FOnUpdate: TOnCacheUpdated;
@@ -111,7 +111,7 @@ type
     FAsmView: TAsmView;
     FAsmSelStart, FAsmSelEnd: Int64;
     FAsmStream: TBufferedROStream;
-    FCacheList: TList<TAsmLine>;
+    FCacheList: TListEx<TAsmLine>;
     FCacheListIndex: Integer;
     FDBase: TCpuViewDBase;
     FDebugger: TAbstractDebugger;
@@ -274,7 +274,7 @@ end;
 constructor TDumpViewList.Create(AUtils: TCommonUtils);
 begin
   FUtils := AUtils;
-  FItems := TList<TDumpViewRec>.Create;
+  FItems := TListEx<TDumpViewRec>.Create;
 end;
 
 destructor TDumpViewList.Destroy;
@@ -430,7 +430,7 @@ constructor TCpuViewCore.Create;
 var
   RemoteStream: TRemoteStream;
 begin
-  FCacheList := TList<TAsmLine>.Create;
+  FCacheList := TListEx<TAsmLine>.Create;
   FAddrIndex := TDictionary<Int64, Integer>.Create;
   FUtils := TCommonUtils.Create;
   FDumpViewList := TDumpViewList.Create(FUtils);

@@ -14,6 +14,11 @@
         <OtherUnitFiles Value="src;src\core;dsgn;dsgn\gui"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
+      <Other>
+        <CompilerMessages>
+          <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4046="True"/>
+        </CompilerMessages>
+      </Other>
     </CompilerOptions>
     <Description Value="Advanced CPU-View for Lazarus"/>
     <License Value="GPL v3"/>

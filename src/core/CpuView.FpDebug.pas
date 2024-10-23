@@ -64,6 +64,7 @@ uses
   CpuView.Linux,
   {$ENDIF}
 
+  FWHexView.Common,
   CpuView.Common,
   CpuView.Stream,
   CpuView.CPUContext,
@@ -138,7 +139,7 @@ type
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; override;
     function CurrentInstructionPoint: UInt64; override;
     function DebugState: TAbstractDebugState; override;
-    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer): TList<TInstruction>; override;
+    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer): TListEx<TInstruction>; override;
     function IsActive: Boolean; override;
     function IsActiveJmp: Boolean; override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
@@ -271,9 +272,9 @@ var
   CurrentIP: Int64;
   ALen, I: Integer;
   InstructionOpcode: array of Byte;
-  List: TList<TInstruction>;
+  List: TListEx<TInstruction>;
 begin
-  FillChar(Result, SizeOf(Result), 0);
+  Result := Default(TInstruction);
   CurrentIP := CurrentInstructionPoint;
   SetLength(InstructionOpcode, 16);
   FSupportStream.Position := CurrentIP;
@@ -643,7 +644,7 @@ begin
 end;
 
 function TCpuViewDebugGate.Disassembly(AddrVA: Int64; pBuff: PByte;
-  nSize: Integer): TList<TInstruction>;
+  nSize: Integer): TListEx<TInstruction>;
 var
   Disasm: TDbgAsmDecoder;
   Process: TDbgProcess;
@@ -653,7 +654,7 @@ var
   AnInfo: TDbgInstInfo;
   ExternalAddr, RipAddr: Int64;
 begin
-  Result := TList<TInstruction>.Create;
+  Result := TListEx<TInstruction>.Create;
   if FDbgController = nil then Exit;
   Process := FDbgController.CurrentProcess;
   if Process = nil then Exit;
@@ -1029,7 +1030,9 @@ begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
 
-  StopAllWorkers;
+  // Вызов опасен, если оставить его то будет AV при остановке процесса через паузу
+  // The call is dangerous, if leave it there will be AV when stop the process via pause
+  //StopAllWorkers;
 
   WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
   if Assigned(WorkQueue) then
