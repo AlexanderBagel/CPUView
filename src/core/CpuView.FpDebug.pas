@@ -107,6 +107,7 @@ type
     FBreakpointsNotification: TIDEBreakPointsNotification;
     FDebugger: TDebuggerIntf;
     FDbgController: TDbgController;
+    FErrorOnInit: Boolean;
     FProcess: TDbgProcess;
     FRegisterInDebugBoss, FRegisterDestroyNotification: Boolean;
     FSupportStream: TRemoteStream;
@@ -500,42 +501,53 @@ end;
 procedure TCpuViewDebugGate.UpdateDebugger(ADebugger: TDebuggerIntf);
 begin
   FDebugger := ADebugger;
-  if Assigned(FDebugger) and (FDebugger is TFpDebugDebugger) then
+  if Assigned(FDebugger) then
   begin
-    {$IFDEF LINUX}
-    LinuxDebugger := TFpDebugDebugger(FDebugger);
-    {$ENDIF}
-    FDbgController := TFpDebugDebugger(FDebugger).DbgController;
-    FProcess := FDbgController.CurrentProcess;
-    if Assigned(FProcess) and not FProcess.GotExitProcess then
+    if FDebugger is TFpDebugDebugger then
     begin
-      FDebugger.AddNotifyEvent(dnrDestroy, DoDebuggerDestroy);
-      FRegisterDestroyNotification := True;
-      //if Assigned(IDEWindowCreators) then
-      //  IDEWindowCreators.OnActivateIDEForm := OnActivateIDEForm;
-      //FDebugger.OnActivateSourceEditor := OnActivateSourceEditor;
-      if Assigned(DebugBoss) then
+      FErrorOnInit := False;
+      DoError('');
+      {$IFDEF LINUX}
+      LinuxDebugger := TFpDebugDebugger(FDebugger);
+      {$ENDIF}
+      FDbgController := TFpDebugDebugger(FDebugger).DbgController;
+      FProcess := FDbgController.CurrentProcess;
+      if Assigned(FProcess) and not FProcess.GotExitProcess then
       begin
-        if Assigned(DebugBoss.BreakPoints) then
+        FDebugger.AddNotifyEvent(dnrDestroy, DoDebuggerDestroy);
+        FRegisterDestroyNotification := True;
+        //if Assigned(IDEWindowCreators) then
+        //  IDEWindowCreators.OnActivateIDEForm := OnActivateIDEForm;
+        //FDebugger.OnActivateSourceEditor := OnActivateSourceEditor;
+        if Assigned(DebugBoss) then
         begin
-          FBreakPoints := DebugBoss.BreakPoints;
-          FBreakPoints.AddNotification(FBreakpointsNotification);
-          BreakPointChanged(FBreakPoints, nil);
+          if Assigned(DebugBoss.BreakPoints) then
+          begin
+            FBreakPoints := DebugBoss.BreakPoints;
+            FBreakPoints.AddNotification(FBreakpointsNotification);
+            BreakPointChanged(FBreakPoints, nil);
+          end;
+          if Assigned(DebugBoss.Threads) then
+          begin
+            FThreadsMonitor := DebugBoss.Threads;
+            FThreadsMonitor.AddNotification(FThreadsNotification);
+          end;
+          if Assigned(DebugBoss.Snapshots) then
+            FSnapshotManager := DebugBoss.Snapshots;
         end;
-        if Assigned(DebugBoss.Threads) then
-        begin
-          FThreadsMonitor := DebugBoss.Threads;
-          FThreadsMonitor.AddNotification(FThreadsNotification);
-        end;
-        if Assigned(DebugBoss.Snapshots) then
-          FSnapshotManager := DebugBoss.Snapshots;
+        Utils.ProcessID := ProcessID;
+        if ADebugger.State = dsPause then
+          UpdateContext;
+        Exit;
       end;
-      Utils.ProcessID := ProcessID;
-      if ADebugger.State = dsPause then
-        UpdateContext;
-      Exit;
+    end
+    else
+    begin
+      FErrorOnInit := True;
+      DoError('Unsupported debugger: "' + FDebugger.ClassName + '". Requires FpDebug.');
     end;
   end;
+
   Reset;
 end;
 
@@ -640,7 +652,10 @@ begin
     end;
   end
   else
-    Result := adsFinished;
+    if FErrorOnInit then
+      Result := adsError
+    else
+      Result := adsFinished;
 end;
 
 function TCpuViewDebugGate.Disassembly(AddrVA: Int64; pBuff: PByte;

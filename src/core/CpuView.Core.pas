@@ -765,6 +765,9 @@ end;
 procedure TCpuViewCore.OnDebugerStateChange(Sender: TObject);
 begin
   case FDebugger.DebugState of
+    adsError:
+      if Assigned(FAsmView) then
+        FAsmView.NoDataText := FDebugger.ErrorMessage;
     adsStoped, adsStart:
       UpdateStreamsProcessID;
     adsPaused:

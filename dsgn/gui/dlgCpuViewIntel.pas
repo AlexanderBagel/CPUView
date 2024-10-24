@@ -327,6 +327,7 @@ begin
   FHintMenuData.Clear;
   edCommands.Text := '';
   memHints.Text := '';
+  UpdateStatusBar;
 end;
 
 procedure TfrmCpuViewIntel.AfterDbgGateCreate;

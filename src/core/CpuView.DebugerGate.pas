@@ -22,7 +22,7 @@ type
   // минимальный абстрактный интерфейс под разные отладчики
   // minimal abstract interface for different debuggers
 
-  TAbstractDebugState = (adsStoped, adsStart, adsPaused, adsRunning, adsFinished);
+  TAbstractDebugState = (adsError, adsStoped, adsStart, adsPaused, adsRunning, adsFinished);
   TInterfaceDebugCommand = (idcRun, idcRunTo, idcPause, idcStepInto, idcStepOver, idcStepOut, idcBreakPoint);
 
   TQuerySymbol = (qsName, qsSourceLine);
@@ -49,12 +49,14 @@ type
     FCtx: TCommonCpuContext;
     FUtils: TCommonAbstractUtils;
     FChange: TNotifyEvent;
+    FErrorMessage: string;
     FBreakPointsChange, FCtxChange, FStateChange: TNotifyEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
     procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
     procedure DoBreakPointsChange;
     procedure DoChange;
+    procedure DoError(const AMessage: string);
     procedure DoStateChange;
     function GetUtilsClass: TCommonAbstractUtilsClass; virtual; abstract;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
@@ -93,6 +95,7 @@ type
     property BreakPointList: TList<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
     property CpuViewForm: TCustomForm read FCpuViewForm;
+    property ErrorMessage: string read FErrorMessage;
     property Utils: TCommonAbstractUtils read FUtils;
     property OnChange: TNotifyEvent read FChange write FChange;
     property OnContextChange: TNotifyEvent read FCtxChange write FCtxChange;
@@ -148,6 +151,11 @@ procedure TAbstractDebugger.DoChange;
 begin
   if Assigned(FChange) then
     FChange(Self);
+end;
+
+procedure TAbstractDebugger.DoError(const AMessage: string);
+begin
+  FErrorMessage := AMessage;
 end;
 
 procedure TAbstractDebugger.DoStateChange;

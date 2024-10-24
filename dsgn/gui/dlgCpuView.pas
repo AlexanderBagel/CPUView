@@ -306,7 +306,6 @@ type
     function CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
     function CheckRegCallback(ANewAddrVA: UInt64): Boolean;
     procedure InternalShowInDump(AddrVA: Int64);
-    procedure UpdateStatusBar;
   protected
     function ActiveDumpView: TDumpView;
     function ActiveViewIndex: Integer;
@@ -318,6 +317,7 @@ type
     function MeasureCanvas: TBitmap;
     function QweryAccessStr(AddrVA: UInt64): string;
     procedure UnlockZOrder;
+    procedure UpdateStatusBar;
   public
     property Core: TCpuViewCore read FCore;
     property DbgGate: TCpuViewDebugGate read FDbgGate;
@@ -470,7 +470,7 @@ end;
 procedure TfrmCpuView.UpdateStatusBar;
 const
   DbgStates: array [TAbstractDebugState] of string = (
-    'Stoped', 'Start', 'Paused', 'Running', 'Finished'
+    'Error', 'Stoped', 'Start', 'Paused', 'Running', 'Finished'
   );
 var
   AddrVA: UInt64;
