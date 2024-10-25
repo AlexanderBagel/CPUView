@@ -46,6 +46,7 @@ const
   xmlGenerator = 'generator';
   xmlGeneratorData = 'CPU-View';
   xmlEncodingUTF8 = 'UTF-8';
+  xmlBasic = 'basic';
   xmlColor = 'colors';
   xmlAsmView = 'asmview';
   xmlDumpView = 'dumpview';
@@ -54,9 +55,14 @@ const
   xmlColumns = 'columns';
   xmlItem = 'item';
   xmlMode = 'mode';
+  xmlLeft = 'left';
+  xmlTop = 'top';
+  xmlHeight = 'height';
   xmlWidth = 'width';
   xmlFont = 'font';
   xmlFontSize = 'size';
+  xmlMaximized = 'maxstate';
+  xmlSplitter = 'splitters';
   xmlBackgroundColor = 'back';
   xmlBookmarkBackgroundColor = 'bookmarkBack';
   xmlBookmarkBorderColor = 'bookmarkBorder';
@@ -131,6 +137,7 @@ type
     ColumnWidth: array [TColumnType] of Double;
     DisplayFuncNameInsteadCallAddr: Boolean;
     ShowOpcodes: Boolean;
+    ShowSourceLines: Boolean;
   end;
 
   TDumpSettings = record
@@ -169,6 +176,11 @@ type
     FFontName: string;
     FRegSettings: TRegAbstractSettings;
     FUseDebugInfo: Boolean;
+    FUseDebugLog: Boolean;
+    FUseCrashDump: Boolean;
+    function GetColor(const Index: string): TColor;
+    procedure SetColor(const Index: string; Value: TColor);
+  private
     procedure LoadAsmSettings(Root: IXMLNode);
     procedure LoadColorMap(Root: IXMLNode);
     procedure LoadDumpSettings(Root: IXMLNode);
@@ -177,16 +189,27 @@ type
     procedure LoadFontSetting(AView: TFWCustomHexView; Root: IXMLNode);
 
     procedure LoadFromAsmColorMap(Value: TAsmColorMap);
-    procedure LoadFromColorMap(Value: THexViewColorMap);
+    procedure LoadFromDefaultColorMap(Value: THexViewColorMap);
     procedure LoadFromRegColorMap(Value: TRegistersColorMap);
     procedure LoadFromStackColorMap(Value: TStackColorMap);
+
+    procedure LoadFromXML_AsmSettings(Root: IXMLNode);
+    procedure LoadFromXML_BasicSettings(Root: IXMLNode);
+    procedure LoadFromXML_Colors(Root: IXMLNode);
+    procedure LoadFromXML_DumpSettings(Root: IXMLNode);
+    procedure LoadFromXML_Full(Root: IXMLNode);
+    procedure LoadFromXML_RegSettings(Root: IXMLNode);
+    procedure LoadFromXML_StackSettings(Root: IXMLNode);
 
     procedure RestoreViewDefSettings(AView: TFWCustomHexView);
 
     procedure SaveToAsmColorMap(Value: TAsmColorMap);
-    procedure SaveToColorMap(Value: THexViewColorMap);
+    procedure SaveToDefaultColorMap(Value: THexViewColorMap);
     procedure SaveToRegColorMap(Value: TRegistersColorMap);
     procedure SaveToStackColorMap(Value: TStackColorMap);
+
+    procedure SaveToXML_Full(Root: IXMLNode);
+    procedure SaveToXML_Colors(Root: IXMLNode);
 
     procedure SaveAsmSettings(Root: IXMLNode);
     procedure SaveColorMap(Root: IXMLNode);
@@ -203,6 +226,9 @@ type
     constructor Create(ARegSettings: TRegAbstractSettings);
     destructor Destroy; override;
 
+    procedure ColorsExport(const FilePath: string);
+    procedure ColorsImport(const FilePath: string);
+
     procedure GetSessionFromAsmView(AAsmView: TAsmView);
     procedure GetSessionFromDumpView(ADumpView: TDumpView);
     procedure GetSessionFromRegView(ARegView: TRegView);
@@ -214,18 +240,13 @@ type
 
     procedure RestoreAsmViewSettings(AAsmView: TAsmView);
 
-    procedure SaveToAsmView(AAsmView: TAsmView);
-    procedure SaveToDumpView(Value: TDumpView);
-    procedure SaveToRegView(Value: TRegView);
-    procedure SaveToStackView(Value: TStackView);
-    property AsmSettings: TAsmSettings read FAsmSettings write FAsmSettings;
     property ColorMode: TColorMode read FColorMode write FColorMode;
-    property Colors: TDictionary<string, TColor> read FColors;
+    property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
-    property DumpSettings: TDumpSettings read FDumpSettings write FDumpSettings;
     property FontName: string read FFontName write FFontName;
-    property RegSettings: TRegAbstractSettings read FRegSettings write FRegSettings;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
+    property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
+    property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
   end;
 
   {$message 'Контекст должен сам себя сериализовать в XML, этот класс выпилить!'}
@@ -346,6 +367,16 @@ end;
 
 { TCpuViewSettins }
 
+procedure TCpuViewSettins.ColorsExport(const FilePath: string);
+begin
+
+end;
+
+procedure TCpuViewSettins.ColorsImport(const FilePath: string);
+begin
+
+end;
+
 constructor TCpuViewSettins.Create(ARegSettings: TRegAbstractSettings);
 begin
   FRegSettings := ARegSettings;
@@ -358,6 +389,12 @@ begin
   Save(ExtractFilePath(ParamStr(0)) + SettingsName);
   FColors.Free;
   inherited;
+end;
+
+function TCpuViewSettins.GetColor(const Index: string): TColor;
+begin
+  if not FColors.TryGetValue(Index, Result) then
+    Result := clDefault;
 end;
 
 procedure TCpuViewSettins.GetSessionFromAsmView(AAsmView: TAsmView);
@@ -417,12 +454,13 @@ begin
   FAsmSettings.ColumnWidth[ctComment] := 440;
   FAsmSettings.DisplayFuncNameInsteadCallAddr := True;
   FAsmSettings.ShowOpcodes := True;
+  FAsmSettings.ShowSourceLines := True;
 
   FColorMode := cmAuto;
   FColors.Clear;
   AsmColorMap := TAsmColorMap.Create(nil);
   try
-    LoadFromColorMap(AsmColorMap);
+    LoadFromDefaultColorMap(AsmColorMap);
     LoadFromAsmColorMap(AsmColorMap);
   finally
     AsmColorMap.Free;
@@ -459,34 +497,25 @@ begin
   FRegSettings.InitDefault;
 
   FUseDebugInfo := True;
+  FUseDebugLog := True;
+  FUseCrashDump := True;
 end;
 
 procedure TCpuViewSettins.Load(const FilePath: string);
 var
   XMLDocument: IXMLDocument;
-  Node: IXMLNode;
 begin
   if not FileExists(FilePath) then Exit;
-  {$IFDEF FPC}
-  ReadXMLFile(XMLDocument, FilePath);
-  {$ELSE}
-  XMLDocument := LoadXMLDocument(FilePath);
-  {$ENDIF}
-  Node := FindNode(XMLDocument.DocumentElement, xmlColor);
-  if Node = nil then Exit;
-  LoadColorMap(Node);
-  Node := FindNode(XMLDocument.DocumentElement, xmlAsmView);
-  if Node = nil then Exit;
-  LoadAsmSettings(Node);
-  Node := FindNode(XMLDocument.DocumentElement, xmlDumpView);
-  if Node = nil then Exit;
-  LoadDumpSettings(Node);
-  Node := FindNode(XMLDocument.DocumentElement, xmlRegView);
-  if Node = nil then Exit;
-  LoadRegSettings(Node);
-  Node := FindNode(XMLDocument.DocumentElement, xmlStackView);
-  if Node = nil then Exit;
-  LoadStackSettings(Node);
+  try
+    {$IFDEF FPC}
+    ReadXMLFile(XMLDocument, FilePath);
+    {$ELSE}
+    XMLDocument := LoadXMLDocument(FilePath);
+    {$ENDIF}
+    LoadFromXML_Full(XMLDocument.DocumentElement);
+  except
+    InitDefault;
+  end;
 end;
 
 procedure TCpuViewSettins.LoadAsmSettings(Root: IXMLNode);
@@ -695,7 +724,7 @@ begin
   FColors.Add(xmlSourceLineColor, Value.SourceLineColor);
 end;
 
-procedure TCpuViewSettins.LoadFromColorMap(Value: THexViewColorMap);
+procedure TCpuViewSettins.LoadFromDefaultColorMap(Value: THexViewColorMap);
 begin
   FColors.Add(xmlBackgroundColor, Value.BackgroundColor);
   FColors.Add(xmlBookmarkBackgroundColor, Value.BookmarkBackgroundColor);
@@ -732,11 +761,93 @@ begin
   FColors.Add(xmlAddrPCColor, Value.AddrPCColor);
   FColors.Add(xmlAddrPCFontColor, Value.AddrPCFontColor);
   FColors.Add(xmlEmptyStackColor, Value.EmptyStackColor);
-  FColors.Add(xmlEmptyStackColor, Value.EmptyStackColor);
   FColors.Add(xmlFrameColor, Value.FrameColor);
   FColors.Add(xmlFrameActiveColor, Value.FrameActiveColor);
   FColors.Add(xmlStackPointColor, Value.StackPointColor);
   FColors.Add(xmlStackPointFontColor, Value.StackPointFontColor);
+end;
+
+procedure TCpuViewSettins.LoadFromXML_AsmSettings(Root: IXMLNode);
+var
+  I: Integer;
+  ColNode, ItemNode: IXMLNode;
+  Column: TColumnType;
+begin
+  ColNode := FindNode(Root, xmlColumns);
+  if ColNode = nil then Exit;
+  for I := 0 to ColNode.ChildNodes.Count - 1 do
+  begin
+    ItemNode := GetChildNode(ColNode, I);
+    Column := TColumnType(GetEnumValue(TypeInfo(TColumnType), GetNodeAttr(ItemNode, xmlItem)));
+    FAsmSettings.ColumnWidth[Column] := XMLReadDouble(ItemNode, xmlWidth);
+  end;
+end;
+
+procedure TCpuViewSettins.LoadFromXML_BasicSettings(Root: IXMLNode);
+var
+  I: Integer;
+  SplittersNode, ItemNode: IXMLNode;
+  Splitter: TSplitters;
+begin
+  FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
+  FCpuViewDlgSettings.BoundsRect.Top := GetNodeAttr(Root, xmlTop);
+  FCpuViewDlgSettings.BoundsRect.Width := GetNodeAttr(Root, xmlWidth);
+  FCpuViewDlgSettings.BoundsRect.Height := GetNodeAttr(Root, xmlHeight);
+  FCpuViewDlgSettings.Maximized := GetNodeAttr(Root, xmlMaximized);
+  SplittersNode := FindNode(Root, xmlSplitter);
+  if Assigned(SplittersNode) then
+  begin
+    for I := 0 to SplittersNode.ChildNodes.Count - 1 do
+    begin
+      ItemNode := GetChildNode(SplittersNode, I);
+      Splitter := TSplitters(GetEnumValue(TypeInfo(TSplitters), GetNodeAttr(ItemNode, xmlItem)));
+      FCpuViewDlgSettings.SplitterPos[Splitter] := XMLReadDouble(ItemNode, xmlWidth);
+    end;
+  end;
+end;
+
+procedure TCpuViewSettins.LoadFromXML_Colors(Root: IXMLNode);
+begin
+
+end;
+
+procedure TCpuViewSettins.LoadFromXML_DumpSettings(Root: IXMLNode);
+begin
+
+end;
+
+procedure TCpuViewSettins.LoadFromXML_Full(Root: IXMLNode);
+var
+  Node: IXMLNode;
+begin
+  Node := FindNode(Root, xmlBasic);
+  if Node = nil then Exit;
+  LoadFromXML_BasicSettings(Node);
+  Node := FindNode(Root, xmlColor);
+  if Node = nil then Exit;
+  LoadFromXML_Colors(Node);
+  Node := FindNode(Root, xmlAsmView);
+  if Node = nil then Exit;
+  LoadFromXML_AsmSettings(Node);
+  Node := FindNode(Root, xmlDumpView);
+  if Node = nil then Exit;
+  LoadDumpSettings(Node);
+  Node := FindNode(Root, xmlRegView);
+  if Node = nil then Exit;
+  LoadRegSettings(Node);
+  Node := FindNode(Root, xmlStackView);
+  if Node = nil then Exit;
+  LoadStackSettings(Node);
+end;
+
+procedure TCpuViewSettins.LoadFromXML_RegSettings(Root: IXMLNode);
+begin
+
+end;
+
+procedure TCpuViewSettins.LoadFromXML_StackSettings(Root: IXMLNode);
+begin
+
 end;
 
 procedure TCpuViewSettins.LoadRegSettings(Root: IXMLNode);
@@ -771,6 +882,7 @@ var
   I: TColumnType;
 begin
   RestoreViewDefSettings(AAsmView);
+  SaveToAsmColorMap(AAsmView.ColorMap);
   for I := Low(TColumnType) to High(TColumnType) do
     if I in AAsmView.Header.Columns then
       FAsmSettings.ColumnWidth[I] := ToDpi(AAsmView.Header.ColumnWidth[I])
@@ -782,7 +894,7 @@ var
 begin
   AView.ResetViewState;
   TViewAccess(AView).Font.Name := FontName;
-  SaveToColorMap(TViewAccess(AView).ColorMap);
+  SaveToDefaultColorMap(TViewAccess(AView).ColorMap);
 end;
 
 procedure TCpuViewSettins.Save(const FilePath: string);
@@ -979,44 +1091,93 @@ end;
 
 procedure TCpuViewSettins.SaveToAsmColorMap(Value: TAsmColorMap);
 begin
-
+  Value.ActiveJmpColor := Color[xmlActiveJumpColor];
+  Value.ArrowDownColor := Color[xmlArrowDownColor];
+  Value.ArrowDownSelectedColor := Color[xmlArrowDownSelectedColor];
+  Value.ArrowUpColor := Color[xmlArrowUpColor];
+  Value.ArrowUpSelectedColor := Color[xmlArrowUpSelectedColor];
+  Value.BreakPointActiveColor := Color[xmlBpActiveColor];
+  Value.BreakPointActiveFontColor := Color[xmlBpActiveFontColor];
+  Value.BreakPointColor := Color[xmlBpColor];
+  Value.BreakPointDisabledColor := Color[xmlBpDisabledColor];
+  Value.BreakPointDisabledFontColor := Color[xmlBpDisabledFontColor];
+  Value.BreakPointFontColor := Color[xmlBpFontColor];
+  Value.JmpMarkColor := Color[xmlJmpMarkColor];
+  Value.JmpMarkTextColor := Color[xmlJmpMarkTextColor];
+  Value.SeparatorBackgroundColor := Color[xmlSeparatorBackgroundColor];
+  Value.SeparatorBorderColor := Color[xmlSeparatorBorderColor];
+  Value.SeparatorTextColor := Color[xmlSeparatorTextColor];
+  Value.NumberColor := Color[xmlNumberColor];
+  Value.InstructionColor := Color[xmlInstructionColor];
+  Value.RegColor := Color[xmlInsRegColor];
+  Value.PrefixColor := Color[xmlPrefixColor];
+  Value.JmpColor := Color[xmlJmpColor];
+  Value.KernelColor := Color[xmlKernelColor];
+  Value.NopColor := Color[xmlNopColor];
+  Value.RegHighlightBackColor := Color[xmlRegHighlightBackColor];
+  Value.RegHighlightFontColor := Color[xmlRegHighlightFontColor];
+  Value.RIPBackgroundColor := Color[xmlRIPBackgroundColor];
+  Value.RIPBackgroundFontColor := Color[xmlRIPBackgroundFontColor];
+  Value.SizePfxColor := Color[xmlSizePfxColor];
+  Value.SourceLineColor := Color[xmlSourceLineColor];
 end;
 
-procedure TCpuViewSettins.SaveToAsmView(AAsmView: TAsmView);
+procedure TCpuViewSettins.SaveToDefaultColorMap(Value: THexViewColorMap);
 begin
-  if AAsmView = nil then Exit;
-  AAsmView.ResetViewState;
-
-end;
-
-procedure TCpuViewSettins.SaveToColorMap(Value: THexViewColorMap);
-begin
-
-end;
-
-procedure TCpuViewSettins.SaveToDumpView(Value: TDumpView);
-begin
-
+  Value.BackgroundColor := Color[xmlBackgroundColor];
+  Value.BookmarkBackgroundColor := Color[xmlBookmarkBackgroundColor];
+  Value.BookmarkBorderColor := Color[xmlBookmarkBorderColor];
+  Value.BookmarkTextColor := Color[xmlBookmarkTextColor];
+  Value.CaretColor := Color[xmlCaretColor];
+  Value.CaretTextColor := Color[xmlCaretTextColor];
+  Value.GroupColor := Color[xmlGroupColor];
+  Value.InfoBackgroundColor := Color[xmlInfoBackgroundColor];
+  Value.InfoBorderColor := Color[xmlInfoBorderColor];
+  Value.InfoTextColor := Color[xmlInfoTextColor];
+  Value.HeaderBackgroundColor := Color[xmlHeaderBackgroundColor];
+  Value.HeaderBorderColor := Color[xmlHeaderBorderColor];
+  Value.HeaderColumnSeparatorColor := Color[xmlHeaderColumnSeparatorColor];
+  Value.HeaderTextColor := Color[xmlHeaderTextColor];
+  Value.RowSeparatorColor := Color[xmlRowSeparatorColor];
+  Value.SelectColor := Color[xmlSelectColor];
+  Value.SelectInactiveColor := Color[xmlSelectInactiveColor];
+  Value.TextColor := Color[xmlTextColor];
+  Value.TextCommentColor := Color[xmlTextCommentColor];
+  Value.WorkSpaceTextColor := Color[xmlWorkSpaceTextColor];
 end;
 
 procedure TCpuViewSettins.SaveToRegColorMap(Value: TRegistersColorMap);
 begin
-
-end;
-
-procedure TCpuViewSettins.SaveToRegView(Value: TRegView);
-begin
-
+  Value.HintColor := Color[xmlHintColor];
+  Value.RegColor := Color[xmlRegColor];
+  Value.ValueColor := Color[xmlValueColor];
+  Value.ValueModifiedColor := Color[xmlValueModifiedColor];
 end;
 
 procedure TCpuViewSettins.SaveToStackColorMap(Value: TStackColorMap);
 begin
+  Value.AddrPCColor := Color[xmlAddrPCColor];
+  Value.AddrPCFontColor := Color[xmlAddrPCFontColor];
+  Value.EmptyStackColor := Color[xmlEmptyStackColor];
+  Value.FrameColor := Color[xmlFrameColor];
+  Value.FrameActiveColor := Color[xmlFrameActiveColor];
+  Value.StackPointColor := Color[xmlStackPointColor];
+  Value.StackPointFontColor := Color[xmlStackPointFontColor];
+end;
+
+procedure TCpuViewSettins.SaveToXML_Colors(Root: IXMLNode);
+begin
 
 end;
 
-procedure TCpuViewSettins.SaveToStackView(Value: TStackView);
+procedure TCpuViewSettins.SaveToXML_Full(Root: IXMLNode);
 begin
 
+end;
+
+procedure TCpuViewSettins.SetColor(const Index: string; Value: TColor);
+begin
+  FColors.TryAdd(Index, Value);
 end;
 
 { TIntelCpuViewSettins }
