@@ -11,7 +11,7 @@ uses
   CpuView.Actions, CpuView.Common, CpuView.CPUContext, CpuView.Settings, 
   CpuView.Viewers, CpuView.Core, CpuView.DBase, CpuView.DebugerGate, 
   CpuView.FpDebug, CpuView.ScriptExecutor, CpuView.Stream, CpuView.Reg, 
-  dlgCpuView, LazarusPackageIntf;
+  CpuView.XML, dlgCpuView, LazarusPackageIntf;
 
 implementation
 

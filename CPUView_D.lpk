@@ -78,6 +78,10 @@
         <UnitName Value="CpuView.Reg"/>
       </Item>
       <Item>
+        <Filename Value="src\CpuView.XML.pas"/>
+        <UnitName Value="CpuView.XML"/>
+      </Item>	  
+      <Item>
         <Filename Value="dsgn\gui\dlgCpuView.lfm"/>
         <Type Value="LFM"/>
       </Item>

@@ -8,7 +8,7 @@ interface
 
 uses
 {$IFnDEF FPC}
-  Windows,
+  Windows, XMLIntf,
 {$ELSE}
   LCLIntf, LCLType,
 {$ENDIF}
@@ -17,6 +17,7 @@ uses
   Generics.Collections,
   FWHexView.Common,
   CpuView.Common,
+  CpuView.XML,
   CpuView.CPUContext,
 {$IFDEF MSWINDOWS}
   CpuView.Windows,
@@ -31,6 +32,16 @@ type
   TFPUMode = (fpuMMX, fpuR, fpuST);
 
   TIntelCpuMapMode = (icmDetailed, icmSimple);
+
+  TIntelCtxSettings = class(TContextAbstractSettings)
+  public
+    procedure InitDefault; override;
+    function GetRegisterContextName: string; override;
+    procedure LoadFromContext(ACtx: TAbstractCPUContext); override;
+    procedure LoadFromXML(Root: IXMLNode); override;
+    procedure SaveToContext(ACtx: TAbstractCPUContext); override;
+    procedure SaveToXML(Root: IXMLNode); override;
+  end;
 
   { TIntelCpuContext }
 
@@ -149,6 +160,43 @@ const
     15, 15, 15, 15,
     16, 16, 16, 16
   );
+
+{ TIntelCtxSettings }
+
+function TIntelCtxSettings.GetRegisterContextName: string;
+begin
+
+end;
+
+procedure TIntelCtxSettings.InitDefault;
+begin
+  inherited;
+
+end;
+
+procedure TIntelCtxSettings.LoadFromContext(ACtx: TAbstractCPUContext);
+begin
+  inherited;
+
+end;
+
+procedure TIntelCtxSettings.LoadFromXML(Root: IXMLNode);
+begin
+  inherited;
+
+end;
+
+procedure TIntelCtxSettings.SaveToContext(ACtx: TAbstractCPUContext);
+begin
+  inherited;
+
+end;
+
+procedure TIntelCtxSettings.SaveToXML(Root: IXMLNode);
+begin
+  inherited;
+
+end;
 
 { TIntelCpuContext }
 

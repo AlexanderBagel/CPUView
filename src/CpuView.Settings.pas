@@ -30,7 +30,8 @@ uses
   CpuView.Common,
   CpuView.Viewers,
   CpuView.CPUContext,
-  CpuView.IntelContext;
+  CpuView.IntelContext,
+  CpuView.XML;
 
 {$IFDEF FPC}
 type
@@ -63,6 +64,12 @@ const
   xmlFontSize = 'size';
   xmlMaximized = 'maxstate';
   xmlSplitter = 'splitters';
+  xmlSaveFormPos = 'saveForm';
+  xmlSaveSplitters = 'saveProportions';
+  xmlSaveFontSize = 'saveFontSize';
+  xmlShowFuncName = 'showFuncName';
+  xmlShowOpcodes = 'showOpcodes';
+  xmlShowSrc = 'showSrc';
   xmlBackgroundColor = 'back';
   xmlBookmarkBackgroundColor = 'bookmarkBack';
   xmlBookmarkBorderColor = 'bookmarkBorder';
@@ -129,6 +136,8 @@ const
   xmlEncoder = 'encoder';
   xmlEncoderName = 'name';
   xmlEncoderCP = 'cp';
+
+  // not used
   xmlContext = 'ctx';
   xmlContextName = 'name';
 
@@ -138,6 +147,7 @@ type
     DisplayFuncNameInsteadCallAddr: Boolean;
     ShowOpcodes: Boolean;
     ShowSourceLines: Boolean;
+    FontHeight: Double;
   end;
 
   TDumpSettings = record
@@ -145,17 +155,7 @@ type
     CodePage: Integer;
     EncodeType: TCharEncoderType;
     EncodingName: string;
-  end;
-
-  TRegAbstractSettings = class
-  protected
-    procedure InitDefault; virtual; abstract;
-    function GetRegisterContextName: string; virtual; abstract;
-    procedure LoadFromXML(Root: IXMLNode); virtual; abstract;
-    procedure SaveToXML(Root: IXMLNode); virtual; abstract;
-  public
-    procedure LoadFromContext(ACtx: TAbstractCPUContext); virtual; abstract;
-    procedure SaveToContext(ACtx: TAbstractCPUContext); virtual; abstract;
+    FontHeight: Double;
   end;
 
   TSplitters = (spTopHorz, spBottomHorz, spCenterVert);
@@ -174,19 +174,20 @@ type
     FCpuViewDlgSettings: TCpuViewDlgSettings;
     FDumpSettings: TDumpSettings;
     FFontName: string;
-    FRegSettings: TRegAbstractSettings;
+    FRegFontHeight: Double;
+    FSaveFontHeight: Boolean;
+    FSaveFormPos: Boolean;
+    FSaveViewerProportions: Boolean;
+    FStackFontHeight: Double;
+    FRegSettings: TContextAbstractSettings;
     FUseDebugInfo: Boolean;
     FUseDebugLog: Boolean;
     FUseCrashDump: Boolean;
     function GetColor(const Index: string): TColor;
     procedure SetColor(const Index: string; Value: TColor);
   private
-    procedure LoadAsmSettings(Root: IXMLNode);
-    procedure LoadColorMap(Root: IXMLNode);
-    procedure LoadDumpSettings(Root: IXMLNode);
-    procedure LoadRegSettings(Root: IXMLNode);
-    procedure LoadStackSettings(Root: IXMLNode);
-    procedure LoadFontSetting(AView: TFWCustomHexView; Root: IXMLNode);
+    function DpiToDouble(AValue: Integer; AView: TFWCustomHexView): Double;
+    function DoubleToDpi(AValue: Double; AView: TFWCustomHexView): Integer;
 
     procedure LoadFromAsmColorMap(Value: TAsmColorMap);
     procedure LoadFromDefaultColorMap(Value: THexViewColorMap);
@@ -208,22 +209,21 @@ type
     procedure SaveToRegColorMap(Value: TRegistersColorMap);
     procedure SaveToStackColorMap(Value: TStackColorMap);
 
-    procedure SaveToXML_Full(Root: IXMLNode);
+    procedure SaveToXML_AsmSettings(Root: IXMLNode);
+    procedure SaveToXML_BasicSettings(Root: IXMLNode);
     procedure SaveToXML_Colors(Root: IXMLNode);
-
-    procedure SaveAsmSettings(Root: IXMLNode);
-    procedure SaveColorMap(Root: IXMLNode);
-    procedure SaveDumpSettings(Root: IXMLNode);
-    procedure SaveRegSettings(Root: IXMLNode);
-    procedure SaveStackSettings(Root: IXMLNode);
-    procedure SaveFontSetting(AView: TFWCustomHexView; Root: IXMLNode);
+    procedure SaveToXML_DumpSettings(Root: IXMLNode);
+    procedure SaveToXML_Full(Root: IXMLNode);
+    procedure SaveToXML_RegSettings(Root: IXMLNode);
+    procedure SaveToXML_StackSettings(Root: IXMLNode);
   protected
     procedure InitDefault;
+    procedure InitDefaultColors;
     function GetRegisterContextName: string; virtual; abstract;
     procedure LoadRegisterContext(Root: IXMLNode); virtual; abstract;
     procedure SaveRegisterContext(Root: IXMLNode); virtual; abstract;
   public
-    constructor Create(ARegSettings: TRegAbstractSettings);
+    constructor Create(ARegSettings: TContextAbstractSettings);
     destructor Destroy; override;
 
     procedure ColorsExport(const FilePath: string);
@@ -238,12 +238,18 @@ type
     procedure Load(const FilePath: string);
     procedure Save(const FilePath: string);
 
-    procedure RestoreAsmViewSettings(AAsmView: TAsmView);
+    procedure SetSettingsToAsmView(AAsmView: TAsmView);
+    procedure SetSettingsToDumpView(ADumpView: TDumpView);
+    procedure SetSettingsToRegView(ARegView: TRegView);
+    procedure SetSettingsToStackView(AStackView: TStackView);
 
     property ColorMode: TColorMode read FColorMode write FColorMode;
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
     property FontName: string read FFontName write FFontName;
+    property SaveFormPos: Boolean read FSaveFormPos write FSaveFormPos;
+    property SaveFontHeight: Boolean read FSaveFontHeight write FSaveFontHeight;
+    property SaveViewerProportions: Boolean read FSaveViewerProportions write FSaveViewerProportions;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
@@ -273,111 +279,56 @@ implementation
 type
   TViewAccess = class(TFWCustomHexView);
 
-function FindNode(ANode: IXMLNode; const ANodeName: string): IXMLNode;
-{$IFDEF FPC}
-var
-  I: Integer;
-{$ENDIF}
-begin
-  Result := nil;
-  if ANode <> nil then
-    {$IFDEF FPC}
-    begin
-      for I := 0 to ANode.ChildNodes.Count - 1 do
-        if ANode.ChildNodes[I].NodeName = ANodeName then
-        begin
-          Result := ANode.ChildNodes[I];
-          Break;
-        end;
-    end;
-    {$ELSE}
-    Result := ANode.ChildNodes.FindNode(ANodeName);
-    {$ENDIF}
-end;
-
-function GetNodeAttr(Node: IXMLNode; const Attr: string): OleVariant;
-{$IFDEF FPC}
-var
-  NamedAttr: TDOMNode;
-{$ENDIF}
-begin
-  {$IFDEF FPC}
-  NamedAttr := Node.Attributes.GetNamedItem(Attr);
-  if NamedAttr = nil then
-    Result := null
-  else
-    Result := NamedAttr.NodeValue;
-  {$ELSE}
-  Result := Node.Attributes[Attr];
-  {$ENDIF}
-end;
-
-procedure SetNodeAttr(Node: IXMLNode; const Attr: string; Value: OleVariant);
-begin
-  {$IFDEF FPC}
-  TDOMElement(Node).SetAttribute(Attr, Value);
-  {$ELSE}
-  Node.Attributes[Attr] := Value;
-  {$ENDIF}
-end;
-
-function GetChildNode(Node: IXMLNode; Index: Integer): IXMLNode;
-begin
-  {$IFDEF FPC}
-  Result := Node.ChildNodes[Index];
-  {$ELSE}
-  Result := Node.ChildNodes.Nodes[Index];
-  {$ENDIF}
-end;
-
-procedure XMLWriteDouble(Node: IXMLNode; const Attr: string; Value: Double);
-var
-  FS: TFormatSettings;
-begin
-  FS := FormatSettings;
-  FS.DecimalSeparator := '.';
-  SetNodeAttr(Node, Attr, FloatToStr(Value, FS));
-end;
-
-function XMLReadDouble(Node: IXMLNode; const Attr: string): Double;
-var
-  Atrib: OleVariant;
-  FS: TFormatSettings;
-begin
-  Result := 0;
-  if Node <> nil then
-  begin
-    Atrib := GetNodeAttr(Node, Attr);
-    FS := FormatSettings;
-    FS.DecimalSeparator := '.';
-    if not VarIsNull(Atrib) then
-      TryStrToFloat(Atrib, Result, FS);
-  end;
-end;
-
-function NewChild(Node: IXMLNode; const ChildName: string): IXMLNode;
-begin
-  {$IFDEF FPC}
-  Result := Node.OwnerDocument.CreateElement(ChildName);
-  Node.AppendChild(Result);
-  {$ELSE}
-  Result := Node.AddChild(ChildName);
-  {$ENDIF}
-end;
-
 { TCpuViewSettins }
 
 procedure TCpuViewSettins.ColorsExport(const FilePath: string);
+var
+  XMLDocument: IXMLDocument;
+  Node: IXMLNode;
 begin
-
+  {$IFDEF FPC}
+  XMLDocument := TXMLDocument.Create;
+  try
+    Node := XMLDocument.CreateElement(xmlColor);
+    XMLDocument.AppendChild(Node);
+    SaveToXML_Full(Node);
+    WriteXML(XMLDocument, FilePath);
+  finally
+    XMLDocument.Free;
+  end;
+  {$ELSE}
+  XMLDocument := NewXMLDocument;
+  try
+    XMLDocument.Active := True;
+    XMLDocument.Encoding := xmlEncodingUTF8;
+    XMLDocument.Options := XMLDocument.Options + [doNodeAutoIndent];
+    Node := XMLDocument.AddChild(xmlColor);
+    SaveToXML_Colors(Node);
+    XMLDocument.SaveToFile(FilePath);
+  finally
+    XMLDocument.Active := False;
+  end;
+  {$ENDIF}
 end;
 
 procedure TCpuViewSettins.ColorsImport(const FilePath: string);
+var
+  XMLDocument: IXMLDocument;
 begin
-
+  if not FileExists(FilePath) then Exit;
+  try
+    {$IFDEF FPC}
+    ReadXMLFile(XMLDocument, FilePath);
+    {$ELSE}
+    XMLDocument := LoadXMLDocument(FilePath);
+    {$ENDIF}
+    LoadFromXML_Colors(XMLDocument.DocumentElement);
+  except
+    InitDefaultColors;
+  end;
 end;
 
-constructor TCpuViewSettins.Create(ARegSettings: TRegAbstractSettings);
+constructor TCpuViewSettins.Create(ARegSettings: TContextAbstractSettings);
 begin
   FRegSettings := ARegSettings;
   FColors := TDictionary<string, TColor>.Create;
@@ -391,6 +342,18 @@ begin
   inherited;
 end;
 
+function TCpuViewSettins.DoubleToDpi(AValue: Double;
+  AView: TFWCustomHexView): Integer;
+begin
+  Result := Round(AValue * AView.CurrentPPI / 96);
+end;
+
+function TCpuViewSettins.DpiToDouble(AValue: Integer;
+  AView: TFWCustomHexView): Double;
+begin
+  Result := AValue * 96 / AView.CurrentPPI;
+end;
+
 function TCpuViewSettins.GetColor(const Index: string): TColor;
 begin
   if not FColors.TryGetValue(Index, Result) then
@@ -398,12 +361,6 @@ begin
 end;
 
 procedure TCpuViewSettins.GetSessionFromAsmView(AAsmView: TAsmView);
-
-  function ToDpi(Value: Integer): Double;
-  begin
-    Result := Value * 96 / AAsmView.CurrentPPI;
-  end;
-
 var
   I: TColumnType;
 begin
@@ -416,35 +373,40 @@ begin
   FillChar(FAsmSettings.ColumnWidth, SizeOf(FAsmSettings.ColumnWidth), 0);
   for I := Low(TColumnType) to High(TColumnType) do
     if I in AAsmView.Header.Columns then
-      FAsmSettings.ColumnWidth[I] := ToDpi(AAsmView.Header.ColumnWidth[I])
+      FAsmSettings.ColumnWidth[I] := DpiToDouble(AAsmView.Header.ColumnWidth[I],AAsmView);
+  if SaveFontHeight then
+    FAsmSettings.FontHeight := DpiToDouble(AAsmView.Font.Height, AAsmView);
 end;
 
 procedure TCpuViewSettins.GetSessionFromDumpView(ADumpView: TDumpView);
 begin
+  if ADumpView = nil then Exit;  
   FDumpSettings.ByteViewMode := ADumpView.ByteViewMode;
   FDumpSettings.CodePage := ADumpView.Encoder.CodePage;
   FDumpSettings.EncodeType := ADumpView.Encoder.EncodeType;
   FDumpSettings.EncodingName := ADumpView.Encoder.EncodingName;
+  if SaveFontHeight then
+    FDumpSettings.FontHeight := DpiToDouble(ADumpView.Font.Height, ADumpView);
 end;
 
 procedure TCpuViewSettins.GetSessionFromRegView(ARegView: TRegView);
 begin
   if ARegView = nil then Exit;
+  if SaveFontHeight then
+    FRegFontHeight := DpiToDouble(ARegView.Font.Height, ARegView);
   FRegSettings.LoadFromContext(ARegView.Context);
 end;
 
 procedure TCpuViewSettins.GetSessionFromStackView(AStackView: TStackView);
 begin
-  // у стека пока что нет сессионных настроек
-
-  // the stack doesn't have session settings yet.
+  if AStackView = nil then Exit;
+  if SaveFontHeight then
+    FStackFontHeight := DpiToDouble(AStackView.Font.Height, AStackView);
 end;
 
 procedure TCpuViewSettins.InitDefault;
-var
-  AsmColorMap: TAsmColorMap;
-  RegColorMap: TRegistersColorMap;
-  StackColorMap: TStackColorMap;
+const
+  DefaultFontHeight = -12;
 begin
   FAsmSettings := Default(TAsmSettings);
   FAsmSettings.ColumnWidth[ctWorkSpace] := 32;
@@ -455,7 +417,45 @@ begin
   FAsmSettings.DisplayFuncNameInsteadCallAddr := True;
   FAsmSettings.ShowOpcodes := True;
   FAsmSettings.ShowSourceLines := True;
+  FAsmSettings.FontHeight := DefaultFontHeight;
 
+  InitDefaultColors;
+
+  FCpuViewDlgSettings := Default(TCpuViewDlgSettings);
+  FCpuViewDlgSettings.SplitterPos[spTopHorz] := 50;
+  FCpuViewDlgSettings.SplitterPos[spBottomHorz] := 50;
+  FCpuViewDlgSettings.SplitterPos[spCenterVert] := 75;
+
+  FDumpSettings := Default(TDumpSettings);
+  FDumpSettings.FontHeight := DefaultFontHeight;
+
+  {$IFDEF MSWINDOWS}
+  FFontName := 'Consolas';
+  {$ENDIF}
+  {$IFDEF UNIX}
+  FFontName := 'DejaVu Sans Mono';
+  {$ENDIF}
+
+  FRegFontHeight := DefaultFontHeight;
+  FRegSettings.InitDefault;
+
+  FSaveFontHeight := True;
+  FSaveFormPos := True;
+  FSaveViewerProportions := True;
+
+  FStackFontHeight := DefaultFontHeight;
+
+  FUseDebugInfo := True;
+  FUseDebugLog := True;
+  FUseCrashDump := True;
+end;
+
+procedure TCpuViewSettins.InitDefaultColors;
+var
+  AsmColorMap: TAsmColorMap;
+  RegColorMap: TRegistersColorMap;
+  StackColorMap: TStackColorMap;
+begin
   FColorMode := cmAuto;
   FColors.Clear;
   AsmColorMap := TAsmColorMap.Create(nil);
@@ -479,26 +479,6 @@ begin
   finally
     StackColorMap.Free;
   end;
-
-  FCpuViewDlgSettings := Default(TCpuViewDlgSettings);
-  FCpuViewDlgSettings.SplitterPos[spTopHorz] := 50;
-  FCpuViewDlgSettings.SplitterPos[spBottomHorz] := 50;
-  FCpuViewDlgSettings.SplitterPos[spCenterVert] := 75;
-
-  FDumpSettings := Default(TDumpSettings);
-
-  {$IFDEF MSWINDOWS}
-  FFontName := 'Consolas';
-  {$ENDIF}
-  {$IFDEF UNIX}
-  FFontName := 'DejaVu Sans Mono';
-  {$ENDIF}
-
-  FRegSettings.InitDefault;
-
-  FUseDebugInfo := True;
-  FUseDebugLog := True;
-  FUseCrashDump := True;
 end;
 
 procedure TCpuViewSettins.Load(const FilePath: string);
@@ -516,179 +496,6 @@ begin
   except
     InitDefault;
   end;
-end;
-
-procedure TCpuViewSettins.LoadAsmSettings(Root: IXMLNode);
-
-//  function ToDpi(Value: Double): Integer;
-//  begin
-//    Result := Round(Value * FAsmView.CurrentPPI / 96);
-//  end;
-
-var
-  I: Integer;
-  ColNode, ItemNode: IXMLNode;
-  Column: TColumnType;
-begin
-//  LoadFontSetting(FAsmView, Root);
-//  ColNode := FindNode(Root, xmlColumns);
-//  if ColNode = nil then Exit;
-//  for I := 0 to ColNode.ChildNodes.Count - 1 do
-//  begin
-//    ItemNode := GetChildNode(ColNode, I);
-//    Column := TColumnType(GetEnumValue(TypeInfo(TColumnType), GetNodeAttr(ItemNode, xmlItem)));
-//    FAsmView.Header.ColumnWidth[Column] := ToDpi(XMLReadDouble(ItemNode, xmlWidth));
-//  end;
-end;
-
-procedure TCpuViewSettins.LoadColorMap(Root: IXMLNode);
-var
-  Cm: THexViewColorMap;
-  CmAsm: TAsmColorMap;
-  CmStack: TStackColorMap;
-  CmReg: TRegistersColorMap;
-
-  procedure UpdateColorMap(Map: THexViewColorMap);
-  begin
-    Map.BackgroundColor := Cm.BackgroundColor;
-    Map.BookmarkBackgroundColor := Cm.BookmarkBackgroundColor;
-    Map.BookmarkBorderColor := Cm.BookmarkBorderColor;
-    Map.BookmarkTextColor := Cm.BookmarkTextColor;
-    Map.CaretColor := Cm.CaretColor;
-    Map.CaretTextColor := Cm.CaretTextColor;
-    Map.GroupColor := Cm.GroupColor;
-    Map.InfoBackgroundColor := Cm.InfoBackgroundColor;
-    Map.InfoBorderColor := Cm.InfoBorderColor;
-    Map.InfoTextColor := Cm.InfoTextColor;
-    Map.HeaderBackgroundColor := Cm.HeaderBackgroundColor;
-    Map.HeaderBorderColor := Cm.HeaderBorderColor;
-    Map.HeaderColumnSeparatorColor := Cm.HeaderColumnSeparatorColor;
-    Map.HeaderTextColor := Cm.HeaderTextColor;
-    Map.RowSeparatorColor := Cm.RowSeparatorColor;
-    Map.SelectColor := Cm.SelectColor;
-    Map.SelectInactiveColor := Cm.SelectInactiveColor;
-    Map.TextColor := Cm.TextColor;
-    Map.TextCommentColor := Cm.TextCommentColor;
-  end;
-
-begin
-//  Cm := FAsmView.ColorMap;
-//  CmAsm := FAsmView.ColorMap;
-//  CmReg := FRegView.ColorMap;
-//  CmStack := FStackView.ColorMap;
-//
-//  Cm.ColorMode := TColorMode(GetEnumValue(TypeInfo(TColorMode), GetNodeAttr(Root, xmlMode)));
-//
-//  // общие цвета для всех четырех вьюверов
-//  if Cm.ColorMode = cmCustom then
-//  begin
-//    Cm.BackgroundColor := GetNodeAttr(Root, xmlBackgroundColor);
-//    Cm.BookmarkBackgroundColor := GetNodeAttr(Root, xmlBookmarkBackgroundColor);
-//    Cm.BookmarkBorderColor := GetNodeAttr(Root, xmlBookmarkBorderColor);
-//    Cm.BookmarkTextColor := GetNodeAttr(Root, xmlBookmarkTextColor);
-//    Cm.CaretColor := GetNodeAttr(Root, xmlCaretColor);
-//    Cm.CaretTextColor := GetNodeAttr(Root, xmlCaretTextColor);
-//    Cm.GroupColor := GetNodeAttr(Root, xmlGroupColor);
-//    Cm.InfoBackgroundColor := GetNodeAttr(Root, xmlInfoBackgroundColor);
-//    Cm.InfoBorderColor := GetNodeAttr(Root, xmlInfoBorderColor);
-//    Cm.InfoTextColor := GetNodeAttr(Root, xmlInfoTextColor);
-//    Cm.HeaderBackgroundColor := GetNodeAttr(Root, xmlHeaderBackgroundColor);
-//    Cm.HeaderBorderColor := GetNodeAttr(Root, xmlHeaderBorderColor);
-//    Cm.HeaderColumnSeparatorColor := GetNodeAttr(Root, xmlHeaderColumnSeparatorColor);
-//    Cm.HeaderTextColor := GetNodeAttr(Root, xmlHeaderTextColor);
-//    Cm.RowSeparatorColor := GetNodeAttr(Root, xmlRowSeparatorColor);
-//    Cm.SelectColor := GetNodeAttr(Root, xmlSelectColor);
-//    Cm.SelectInactiveColor := GetNodeAttr(Root, xmlSelectInactiveColor);
-//    Cm.TextColor := GetNodeAttr(Root, xmlTextColor);
-//    Cm.TextCommentColor := GetNodeAttr(Root, xmlTextCommentColor);
-//    Cm.WorkSpaceTextColor := GetNodeAttr(Root, xmlWorkSpaceTextColor);
-//  end;
-//  UpdateColorMap(CmAsm);
-//  UpdateColorMap(CmStack);
-//  UpdateColorMap(CmReg);
-//
-//  // настройки цвета для дизассемблера
-//  if not VarIsNull(GetNodeAttr(Root, xmlArrowDownColor)) then
-//  begin
-//    CmAsm.ActiveJmpColor := GetNodeAttr(Root, xmlActiveJumpColor);
-//    CmAsm.ArrowDownColor := GetNodeAttr(Root, xmlArrowDownColor);
-//    CmAsm.ArrowDownSelectedColor := GetNodeAttr(Root, xmlArrowDownSelectedColor);
-//    CmAsm.ArrowUpColor := GetNodeAttr(Root, xmlArrowUpColor);
-//    CmAsm.ArrowUpSelectedColor := GetNodeAttr(Root, xmlArrowUpSelectedColor);
-//    CmAsm.BreakPointActiveColor := GetNodeAttr(Root, xmlBpActiveColor);
-//    CmAsm.BreakPointActiveFontColor := GetNodeAttr(Root, xmlBpActiveFontColor);
-//    CmAsm.BreakPointColor := GetNodeAttr(Root, xmlBpColor);
-//    CmAsm.BreakPointDisabledColor := GetNodeAttr(Root, xmlBpDisabledColor);
-//    CmAsm.BreakPointDisabledFontColor := GetNodeAttr(Root, xmlBpDisabledFontColor);
-//    CmAsm.BreakPointFontColor := GetNodeAttr(Root, xmlBpFontColor);
-//    CmAsm.JmpMarkColor := GetNodeAttr(Root, xmlJmpMarkColor);
-//    CmAsm.JmpMarkTextColor := GetNodeAttr(Root, xmlJmpMarkTextColor);
-//    CmAsm.SeparatorBackgroundColor := GetNodeAttr(Root, xmlSeparatorBackgroundColor);
-//    CmAsm.SeparatorBorderColor := GetNodeAttr(Root, xmlSeparatorBorderColor);
-//    CmAsm.SeparatorTextColor := GetNodeAttr(Root, xmlSeparatorTextColor);
-//    CmAsm.NumberColor := GetNodeAttr(Root, xmlNumberColor);
-//    CmAsm.InstructionColor := GetNodeAttr(Root, xmlInstructionColor);
-//    CmAsm.RegColor := GetNodeAttr(Root, xmlInsRegColor);
-//    CmAsm.PrefixColor := GetNodeAttr(Root, xmlPrefixColor);
-//    CmAsm.JmpColor := GetNodeAttr(Root, xmlJmpColor);
-//    CmAsm.KernelColor := GetNodeAttr(Root, xmlKernelColor);
-//    CmAsm.NopColor := GetNodeAttr(Root, xmlNopColor);
-//    CmAsm.RegHighlightBackColor := GetNodeAttr(Root, xmlRegHighlightBackColor);
-//    CmAsm.RegHighlightFontColor := GetNodeAttr(Root, xmlRegHighlightFontColor);
-//    CmAsm.RIPBackgroundColor := GetNodeAttr(Root, xmlRIPBackgroundColor);
-//    CmAsm.RIPBackgroundFontColor := GetNodeAttr(Root, xmlRIPBackgroundFontColor);
-//    CmAsm.SizePfxColor := GetNodeAttr(Root, xmlSizePfxColor);
-//    CmAsm.SourceLineColor := GetNodeAttr(Root, xmlSourceLineColor);
-//  end;
-//
-//  // настройки цвета для регистров
-//  if not VarIsNull(GetNodeAttr(Root, xmlHintColor)) then
-//  begin
-//    CmReg.HintColor := GetNodeAttr(Root, xmlHintColor);
-//    CmReg.RegColor := GetNodeAttr(Root, xmlRegColor);
-//    CmReg.ValueColor := GetNodeAttr(Root, xmlValueColor);
-//    CmReg.ValueModifiedColor := GetNodeAttr(Root, xmlValueModifiedColor);
-//  end;
-//
-//  // настройки цвета для стека
-//  if not VarIsNull(GetNodeAttr(Root, xmlFrameColor)) then
-//  begin
-//    CmStack.AddrPCColor := GetNodeAttr(Root, xmlAddrPCColor);
-//    CmStack.AddrPCFontColor := GetNodeAttr(Root, xmlAddrPCFontColor);
-//    CmStack.EmptyStackColor := GetNodeAttr(Root, xmlEmptyStackColor);
-//    CmStack.FrameColor := GetNodeAttr(Root, xmlFrameColor);
-//    CmStack.FrameActiveColor := GetNodeAttr(Root, xmlFrameActiveColor);
-//    CmStack.StackPointColor := GetNodeAttr(Root, xmlStackPointColor);
-//    CmStack.StackPointFontColor := GetNodeAttr(Root, xmlStackPointFontColor);
-//  end;
-end;
-
-procedure TCpuViewSettins.LoadDumpSettings(Root: IXMLNode);
-var
-  Node: IXMLNode;
-begin
-//  LoadFontSetting(FDumpView, Root);
-//  Node := FindNode(Root, xmlByteView);
-//  if Node = nil then Exit;
-//  FDumpView.ByteViewMode := TByteViewMode(
-//    GetEnumValue(TypeInfo(TByteViewMode), GetNodeAttr(Node, xmlAttrMode)));
-//  Node := FindNode(Root, xmlEncoder);
-//  if Node = nil then Exit;
-//  FDumpView.Encoder.EncodeType := TCharEncoderType(
-//    GetEnumValue(TypeInfo(TCharEncoderType), GetNodeAttr(Node, xmlAttrMode)));
-//  FDumpView.Encoder.EncodingName := GetNodeAttr(Node, xmlEncoderName);
-//  FDumpView.Encoder.CodePage := GetNodeAttr(Node, xmlEncoderCP);
-end;
-
-procedure TCpuViewSettins.LoadFontSetting(AView: TFWCustomHexView;
-  Root: IXMLNode);
-var
-  Node: IXMLNode;
-begin
-  Node := FindNode(Root, xmlFont);
-  if Assigned(Node) then
-    TViewAccess(AView).Font.Height := Round(
-      XMLReadDouble(Node, xmlFontSize) * AView.CurrentPPI / 96);
 end;
 
 procedure TCpuViewSettins.LoadFromAsmColorMap(Value: TAsmColorMap);
@@ -773,6 +580,13 @@ var
   ColNode, ItemNode: IXMLNode;
   Column: TColumnType;
 begin
+  if SaveFontHeight then
+    FAsmSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
+
+  FAsmSettings.DisplayFuncNameInsteadCallAddr := GetNodeAttr(Root, xmlShowFuncName);
+  FAsmSettings.ShowOpcodes := GetNodeAttr(Root, xmlShowOpcodes);
+  FAsmSettings.ShowSourceLines := GetNodeAttr(Root, xmlShowSrc);
+
   ColNode := FindNode(Root, xmlColumns);
   if ColNode = nil then Exit;
   for I := 0 to ColNode.ChildNodes.Count - 1 do
@@ -789,31 +603,64 @@ var
   SplittersNode, ItemNode: IXMLNode;
   Splitter: TSplitters;
 begin
-  FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
-  FCpuViewDlgSettings.BoundsRect.Top := GetNodeAttr(Root, xmlTop);
-  FCpuViewDlgSettings.BoundsRect.Width := GetNodeAttr(Root, xmlWidth);
-  FCpuViewDlgSettings.BoundsRect.Height := GetNodeAttr(Root, xmlHeight);
-  FCpuViewDlgSettings.Maximized := GetNodeAttr(Root, xmlMaximized);
-  SplittersNode := FindNode(Root, xmlSplitter);
-  if Assigned(SplittersNode) then
+  if SaveFontHeight then
+    FSaveFontHeight := GetNodeAttr(Root, xmlSaveFontSize);
+  FSaveFormPos := GetNodeAttr(Root, xmlSaveFormPos);
+  FSaveViewerProportions := GetNodeAttr(Root, xmlSaveSplitters);
+  FFontName := GetNodeAttr(Root, xmlFont);
+  if FSaveFormPos then
   begin
-    for I := 0 to SplittersNode.ChildNodes.Count - 1 do
+    FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
+    FCpuViewDlgSettings.BoundsRect.Top := GetNodeAttr(Root, xmlTop);
+    FCpuViewDlgSettings.BoundsRect.Width := GetNodeAttr(Root, xmlWidth);
+    FCpuViewDlgSettings.BoundsRect.Height := GetNodeAttr(Root, xmlHeight);
+    FCpuViewDlgSettings.Maximized := GetNodeAttr(Root, xmlMaximized);
+  end;
+  if FSaveViewerProportions then
+  begin
+    SplittersNode := FindNode(Root, xmlSplitter);
+    if Assigned(SplittersNode) then
     begin
-      ItemNode := GetChildNode(SplittersNode, I);
-      Splitter := TSplitters(GetEnumValue(TypeInfo(TSplitters), GetNodeAttr(ItemNode, xmlItem)));
-      FCpuViewDlgSettings.SplitterPos[Splitter] := XMLReadDouble(ItemNode, xmlWidth);
+      for I := 0 to SplittersNode.ChildNodes.Count - 1 do
+      begin
+        ItemNode := GetChildNode(SplittersNode, I);
+        Splitter := TSplitters(GetEnumValue(TypeInfo(TSplitters), GetNodeAttr(ItemNode, xmlItem)));
+        FCpuViewDlgSettings.SplitterPos[Splitter] := XMLReadDouble(ItemNode, xmlWidth);
+      end;
     end;
   end;
 end;
 
 procedure TCpuViewSettins.LoadFromXML_Colors(Root: IXMLNode);
+var
+  I: Integer;
+  ColorValue: TColor;
+  AttrList: TArray<string>;
 begin
-
+  AttrList := FColors.Keys.ToArray;
+  for I := 0 to Length(AttrList) - 1 do
+  begin
+    ColorValue := GetNodeAttr(Root, AttrList[I]);
+    FColors.AddOrSetValue(AttrList[I], ColorValue);
+  end;
 end;
 
 procedure TCpuViewSettins.LoadFromXML_DumpSettings(Root: IXMLNode);
+var
+  Node: IXMLNode;
 begin
-
+  Node := FindNode(Root, xmlByteView);
+  if Node = nil then Exit;
+  FDumpSettings.ByteViewMode := TByteViewMode(
+    GetEnumValue(TypeInfo(TByteViewMode), GetNodeAttr(Node, xmlAttrMode)));
+  Node := FindNode(Root, xmlEncoder);
+  if Node = nil then Exit;
+  FDumpSettings.EncodeType := TCharEncoderType(
+    GetEnumValue(TypeInfo(TCharEncoderType), GetNodeAttr(Node, xmlAttrMode)));
+  FDumpSettings.EncodingName := GetNodeAttr(Node, xmlEncoderName);
+  FDumpSettings.CodePage := GetNodeAttr(Node, xmlEncoderCP);
+  if SaveFontHeight then
+    FDumpSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_Full(Root: IXMLNode);
@@ -831,39 +678,26 @@ begin
   LoadFromXML_AsmSettings(Node);
   Node := FindNode(Root, xmlDumpView);
   if Node = nil then Exit;
-  LoadDumpSettings(Node);
+  LoadFromXML_DumpSettings(Node);
   Node := FindNode(Root, xmlRegView);
   if Node = nil then Exit;
-  LoadRegSettings(Node);
+  LoadFromXML_RegSettings(Node);
   Node := FindNode(Root, xmlStackView);
   if Node = nil then Exit;
-  LoadStackSettings(Node);
+  LoadFromXML_StackSettings(Node);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_RegSettings(Root: IXMLNode);
 begin
-
+  if SaveFontHeight then
+    FRegFontHeight := XMLReadDouble(Root, xmlFontSize);
+  FRegSettings.LoadFromXML(Root);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_StackSettings(Root: IXMLNode);
 begin
-
-end;
-
-procedure TCpuViewSettins.LoadRegSettings(Root: IXMLNode);
-var
-  Ctx: IXMLNode;
-begin
-//  LoadFontSetting(FRegView, Root);
-//  Ctx := FindNode(Root, xmlContext);
-//  if Ctx = nil then Exit;
-//  if GetNodeAttr(Ctx, xmlContextName) <> GetRegisterContextName then Exit;
-//  LoadRegisterContext(Ctx);
-end;
-
-procedure TCpuViewSettins.LoadStackSettings(Root: IXMLNode);
-begin
-//  LoadFontSetting(FStackView, Root);
+  if SaveFontHeight then
+    FStackFontHeight := XMLReadDouble(Root, xmlFontSize);
 end;
 
 procedure TCpuViewSettins.Reset;
@@ -871,26 +705,7 @@ begin
   InitDefault;
 end;
 
-procedure TCpuViewSettins.RestoreAsmViewSettings(AAsmView: TAsmView);
-
-  function ToDpi(Value: Double): Integer;
-  begin
-    Result := Round(Value * AAsmView.CurrentPPI / 96);
-  end;
-
-var
-  I: TColumnType;
-begin
-  RestoreViewDefSettings(AAsmView);
-  SaveToAsmColorMap(AAsmView.ColorMap);
-  for I := Low(TColumnType) to High(TColumnType) do
-    if I in AAsmView.Header.Columns then
-      FAsmSettings.ColumnWidth[I] := ToDpi(AAsmView.Header.ColumnWidth[I])
-end;
-
 procedure TCpuViewSettins.RestoreViewDefSettings(AView: TFWCustomHexView);
-var
-  I: TColumnType;
 begin
   AView.ResetViewState;
   TViewAccess(AView).Font.Name := FontName;
@@ -909,11 +724,7 @@ begin
     XMLDocument.AppendChild(Node);
     TDOMElement(Node).SetAttribute(xmlVersion, xmlVersionData);
     TDOMElement(Node).SetAttribute(xmlGenerator, xmlGeneratorData);
-    SaveColorMap(NewChild(Node, xmlColor));
-    SaveAsmSettings(NewChild(Node, xmlAsmView));
-    SaveDumpSettings(NewChild(Node, xmlDumpView));
-    SaveRegSettings(NewChild(Node, xmlRegView));
-    SaveStackSettings(NewChild(Node, xmlStackView));
+    SaveToXML_Full(Node);
     WriteXML(XMLDocument, FilePath);
   finally
     XMLDocument.Free;
@@ -927,166 +738,12 @@ begin
     Node := XMLDocument.AddChild(SettingRoot);
     Node.Attributes[xmlVersion] := xmlVersionData;
     Node.Attributes[xmlGenerator] := xmlGeneratorData;
-    SaveColorMap(Node.AddChild(xmlColor));
-    SaveAsmSettings(Node.AddChild(xmlAsmView));
-    SaveDumpSettings(Node.AddChild(xmlDumpView));
-    SaveRegSettings(Node.AddChild(xmlRegView));
-    SaveStackSettings(Node.AddChild(xmlStackView));
+    SaveToXML_Full(Node);
     XMLDocument.SaveToFile(FilePath);
   finally
     XMLDocument.Active := False;
   end;
   {$ENDIF}
-end;
-
-procedure TCpuViewSettins.SaveAsmSettings(Root: IXMLNode);
-
-//  function ToDpi(Value: Integer): Double;
-//  begin
-//    Result := Value * 96 / FAsmView.CurrentPPI;
-//  end;
-
-var
-  I: TColumnType;
-  ColNode, ItemNode: IXMLNode;
-begin
-//  SaveFontSetting(FAsmView, Root);
-//  ColNode := NewChild(Root, xmlColumns);
-//  for I := Low(TColumnType) to High(TColumnType) do
-//    if I in TViewAccess(FAsmView).Header.Columns then
-//    begin
-//      ItemNode := NewChild(ColNode, xmlItem);
-//      SetNodeAttr(ItemNode, xmlItem, GetEnumName(TypeInfo(TColumnType), Integer(I)));
-//      XMLWriteDouble(ItemNode, xmlWidth, ToDpi(FAsmView.Header.ColumnWidth[I]));
-//    end;
-end;
-
-procedure TCpuViewSettins.SaveColorMap(Root: IXMLNode);
-var
-  Cm: THexViewColorMap;
-  CmAsm: TAsmColorMap;
-  CmStack: TStackColorMap;
-  CmReg: TRegistersColorMap;
-begin
-//  Cm := FAsmView.ColorMap;
-//  SetNodeAttr(Root, xmlMode, GetEnumName(TypeInfo(TColorMode), Integer(Cm.ColorMode)));
-//  // общие цвета для всех четырех вьюверов
-//  if Cm.ColorMode = cmCustom then
-//  begin
-//    SetNodeAttr(Root, xmlBackgroundColor, Cm.BackgroundColor);
-//    SetNodeAttr(Root, xmlBookmarkBackgroundColor, Cm.BookmarkBackgroundColor);
-//    SetNodeAttr(Root, xmlBookmarkBorderColor, Cm.BookmarkBorderColor);
-//    SetNodeAttr(Root, xmlBookmarkTextColor, Cm.BookmarkTextColor);
-//    SetNodeAttr(Root, xmlCaretColor, Cm.CaretColor);
-//    SetNodeAttr(Root, xmlCaretTextColor, Cm.CaretTextColor);
-//    SetNodeAttr(Root, xmlGroupColor, Cm.GroupColor);
-//    SetNodeAttr(Root, xmlInfoBackgroundColor, Cm.InfoBackgroundColor);
-//    SetNodeAttr(Root, xmlInfoBorderColor, Cm.InfoBorderColor);
-//    SetNodeAttr(Root, xmlInfoTextColor, Cm.InfoTextColor);
-//    SetNodeAttr(Root, xmlHeaderBackgroundColor, Cm.HeaderBackgroundColor);
-//    SetNodeAttr(Root, xmlHeaderBorderColor, Cm.HeaderBorderColor);
-//    SetNodeAttr(Root, xmlHeaderColumnSeparatorColor, Cm.HeaderColumnSeparatorColor);
-//    SetNodeAttr(Root, xmlHeaderTextColor, Cm.HeaderTextColor);
-//    SetNodeAttr(Root, xmlRowSeparatorColor, Cm.RowSeparatorColor);
-//    SetNodeAttr(Root, xmlSelectColor, Cm.SelectColor);
-//    SetNodeAttr(Root, xmlSelectInactiveColor, Cm.SelectInactiveColor);
-//    SetNodeAttr(Root, xmlTextColor, Cm.TextColor);
-//    SetNodeAttr(Root, xmlTextCommentColor, Cm.TextCommentColor);
-//    SetNodeAttr(Root, xmlWorkSpaceTextColor, Cm.WorkSpaceTextColor);
-//  end;
-//  // настройки цвета для дизассемблера
-//  CmAsm := FAsmView.ColorMap;
-//  if CmAsm.ColorMode = cmCustom then
-//  begin
-//    SetNodeAttr(Root, xmlActiveJumpColor, CmAsm.ActiveJmpColor);
-//    SetNodeAttr(Root, xmlArrowDownColor, CmAsm.ArrowDownColor);
-//    SetNodeAttr(Root, xmlArrowDownSelectedColor, CmAsm.ArrowDownSelectedColor);
-//    SetNodeAttr(Root, xmlArrowUpColor, CmAsm.ArrowUpColor);
-//    SetNodeAttr(Root, xmlArrowUpSelectedColor, CmAsm.ArrowUpSelectedColor);
-//    SetNodeAttr(Root, xmlBpActiveColor, CmAsm.BreakPointActiveColor);
-//    SetNodeAttr(Root, xmlBpActiveFontColor, CmAsm.BreakPointActiveFontColor);
-//    SetNodeAttr(Root, xmlBpColor, CmAsm.BreakPointColor);
-//    SetNodeAttr(Root, xmlBpDisabledColor, CmAsm.BreakPointDisabledColor);
-//    SetNodeAttr(Root, xmlBpDisabledFontColor, CmAsm.BreakPointDisabledFontColor);
-//    SetNodeAttr(Root, xmlBpFontColor, CmAsm.BreakPointFontColor);
-//    SetNodeAttr(Root, xmlJmpMarkColor, CmAsm.JmpMarkColor);
-//    SetNodeAttr(Root, xmlJmpMarkTextColor, CmAsm.JmpMarkTextColor);
-//    SetNodeAttr(Root, xmlSeparatorBackgroundColor, CmAsm.SeparatorBackgroundColor);
-//    SetNodeAttr(Root, xmlSeparatorBorderColor, CmAsm.SeparatorBorderColor);
-//    SetNodeAttr(Root, xmlSeparatorTextColor, CmAsm.SeparatorTextColor);
-//    SetNodeAttr(Root, xmlNumberColor, CmAsm.NumberColor);
-//    SetNodeAttr(Root, xmlInstructionColor, CmAsm.InstructionColor);
-//    SetNodeAttr(Root, xmlInsRegColor, CmAsm.RegColor);
-//    SetNodeAttr(Root, xmlPrefixColor, CmAsm.PrefixColor);
-//    SetNodeAttr(Root, xmlJmpColor, CmAsm.JmpColor);
-//    SetNodeAttr(Root, xmlKernelColor, CmAsm.KernelColor);
-//    SetNodeAttr(Root, xmlNopColor, CmAsm.NopColor);
-//    SetNodeAttr(Root, xmlRegHighlightBackColor, CmAsm.RegHighlightBackColor);
-//    SetNodeAttr(Root, xmlRegHighlightFontColor, CmAsm.RegHighlightFontColor);
-//    SetNodeAttr(Root, xmlRIPBackgroundColor, CmAsm.RIPBackgroundColor);
-//    SetNodeAttr(Root, xmlRIPBackgroundFontColor, CmAsm.RIPBackgroundFontColor);
-//    SetNodeAttr(Root, xmlSizePfxColor, CmAsm.SizePfxColor);
-//    SetNodeAttr(Root, xmlSourceLineColor, CmAsm.SourceLineColor);
-//  end;
-//  // настройки цвета для регистров
-//  CmReg := FRegView.ColorMap;
-//  if CmReg.ColorMode = cmCustom then
-//  begin
-//    SetNodeAttr(Root, xmlHintColor, CmReg.HintColor);
-//    SetNodeAttr(Root, xmlRegColor, CmReg.RegColor);
-//    SetNodeAttr(Root, xmlValueColor, CmReg.ValueColor);
-//    SetNodeAttr(Root, xmlValueModifiedColor, CmReg.ValueModifiedColor);
-//  end;
-//  // настройки цвета для стека
-//  CmStack := FStackView.ColorMap;
-//  if CmStack.ColorMode = cmCustom then
-//  begin
-//    SetNodeAttr(Root, xmlAddrPCColor, CmStack.AddrPCColor);
-//    SetNodeAttr(Root, xmlAddrPCFontColor, CmStack.AddrPCFontColor);
-//    SetNodeAttr(Root, xmlEmptyStackColor, CmStack.EmptyStackColor);
-//    SetNodeAttr(Root, xmlEmptyStackColor, CmStack.EmptyStackColor);
-//    SetNodeAttr(Root, xmlFrameColor, CmStack.FrameColor);
-//    SetNodeAttr(Root, xmlFrameActiveColor, CmStack.FrameActiveColor);
-//    SetNodeAttr(Root, xmlStackPointColor, CmStack.StackPointColor);
-//    SetNodeAttr(Root, xmlStackPointFontColor, CmStack.StackPointFontColor);
-//  end;
-end;
-
-procedure TCpuViewSettins.SaveDumpSettings(Root: IXMLNode);
-var
-  ByteView, Encoder: IXMLNode;
-begin
-//  SaveFontSetting(FDumpView, Root);
-//  ByteView := NewChild(Root, xmlByteView);
-//  SetNodeAttr(ByteView, xmlAttrMode,
-//    GetEnumName(TypeInfo(TByteViewMode), Integer(FDumpView.ByteViewMode)));
-//  Encoder := NewChild(Root, xmlEncoder);
-//  SetNodeAttr(Encoder, xmlAttrMode,
-//    GetEnumName(TypeInfo(TCharEncoderType), Integer(FDumpView.Encoder.EncodeType)));
-//  SetNodeAttr(Encoder, xmlEncoderName, FDumpView.Encoder.EncodingName);
-//  SetNodeAttr(Encoder, xmlEncoderCP, FDumpView.Encoder.CodePage);
-end;
-
-procedure TCpuViewSettins.SaveFontSetting(AView: TFWCustomHexView;
-  Root: IXMLNode);
-begin
-  XMLWriteDouble(NewChild(Root, xmlFont), xmlFontSize,
-    TViewAccess(AView).Font.Height * 96 / AView.CurrentPPI);
-end;
-
-procedure TCpuViewSettins.SaveRegSettings(Root: IXMLNode);
-var
-  Ctx: IXMLNode;
-begin
-//  SaveFontSetting(FRegView, Root);
-//  Ctx := NewChild(Root, xmlContext);
-//  SetNodeAttr(Ctx, xmlContextName, GetRegisterContextName);
-//  SaveRegisterContext(Ctx);
-end;
-
-procedure TCpuViewSettins.SaveStackSettings(Root: IXMLNode);
-begin
-//  SaveFontSetting(FStackView, Root);
 end;
 
 procedure TCpuViewSettins.SaveToAsmColorMap(Value: TAsmColorMap);
@@ -1165,19 +822,168 @@ begin
   Value.StackPointFontColor := Color[xmlStackPointFontColor];
 end;
 
-procedure TCpuViewSettins.SaveToXML_Colors(Root: IXMLNode);
+procedure TCpuViewSettins.SaveToXML_AsmSettings(Root: IXMLNode);
+var
+  I: TColumnType;
+  ColNode, ItemNode: IXMLNode;
+  Columns: TFWHexViewColumnTypes;
 begin
+  if SaveFontHeight then
+    XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
 
+  SetNodeAttr(Root, xmlShowFuncName, FAsmSettings.DisplayFuncNameInsteadCallAddr);
+  SetNodeAttr(Root, xmlShowOpcodes, FAsmSettings.ShowOpcodes);
+  SetNodeAttr(Root, xmlShowSrc, FAsmSettings.ShowSourceLines);
+
+  ColNode := NewChild(Root, xmlColumns);
+  Columns := [ctWorkSpace..ctComment];
+  if not FAsmSettings.ShowOpcodes then
+    Exclude(Columns, ctOpcode);
+  for I := Low(TColumnType) to High(TColumnType) do
+    if I in Columns then
+    begin
+      ItemNode := NewChild(ColNode, xmlItem);
+      SetNodeAttr(ItemNode, xmlItem, GetEnumName(TypeInfo(TColumnType), Integer(I)));
+      XMLWriteDouble(ItemNode, xmlWidth, FAsmSettings.ColumnWidth[I]);
+    end;
+end;
+
+procedure TCpuViewSettins.SaveToXML_BasicSettings(Root: IXMLNode);
+var
+  SplitNode, ItemNode: IXMLNode;
+  I: TSplitters;
+begin
+  SetNodeAttr(Root, xmlSaveFontSize, FSaveFontHeight);
+  SetNodeAttr(Root, xmlSaveFormPos, FSaveFormPos);
+  SetNodeAttr(Root, xmlSaveSplitters, FSaveViewerProportions);
+  SetNodeAttr(Root, xmlFont, FFontName);
+  if FSaveFormPos then
+  begin
+    SetNodeAttr(Root, xmlLeft, FCpuViewDlgSettings.BoundsRect.Left);
+    SetNodeAttr(Root, xmlTop, FCpuViewDlgSettings.BoundsRect.Top);
+    SetNodeAttr(Root, xmlWidth, FCpuViewDlgSettings.BoundsRect.Width);
+    SetNodeAttr(Root, xmlHeight, FCpuViewDlgSettings.BoundsRect.Height);
+    SetNodeAttr(Root, xmlMaximized, FCpuViewDlgSettings.Maximized);
+  end;
+  if FSaveViewerProportions then
+  begin
+    SplitNode := NewChild(Root, xmlSplitter);
+    for I := Low(TSplitters) to High(TSplitters) do
+    begin
+      ItemNode := NewChild(SplitNode, xmlItem);
+      SetNodeAttr(ItemNode, xmlItem, GetEnumName(TypeInfo(TSplitters), Integer(I)));
+      XMLWriteDouble(ItemNode, xmlWidth, FCpuViewDlgSettings.SplitterPos[I]);
+    end;
+  end;
+end;
+
+procedure TCpuViewSettins.SaveToXML_Colors(Root: IXMLNode);
+var
+  I: Integer;
+  AttrList: TArray<string>;
+begin
+  SetNodeAttr(Root, xmlMode, GetEnumName(TypeInfo(TColorMode), Integer(FColorMode)));
+  AttrList := FColors.Keys.ToArray;
+  for I := 0 to Length(AttrList) - 1 do
+    SetNodeAttr(Root, AttrList[I], Color[AttrList[I]]);
+end;
+
+procedure TCpuViewSettins.SaveToXML_DumpSettings(Root: IXMLNode);
+var
+  ByteView, Encoder: IXMLNode;
+begin
+  if SaveFontHeight then
+    XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
+  ByteView := NewChild(Root, xmlByteView);
+  SetNodeAttr(ByteView, xmlAttrMode,
+    GetEnumName(TypeInfo(TByteViewMode), Integer(FDumpSettings.ByteViewMode)));
+  Encoder := NewChild(Root, xmlEncoder);
+  SetNodeAttr(Encoder, xmlAttrMode,
+    GetEnumName(TypeInfo(TCharEncoderType), Integer(FDumpSettings.EncodeType)));
+  SetNodeAttr(Encoder, xmlEncoderName, FDumpSettings.EncodingName);
+  SetNodeAttr(Encoder, xmlEncoderCP, FDumpSettings.CodePage);
 end;
 
 procedure TCpuViewSettins.SaveToXML_Full(Root: IXMLNode);
 begin
+  {$IFDEF FPC}
+  SaveToXML_BasicSettings(NewChild(Root, xmlBasic));
+  SaveToXML_Colors(NewChild(Root, xmlColor));
+  SaveToXML_AsmSettings(NewChild(Root, xmlAsmView));
+  SaveToXML_DumpSettings(NewChild(Root, xmlDumpView));
+  SaveToXML_RegSettings(NewChild(Root, xmlRegView));
+  SaveToXML_StackSettings(NewChild(Root, xmlStackView));
+  {$ELSE}
+  SaveToXML_BasicSettings(Root.AddChild(xmlBasic));
+  SaveToXML_Colors(Root.AddChild(xmlColor));
+  SaveToXML_AsmSettings(Root.AddChild(xmlAsmView));
+  SaveToXML_DumpSettings(Root.AddChild(xmlDumpView));
+  SaveToXML_RegSettings(Root.AddChild(xmlRegView));
+  SaveToXML_StackSettings(Root.AddChild(xmlStackView));
+  {$ENDIF}
+end;
 
+procedure TCpuViewSettins.SaveToXML_RegSettings(Root: IXMLNode);
+begin
+  if SaveFontHeight then
+    XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
+  FRegSettings.SaveToXML(Root);
+end;
+
+procedure TCpuViewSettins.SaveToXML_StackSettings(Root: IXMLNode);
+begin
+  if SaveFontHeight then
+    XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
 end;
 
 procedure TCpuViewSettins.SetColor(const Index: string; Value: TColor);
 begin
   FColors.TryAdd(Index, Value);
+end;
+
+procedure TCpuViewSettins.SetSettingsToAsmView(AAsmView: TAsmView);
+var
+  I: TColumnType;
+begin
+  if AAsmView = nil then Exit;
+  RestoreViewDefSettings(AAsmView);
+  SaveToAsmColorMap(AAsmView.ColorMap);
+  if SaveFontHeight then
+    AAsmView.Font.Height := DoubleToDpi(FAsmSettings.FontHeight, AAsmView);
+  for I := Low(TColumnType) to High(TColumnType) do
+    if I in AAsmView.Header.Columns then
+      FAsmSettings.ColumnWidth[I] := DoubleToDpi(AAsmView.Header.ColumnWidth[I], AAsmView)
+end;
+
+procedure TCpuViewSettins.SetSettingsToDumpView(ADumpView: TDumpView);
+begin
+  if ADumpView = nil then Exit;
+  RestoreViewDefSettings(ADumpView);
+  if SaveFontHeight then
+    ADumpView.Font.Height := DoubleToDpi(FDumpSettings.FontHeight, ADumpView);
+  ADumpView.ByteViewMode := FDumpSettings.ByteViewMode;
+  ADumpView.Encoder.EncodeType := FDumpSettings.EncodeType;
+  ADumpView.Encoder.CodePage := FDumpSettings.CodePage;
+  ADumpView.Encoder.EncodingName := FDumpSettings.EncodingName;
+end;
+
+procedure TCpuViewSettins.SetSettingsToRegView(ARegView: TRegView);
+begin
+  if ARegView = nil then Exit;
+  RestoreViewDefSettings(ARegView);
+  if SaveFontHeight then
+    ARegView.Font.Height := DoubleToDpi(FRegFontHeight, ARegView);
+  SaveToRegColorMap(ARegView.ColorMap);
+  FRegSettings.SaveToContext(ARegView.Context);
+end;
+
+procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);
+begin
+  if AStackView = nil then Exit;
+  RestoreViewDefSettings(AStackView);
+  if SaveFontHeight then
+    AStackView.Font.Height := DoubleToDpi(FStackFontHeight, AStackView);
+  SaveToStackColorMap(AStackView.ColorMap);
 end;
 
 { TIntelCpuViewSettins }

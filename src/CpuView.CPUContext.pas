@@ -8,7 +8,7 @@ interface
 
 uses
 {$IFnDEF FPC}
-  Windows,
+  Windows, XMLIntf,
 {$ELSE}
   LCLIntf, LCLType,
 {$ENDIF}
@@ -16,7 +16,8 @@ uses
   Classes,
   Generics.Collections,
   FWHexView.Common,
-  CpuView.Common;
+  CpuView.Common,
+  CpuView.XML;
 
 const
   // supported display types by each register type
@@ -97,6 +98,22 @@ type
     const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string) of object;
 
   TRegQueryStringType = (rqstName, rqstValue);
+
+  TAbstractCPUContext = class;
+
+  { TRegAbstractSettings }
+
+  TContextAbstractSettings = class
+  public
+    procedure InitDefault; virtual; abstract;
+    function GetRegisterContextName: string; virtual; abstract;
+    procedure LoadFromContext(ACtx: TAbstractCPUContext); virtual; abstract;
+    procedure LoadFromXML(Root: IXMLNode); virtual; abstract;
+    procedure SaveToContext(ACtx: TAbstractCPUContext); virtual; abstract;
+    procedure SaveToXML(Root: IXMLNode); virtual; abstract;
+  end;
+
+  TRegAbstractSettingsClass = class of TContextAbstractSettings;
 
   { TAbstractCPUContext }
 
