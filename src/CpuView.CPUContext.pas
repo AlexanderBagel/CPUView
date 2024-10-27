@@ -104,13 +104,16 @@ type
   { TRegAbstractSettings }
 
   TContextAbstractSettings = class
+  protected
+    function GetContextName: string; virtual; abstract;
+    procedure InternalLoadFromXML(Root: IXMLNode); virtual; abstract;
+    procedure InternalSaveToXML(Root: IXMLNode); virtual; abstract;
   public
     procedure InitDefault; virtual; abstract;
-    function GetRegisterContextName: string; virtual; abstract;
     procedure LoadFromContext(ACtx: TAbstractCPUContext); virtual; abstract;
-    procedure LoadFromXML(Root: IXMLNode); virtual; abstract;
     procedure SaveToContext(ACtx: TAbstractCPUContext); virtual; abstract;
-    procedure SaveToXML(Root: IXMLNode); virtual; abstract;
+    procedure LoadFromXML(Root: IXMLNode);
+    procedure SaveToXML(Root: IXMLNode);
   end;
 
   TRegAbstractSettingsClass = class of TContextAbstractSettings;
@@ -122,7 +125,6 @@ type
   TAbstractCPUContext = class(TComponent)
   private
     FAddressMode: TAddressMode;
-    FChange: TContextChangeEvent;
     FChangeList: TList<TContextChangeEvent>;
     FQueryHint: TContextQueryRegHintEvent;
     FQueryExternalHint: TContextQueryExternalRegHintEvent;
@@ -277,6 +279,22 @@ end;
 function TRegParam.Valid: Boolean;
 begin
   Result := Self.ColIndex > -1;
+end;
+
+{ TContextAbstractSettings }
+
+procedure TContextAbstractSettings.LoadFromXML(Root: IXMLNode);
+var
+  Node: IXMLNode;
+begin
+  Node := FindNode(Root, GetContextName);
+  if Assigned(Node) then
+    InternalLoadFromXML(Node);
+end;
+
+procedure TContextAbstractSettings.SaveToXML(Root: IXMLNode);
+begin
+  InternalSaveToXML(NewChild(Root, GetContextName));
 end;
 
 { TAbstractCPUContext }

@@ -14,6 +14,7 @@ uses
 {$ENDIF}
   SysUtils,
   Classes,
+  TypInfo,
   Generics.Collections,
   FWHexView.Common,
   CpuView.Common,
@@ -34,13 +35,37 @@ type
   TIntelCpuMapMode = (icmDetailed, icmSimple);
 
   TIntelCtxSettings = class(TContextAbstractSettings)
+  private const
+    xmlName = 'intel';
+    xmlFlags = 'flags';
+    xmlFPUMode = 'fpuMode';
+    xmlMapMode = 'mapMode';
+    xmlShowDebug = 'showDebug';
+    xmlShowFPU = 'showFPU';
+    xmlShowXMM = 'showXMM';
+    xmlShowYMM = 'showYMM';
+    xmlRegList = 'regs';
+    xmlRegID = 'id';
+    SavedRegs = [0..7, 9..16, 33, 41, 49, 58, 74];
+  private
+    FMapMode: TIntelCpuMapMode;
+    FFPUMode: TFPUMode;
+    FRegViewMode: TDictionary<Integer, TRegViewMode>;
+    FShowDebug: Boolean;
+    FShowFPU: Boolean;
+    FShowXMM: Boolean;
+    FShowYMM: Boolean;
+  protected
+    function GetContextName: string; override;
+    procedure InternalLoadFromXML(Root: IXMLNode); override;
+    procedure InternalSaveToXML(Root: IXMLNode); override;
   public
+    constructor Create;
+    destructor Destroy; override;
     procedure InitDefault; override;
-    function GetRegisterContextName: string; override;
+    // load/save session settings
     procedure LoadFromContext(ACtx: TAbstractCPUContext); override;
-    procedure LoadFromXML(Root: IXMLNode); override;
     procedure SaveToContext(ACtx: TAbstractCPUContext); override;
-    procedure SaveToXML(Root: IXMLNode); override;
   end;
 
   { TIntelCpuContext }
@@ -52,9 +77,9 @@ type
     FFPUMode: TFPUMode;
     FQueryRegAtAddr: TDictionary<Int64, string>;
     FShowDebug: Boolean;
+    FShowFPU: Boolean;
     FShowXMM: Boolean;
     FShowYMM: Boolean;
-    FShowFPU: Boolean;
     FSavedDetailed: array [0..3] of Boolean;
     function GetRegExtendedIndex(const ARegName: string): Integer;
     procedure SetContext(const Value: TIntelThreadContext);
@@ -163,39 +188,124 @@ const
 
 { TIntelCtxSettings }
 
-function TIntelCtxSettings.GetRegisterContextName: string;
+constructor TIntelCtxSettings.Create;
 begin
+  FRegViewMode := TDictionary<Integer, TRegViewMode>.Create;
+end;
 
+destructor TIntelCtxSettings.Destroy;
+begin
+  FRegViewMode.Free;
+  inherited;
+end;
+
+function TIntelCtxSettings.GetContextName: string;
+begin
+  Result := xmlName;
 end;
 
 procedure TIntelCtxSettings.InitDefault;
+var
+  I: Integer;
 begin
-  inherited;
+  FMapMode := icmDetailed;
+  FFPUMode := fpuST;
+  FShowDebug := True;
+  FShowXMM := True;
+  FShowYMM := False;
+  FShowFPU := True;
+  FRegViewMode.Clear;
+  for I in SavedRegs do
+    FRegViewMode.Add(I, rvmHex);
+end;
 
+procedure TIntelCtxSettings.InternalLoadFromXML(Root: IXMLNode);
+var
+  Flags, Regs, ItemNode: IXMLNode;
+  I, RegID: Integer;
+begin
+  Flags := FindNode(Root, xmlFlags);
+  if Flags = nil then Exit;
+  FFPUMode := TFPUMode(
+    GetEnumValue(TypeInfo(TFPUMode), GetNodeAttr(Flags, xmlFPUMode)));
+  FMapMode := TIntelCpuMapMode(
+    GetEnumValue(TypeInfo(TIntelCpuMapMode), GetNodeAttr(Flags, xmlMapMode)));
+  FShowDebug := GetNodeAttr(Flags, xmlShowDebug);
+  FShowFPU := GetNodeAttr(Flags, xmlShowFPU);
+  FShowXMM := GetNodeAttr(Flags, xmlShowXMM);
+  FShowYMM := GetNodeAttr(Flags, xmlShowYMM);
+  Regs := FindNode(Root, xmlRegList);
+  if Regs = nil then Exit;
+  for I := 0 to Regs.ChildNodes.Count - 1 do
+  begin
+    ItemNode := GetChildNode(Regs, I);
+    RegID := GetNodeAttr(ItemNode, xmlRegID);
+    FRegViewMode.AddOrSetValue(RegID, TRegViewMode(
+      GetEnumValue(TypeInfo(TRegViewMode), GetNodeAttr(ItemNode, xmlMode))));
+  end;
+end;
+
+procedure TIntelCtxSettings.InternalSaveToXML(Root: IXMLNode);
+var
+  Flags, Regs, ItemNode: IXMLNode;
+  RegID: Integer;
+  ARegViewMode: TRegViewMode;
+begin
+  Flags := NewChild(Root, xmlFlags);
+  SetNodeAttr(Flags, xmlFPUMode,
+    GetEnumName(TypeInfo(TFPUMode), Integer(FFPUMode)));
+  SetNodeAttr(Flags, xmlMapMode,
+    GetEnumName(TypeInfo(TIntelCpuMapMode), Integer(FMapMode)));
+  SetNodeAttr(Flags, xmlShowDebug, FShowDebug);
+  SetNodeAttr(Flags, xmlShowFPU, FShowFPU);
+  SetNodeAttr(Flags, xmlShowXMM, FShowXMM);
+  SetNodeAttr(Flags, xmlShowYMM, FShowYMM);
+  Regs := nil;
+  for RegID in SavedRegs do
+  begin
+    if not FRegViewMode.TryGetValue(RegID, ARegViewMode) then Continue;
+    if ARegViewMode = rvmHex then Continue;
+    if Regs = nil then
+      Regs := NewChild(Root, xmlRegList);
+    ItemNode := NewChild(Regs, xmlItem);
+    SetNodeAttr(ItemNode, xmlRegID, RegID);
+    SetNodeAttr(ItemNode, xmlMode,
+      GetEnumName(TypeInfo(TRegViewMode), Integer(ARegViewMode)));
+  end;
 end;
 
 procedure TIntelCtxSettings.LoadFromContext(ACtx: TAbstractCPUContext);
+var
+  Ctx: TIntelCpuContext;
+  RegID: Integer;
 begin
-  inherited;
-
-end;
-
-procedure TIntelCtxSettings.LoadFromXML(Root: IXMLNode);
-begin
-  inherited;
-
+  Ctx := ACtx as TIntelCpuContext;
+  FMapMode := Ctx.MapMode;
+  FFPUMode := Ctx.FPUMode;
+  FShowDebug := Ctx.ShowDebug;
+  FShowFPU := Ctx.ShowFPU;
+  FShowXMM := Ctx.ShowXMM;
+  FShowYMM := Ctx.ShowYMM;
+  for RegID in SavedRegs do
+    FRegViewMode.AddOrSetValue(RegID, Ctx.ViewMode[RegID]);
 end;
 
 procedure TIntelCtxSettings.SaveToContext(ACtx: TAbstractCPUContext);
+var
+  Ctx: TIntelCpuContext;
+  RegID: Integer;
+  ARegViewMode: TRegViewMode;
 begin
-  inherited;
-
-end;
-
-procedure TIntelCtxSettings.SaveToXML(Root: IXMLNode);
-begin
-  inherited;
-
+  Ctx := ACtx as TIntelCpuContext;
+  Ctx.MapMode := FMapMode;
+  Ctx.FPUMode := FFPUMode;
+  Ctx.ShowDebug := FShowDebug;
+  Ctx.ShowFPU := FShowFPU;
+  Ctx.ShowXMM := FShowXMM;
+  Ctx.ShowYMM := FShowYMM;
+  for RegID in SavedRegs do
+    if FRegViewMode.TryGetValue(RegID, ARegViewMode) then
+      Ctx.ViewMode[RegID] := ARegViewMode;
 end;
 
 { TIntelCpuContext }

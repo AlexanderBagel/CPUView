@@ -19,6 +19,10 @@ uses
   Variants,
   SysUtils;
 
+const
+  xmlItem = 'item';
+  xmlMode = 'mode';
+
 {$IFDEF FPC}
 type
   IXMLNode = TDOMNode;

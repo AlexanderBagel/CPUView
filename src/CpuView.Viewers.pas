@@ -187,6 +187,7 @@ type
       AColumn: TColumnType = ctNone): Int64; override;
     function GetColorMapClass: THexViewColorMapClass; override;
     function GetOverloadPainterClass(Value: TPrimaryRowPainterClass): TPrimaryRowPainterClass; override;
+    procedure InitDefault; override;
     procedure InitPainters; override;
   protected
     // Lock Vertical Scroll
@@ -1118,8 +1119,6 @@ constructor TCustomAsmView.Create(AOwner: TComponent);
 begin
   inherited;
   ScrollBars :=  TScrollStyle.ssBoth;
-  Header.Columns := [ctWorkSpace..ctComment];
-  Header.Visible := False;
   FTokenizer := TAsmTokenizer.Create;
   DrawIncomingJmp := True;
   FBreakPoints := TDictionary<Int64, Boolean>.Create;
@@ -1261,6 +1260,13 @@ begin
       Result := TAsmViewSrcLineRow
     else
       Result := Value;
+end;
+
+procedure TCustomAsmView.InitDefault;
+begin
+  inherited InitDefault;
+  Header.Columns := [ctWorkSpace..ctComment];
+  Header.Visible := False;
 end;
 
 procedure TCustomAsmView.InitPainters;

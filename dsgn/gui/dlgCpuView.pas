@@ -9,6 +9,8 @@ uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
   ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList,
 
+  LazIDEIntf,
+
   FWHexView,
   FWHexView.Actions,
   FWHexView.MappedView,
@@ -19,7 +21,8 @@ uses
   CpuView.Viewers,
   CpuView.DebugerGate,
   CpuView.FpDebug,
-  CpuView.Actions;
+  CpuView.Actions,
+  CpuView.Settings;
 
 type
 
@@ -278,6 +281,7 @@ type
     procedure acViewGotoExecute(Sender: TObject);
     procedure AsmViewSelectionChange(Sender: TObject);
     procedure DumpViewSelectionChange(Sender: TObject);
+    procedure FormChangeBounds(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
@@ -292,6 +296,7 @@ type
   private
     FCore: TCpuViewCore;
     FDbgGate: TCpuViewDebugGate;
+    FSettings: TCpuViewSettins;
     FAsmViewSelectedAddr,
     FContextRegValue,
     FDumpSelectedValue,
@@ -302,9 +307,11 @@ type
     FContextRegisterParam: TRegParam;
     FQweryAddrViewerIndex: Integer;
     FSourceLine: Integer;
+    FLastBounds: TRect;
     function ActiveViewerSelectedValue: UInt64;
     function CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
     function CheckRegCallback(ANewAddrVA: UInt64): Boolean;
+    function ConfigPath: string;
     procedure InternalShowInDump(AddrVA: Int64);
   protected
     function ActiveDumpView: TDumpView;
@@ -312,15 +319,20 @@ type
     procedure AfterDbgGateCreate; virtual; abstract;
     procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
+    function GetContextSettings: TContextAbstractSettings; virtual; abstract;
     function ToDpi(Value: Integer): Integer;
+    function ToDefaultDpi(Value: Integer): Integer;
     procedure LockZOrder;
     function MeasureCanvas: TBitmap;
     function QweryAccessStr(AddrVA: UInt64): string;
     procedure UnlockZOrder;
     procedure UpdateStatusBar;
   public
+    procedure LoadSettings;
+    procedure SaveSettings;
     property Core: TCpuViewCore read FCore;
     property DbgGate: TCpuViewDebugGate read FDbgGate;
+    property Settings: TCpuViewSettins read FSettings;
   end;
 
 var
@@ -340,7 +352,8 @@ uses
 
 procedure TfrmCpuView.FormCreate(Sender: TObject);
 begin
-  FCore := TCpuViewCore.Create;
+  FSettings := TCpuViewSettins.Create(GetContextSettings);
+  FCore := TCpuViewCore.Create(FSettings);
   FDbgGate := TCpuViewDebugGate.Create(Self);
   FDbgGate.Context := GetContext;
   AfterDbgGateCreate;
@@ -359,6 +372,7 @@ begin
   miAsmRunTo.ImageIndex := tbRunTo.ImageIndex;
   miAsmCurrentIP.ImageIndex := IDEImages.LoadImage('debugger_show_execution_point');
   SetHooks;
+  LoadSettings;
 end;
 
 procedure TfrmCpuView.FormDeactivate(Sender: TObject);
@@ -373,10 +387,12 @@ end;
 procedure TfrmCpuView.FormDestroy(Sender: TObject);
 begin
   ResetHooks;
+  SaveSettings;
   BeforeDbgGateDestroy;
   FDbgGate.Context := nil;
   FCore.Free;
   FDbgGate.Free;
+  FSettings.Free;
 end;
 
 procedure TfrmCpuView.pcDumpsChange(Sender: TObject);
@@ -456,6 +472,11 @@ begin
   Result := True;
 end;
 
+function TfrmCpuView.ConfigPath: string;
+begin
+  Result := IncludeTrailingPathDelimiter(LazarusIDE.GetPrimaryConfigPath) + 'cpuview.xml';
+end;
+
 procedure TfrmCpuView.InternalShowInDump(AddrVA: Int64);
 begin
   Core.ShowDumpAtAddr(AddrVA);
@@ -494,6 +515,60 @@ begin
   end;
 end;
 
+procedure TfrmCpuView.LoadSettings;
+var
+  R: TRect;
+begin
+  Settings.Load(ConfigPath);
+  Settings.SetSettingsToAsmView(AsmView);
+  Settings.SetSettingsToDumpView(DumpView);
+  Settings.SetSettingsToRegView(RegView);
+  Settings.SetSettingsToContext(DbgGate.Context);
+  Settings.SetSettingsToStackView(StackView);
+  R := Settings.CpuViewDlgSettings.BoundsRect;
+  if R.IsEmpty then
+    Position := poScreenCenter
+  else
+  begin
+    Position := poDesigned;
+    SetBounds(R.Left, R.Top, ToDpi(R.Width), ToDpi(R.Height));
+  end;
+  if Settings.CpuViewDlgSettings.Maximized then
+    WindowState := wsMaximized
+  else
+    WindowState := wsNormal;
+  RegView.Width := Round(Settings.CpuViewDlgSettings.SplitterPos[spTopHorz] * (ClientWidth / 100));
+  StackView.Width := Round(Settings.CpuViewDlgSettings.SplitterPos[spBottomHorz] * (ClientWidth / 100));
+  pnDumps.Height := Round(Settings.CpuViewDlgSettings.SplitterPos[spCenterVert] * (ClientHeight / 100));
+end;
+
+procedure TfrmCpuView.SaveSettings;
+var
+  DlgSettings: TCpuViewDlgSettings;
+begin
+  if not (Settings.SaveViewersSession or Settings.SaveFormSession) then Exit;
+  if Settings.SaveViewersSession then
+  begin
+    Settings.GetSessionFromAsmView(AsmView);
+    Settings.GetSessionFromDumpView(DumpView);
+    Settings.GetSessionFromRegView(RegView);
+    Settings.GetSessionFromContext(DbgGate.Context);
+    Settings.GetSessionFromStackView(StackView);
+  end;
+  if Settings.SaveFormSession then
+  begin
+    DlgSettings.BoundsRect := FLastBounds;
+    DlgSettings.BoundsRect.Width := ToDefaultDpi(FLastBounds.Width);
+    DlgSettings.BoundsRect.Height := ToDefaultDpi(FLastBounds.Height);
+    DlgSettings.Maximized := WindowState = wsMaximized;
+    DlgSettings.SplitterPos[spTopHorz] := RegView.Width / (ClientWidth / 100);
+    DlgSettings.SplitterPos[spBottomHorz] := StackView.Width / (ClientWidth / 100);
+    DlgSettings.SplitterPos[spCenterVert] := pnDumps.Height / (ClientHeight / 100);
+    Settings.CpuViewDlgSettings := DlgSettings;
+  end;
+  Settings.Save(ConfigPath);
+end;
+
 function TfrmCpuView.ActiveDumpView: TDumpView;
 begin
   Result := pcDumps.ActivePage.Controls[0] as TDumpView;
@@ -515,6 +590,11 @@ end;
 function TfrmCpuView.ToDpi(Value: Integer): Integer;
 begin
   Result := MulDiv(Value, PixelsPerInch, 96);
+end;
+
+function TfrmCpuView.ToDefaultDpi(Value: Integer): Integer;
+begin
+  Result := MulDiv(Value, 96, PixelsPerInch);
 end;
 
 procedure TfrmCpuView.LockZOrder;
@@ -613,6 +693,12 @@ begin
   FDumpSelectedValue := 0;
   ActiveDumpView.ReadDataAtSelStart(FDumpSelectedValue, FDbgGate.PointerSize);
   UpdateStatusBar;
+end;
+
+procedure TfrmCpuView.FormChangeBounds(Sender: TObject);
+begin
+  if WindowState = wsNormal then
+    FLastBounds := BoundsRect;
 end;
 
 procedure TfrmCpuView.acShowInDumpUpdate(Sender: TObject);

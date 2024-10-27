@@ -54,8 +54,6 @@ const
   xmlRegView = 'regview';
   xmlStackView = 'stackview';
   xmlColumns = 'columns';
-  xmlItem = 'item';
-  xmlMode = 'mode';
   xmlLeft = 'left';
   xmlTop = 'top';
   xmlHeight = 'height';
@@ -64,9 +62,8 @@ const
   xmlFontSize = 'size';
   xmlMaximized = 'maxstate';
   xmlSplitter = 'splitters';
-  xmlSaveFormPos = 'saveForm';
-  xmlSaveSplitters = 'saveProportions';
-  xmlSaveFontSize = 'saveFontSize';
+  xmlSaveFormSession = 'sessionForm';
+  xmlSaveViewersSession = 'sessionView';
   xmlShowFuncName = 'showFuncName';
   xmlShowOpcodes = 'showOpcodes';
   xmlShowSrc = 'showSrc';
@@ -166,6 +163,8 @@ type
     SplitterPos: array [TSplitters] of Double;
   end;
 
+  { TCpuViewSettins }
+
   TCpuViewSettins = class
   strict private
     FAsmSettings: TAsmSettings;
@@ -175,9 +174,8 @@ type
     FDumpSettings: TDumpSettings;
     FFontName: string;
     FRegFontHeight: Double;
-    FSaveFontHeight: Boolean;
-    FSaveFormPos: Boolean;
-    FSaveViewerProportions: Boolean;
+    FSaveFormSession: Boolean;
+    FSaveViewersSession: Boolean;
     FStackFontHeight: Double;
     FRegSettings: TContextAbstractSettings;
     FUseDebugInfo: Boolean;
@@ -230,6 +228,7 @@ type
     procedure ColorsImport(const FilePath: string);
 
     procedure GetSessionFromAsmView(AAsmView: TAsmView);
+    procedure GetSessionFromContext(AContext: TAbstractCPUContext);
     procedure GetSessionFromDumpView(ADumpView: TDumpView);
     procedure GetSessionFromRegView(ARegView: TRegView);
     procedure GetSessionFromStackView(AStackView: TStackView);
@@ -239,6 +238,7 @@ type
     procedure Save(const FilePath: string);
 
     procedure SetSettingsToAsmView(AAsmView: TAsmView);
+    procedure SetSettingsToContext(AContext: TAbstractCPUContext);
     procedure SetSettingsToDumpView(ADumpView: TDumpView);
     procedure SetSettingsToRegView(ARegView: TRegView);
     procedure SetSettingsToStackView(AStackView: TStackView);
@@ -247,31 +247,11 @@ type
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
     property FontName: string read FFontName write FFontName;
-    property SaveFormPos: Boolean read FSaveFormPos write FSaveFormPos;
-    property SaveFontHeight: Boolean read FSaveFontHeight write FSaveFontHeight;
-    property SaveViewerProportions: Boolean read FSaveViewerProportions write FSaveViewerProportions;
+    property SaveFormSession: Boolean read FSaveFormSession write FSaveFormSession;
+    property SaveViewersSession: Boolean read FSaveViewersSession write FSaveViewersSession;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
-  end;
-
-  {$message 'Контекст должен сам себя сериализовать в XML, этот класс выпилить!'}
-  TIntelCpuViewSettins = class(TCpuViewSettins)
-  private const
-    xmlName = 'intel';
-    xmlFlags = 'flags';
-    xmlFPUMode = 'fpuMode';
-    xmlMapMode = 'mapMode';
-    xmlShowDebug = 'showDebug';
-    xmlShowFPU = 'showFPU';
-    xmlShowXMM = 'showXMM';
-    xmlShowYMM = 'showYMM';
-    xmlRegList = 'regs';
-    xmlRegID = 'id';
-  protected
-    function GetRegisterContextName: string; override;
-    procedure LoadRegisterContext(Root: IXMLNode); override;
-    procedure SaveRegisterContext(Root: IXMLNode); override;
   end;
 
 implementation
@@ -332,13 +312,13 @@ constructor TCpuViewSettins.Create(ARegSettings: TContextAbstractSettings);
 begin
   FRegSettings := ARegSettings;
   FColors := TDictionary<string, TColor>.Create;
-  Load(ExtractFilePath(ParamStr(0)) + SettingsName);
+  InitDefault;
 end;
 
 destructor TCpuViewSettins.Destroy;
 begin
-  Save(ExtractFilePath(ParamStr(0)) + SettingsName);
   FColors.Free;
+  FRegSettings.Free;
   inherited;
 end;
 
@@ -364,7 +344,6 @@ procedure TCpuViewSettins.GetSessionFromAsmView(AAsmView: TAsmView);
 var
   I: TColumnType;
 begin
-  if AAsmView = nil then Exit;
   // от вьювера загружаются только сессионные настройки
   // остальные хранятся сами по себе
 
@@ -374,34 +353,31 @@ begin
   for I := Low(TColumnType) to High(TColumnType) do
     if I in AAsmView.Header.Columns then
       FAsmSettings.ColumnWidth[I] := DpiToDouble(AAsmView.Header.ColumnWidth[I],AAsmView);
-  if SaveFontHeight then
-    FAsmSettings.FontHeight := DpiToDouble(AAsmView.Font.Height, AAsmView);
+  FAsmSettings.FontHeight := DpiToDouble(AAsmView.Font.Height, AAsmView);
+end;
+
+procedure TCpuViewSettins.GetSessionFromContext(AContext: TAbstractCPUContext);
+begin
+  FRegSettings.LoadFromContext(AContext);
 end;
 
 procedure TCpuViewSettins.GetSessionFromDumpView(ADumpView: TDumpView);
 begin
-  if ADumpView = nil then Exit;  
   FDumpSettings.ByteViewMode := ADumpView.ByteViewMode;
   FDumpSettings.CodePage := ADumpView.Encoder.CodePage;
   FDumpSettings.EncodeType := ADumpView.Encoder.EncodeType;
   FDumpSettings.EncodingName := ADumpView.Encoder.EncodingName;
-  if SaveFontHeight then
-    FDumpSettings.FontHeight := DpiToDouble(ADumpView.Font.Height, ADumpView);
+  FDumpSettings.FontHeight := DpiToDouble(ADumpView.Font.Height, ADumpView);
 end;
 
 procedure TCpuViewSettins.GetSessionFromRegView(ARegView: TRegView);
 begin
-  if ARegView = nil then Exit;
-  if SaveFontHeight then
-    FRegFontHeight := DpiToDouble(ARegView.Font.Height, ARegView);
-  FRegSettings.LoadFromContext(ARegView.Context);
+  FRegFontHeight := DpiToDouble(ARegView.Font.Height, ARegView);
 end;
 
 procedure TCpuViewSettins.GetSessionFromStackView(AStackView: TStackView);
 begin
-  if AStackView = nil then Exit;
-  if SaveFontHeight then
-    FStackFontHeight := DpiToDouble(AStackView.Font.Height, AStackView);
+  FStackFontHeight := DpiToDouble(AStackView.Font.Height, AStackView);
 end;
 
 procedure TCpuViewSettins.InitDefault;
@@ -422,9 +398,9 @@ begin
   InitDefaultColors;
 
   FCpuViewDlgSettings := Default(TCpuViewDlgSettings);
-  FCpuViewDlgSettings.SplitterPos[spTopHorz] := 50;
-  FCpuViewDlgSettings.SplitterPos[spBottomHorz] := 50;
-  FCpuViewDlgSettings.SplitterPos[spCenterVert] := 75;
+  FCpuViewDlgSettings.SplitterPos[spTopHorz] := 34;
+  FCpuViewDlgSettings.SplitterPos[spBottomHorz] := 45;
+  FCpuViewDlgSettings.SplitterPos[spCenterVert] := 38;
 
   FDumpSettings := Default(TDumpSettings);
   FDumpSettings.FontHeight := DefaultFontHeight;
@@ -439,9 +415,8 @@ begin
   FRegFontHeight := DefaultFontHeight;
   FRegSettings.InitDefault;
 
-  FSaveFontHeight := True;
-  FSaveFormPos := True;
-  FSaveViewerProportions := True;
+  FSaveFormSession := True;
+  FSaveViewersSession := True;
 
   FStackFontHeight := DefaultFontHeight;
 
@@ -580,9 +555,7 @@ var
   ColNode, ItemNode: IXMLNode;
   Column: TColumnType;
 begin
-  if SaveFontHeight then
-    FAsmSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
-
+  FAsmSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
   FAsmSettings.DisplayFuncNameInsteadCallAddr := GetNodeAttr(Root, xmlShowFuncName);
   FAsmSettings.ShowOpcodes := GetNodeAttr(Root, xmlShowOpcodes);
   FAsmSettings.ShowSourceLines := GetNodeAttr(Root, xmlShowSrc);
@@ -603,21 +576,16 @@ var
   SplittersNode, ItemNode: IXMLNode;
   Splitter: TSplitters;
 begin
-  if SaveFontHeight then
-    FSaveFontHeight := GetNodeAttr(Root, xmlSaveFontSize);
-  FSaveFormPos := GetNodeAttr(Root, xmlSaveFormPos);
-  FSaveViewerProportions := GetNodeAttr(Root, xmlSaveSplitters);
+  FSaveFormSession := GetNodeAttr(Root, xmlSaveFormSession);
+  FSaveViewersSession := GetNodeAttr(Root, xmlSaveViewersSession);
   FFontName := GetNodeAttr(Root, xmlFont);
-  if FSaveFormPos then
+  if FSaveFormSession then
   begin
     FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
     FCpuViewDlgSettings.BoundsRect.Top := GetNodeAttr(Root, xmlTop);
     FCpuViewDlgSettings.BoundsRect.Width := GetNodeAttr(Root, xmlWidth);
     FCpuViewDlgSettings.BoundsRect.Height := GetNodeAttr(Root, xmlHeight);
     FCpuViewDlgSettings.Maximized := GetNodeAttr(Root, xmlMaximized);
-  end;
-  if FSaveViewerProportions then
-  begin
     SplittersNode := FindNode(Root, xmlSplitter);
     if Assigned(SplittersNode) then
     begin
@@ -659,8 +627,7 @@ begin
     GetEnumValue(TypeInfo(TCharEncoderType), GetNodeAttr(Node, xmlAttrMode)));
   FDumpSettings.EncodingName := GetNodeAttr(Node, xmlEncoderName);
   FDumpSettings.CodePage := GetNodeAttr(Node, xmlEncoderCP);
-  if SaveFontHeight then
-    FDumpSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
+  FDumpSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_Full(Root: IXMLNode);
@@ -689,15 +656,13 @@ end;
 
 procedure TCpuViewSettins.LoadFromXML_RegSettings(Root: IXMLNode);
 begin
-  if SaveFontHeight then
-    FRegFontHeight := XMLReadDouble(Root, xmlFontSize);
+  FRegFontHeight := XMLReadDouble(Root, xmlFontSize);
   FRegSettings.LoadFromXML(Root);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_StackSettings(Root: IXMLNode);
 begin
-  if SaveFontHeight then
-    FStackFontHeight := XMLReadDouble(Root, xmlFontSize);
+  FStackFontHeight := XMLReadDouble(Root, xmlFontSize);
 end;
 
 procedure TCpuViewSettins.Reset;
@@ -828,9 +793,7 @@ var
   ColNode, ItemNode: IXMLNode;
   Columns: TFWHexViewColumnTypes;
 begin
-  if SaveFontHeight then
-    XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
-
+  XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
   SetNodeAttr(Root, xmlShowFuncName, FAsmSettings.DisplayFuncNameInsteadCallAddr);
   SetNodeAttr(Root, xmlShowOpcodes, FAsmSettings.ShowOpcodes);
   SetNodeAttr(Root, xmlShowSrc, FAsmSettings.ShowSourceLines);
@@ -853,20 +816,16 @@ var
   SplitNode, ItemNode: IXMLNode;
   I: TSplitters;
 begin
-  SetNodeAttr(Root, xmlSaveFontSize, FSaveFontHeight);
-  SetNodeAttr(Root, xmlSaveFormPos, FSaveFormPos);
-  SetNodeAttr(Root, xmlSaveSplitters, FSaveViewerProportions);
+  SetNodeAttr(Root, xmlSaveFormSession, FSaveFormSession);
+  SetNodeAttr(Root, xmlSaveViewersSession, FSaveViewersSession);
   SetNodeAttr(Root, xmlFont, FFontName);
-  if FSaveFormPos then
+  if FSaveFormSession then
   begin
     SetNodeAttr(Root, xmlLeft, FCpuViewDlgSettings.BoundsRect.Left);
     SetNodeAttr(Root, xmlTop, FCpuViewDlgSettings.BoundsRect.Top);
     SetNodeAttr(Root, xmlWidth, FCpuViewDlgSettings.BoundsRect.Width);
     SetNodeAttr(Root, xmlHeight, FCpuViewDlgSettings.BoundsRect.Height);
     SetNodeAttr(Root, xmlMaximized, FCpuViewDlgSettings.Maximized);
-  end;
-  if FSaveViewerProportions then
-  begin
     SplitNode := NewChild(Root, xmlSplitter);
     for I := Low(TSplitters) to High(TSplitters) do
     begin
@@ -892,8 +851,7 @@ procedure TCpuViewSettins.SaveToXML_DumpSettings(Root: IXMLNode);
 var
   ByteView, Encoder: IXMLNode;
 begin
-  if SaveFontHeight then
-    XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
+  XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
   ByteView := NewChild(Root, xmlByteView);
   SetNodeAttr(ByteView, xmlAttrMode,
     GetEnumName(TypeInfo(TByteViewMode), Integer(FDumpSettings.ByteViewMode)));
@@ -925,15 +883,13 @@ end;
 
 procedure TCpuViewSettins.SaveToXML_RegSettings(Root: IXMLNode);
 begin
-  if SaveFontHeight then
-    XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
+  XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
   FRegSettings.SaveToXML(Root);
 end;
 
 procedure TCpuViewSettins.SaveToXML_StackSettings(Root: IXMLNode);
 begin
-  if SaveFontHeight then
-    XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
+  XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
 end;
 
 procedure TCpuViewSettins.SetColor(const Index: string; Value: TColor);
@@ -945,22 +901,25 @@ procedure TCpuViewSettins.SetSettingsToAsmView(AAsmView: TAsmView);
 var
   I: TColumnType;
 begin
-  if AAsmView = nil then Exit;
   RestoreViewDefSettings(AAsmView);
   SaveToAsmColorMap(AAsmView.ColorMap);
-  if SaveFontHeight then
-    AAsmView.Font.Height := DoubleToDpi(FAsmSettings.FontHeight, AAsmView);
+  AAsmView.Font.Height := DoubleToDpi(FAsmSettings.FontHeight, AAsmView);
   for I := Low(TColumnType) to High(TColumnType) do
     if I in AAsmView.Header.Columns then
-      FAsmSettings.ColumnWidth[I] := DoubleToDpi(AAsmView.Header.ColumnWidth[I], AAsmView)
+      FAsmSettings.ColumnWidth[I] := DoubleToDpi(AAsmView.Header.ColumnWidth[I], AAsmView);
+  if not FAsmSettings.ShowOpcodes then
+    AAsmView.Header.Columns := AAsmView.Header.Columns - [ctOpcode];
+end;
+
+procedure TCpuViewSettins.SetSettingsToContext(AContext: TAbstractCPUContext);
+begin
+  FRegSettings.SaveToContext(AContext);
 end;
 
 procedure TCpuViewSettins.SetSettingsToDumpView(ADumpView: TDumpView);
 begin
-  if ADumpView = nil then Exit;
   RestoreViewDefSettings(ADumpView);
-  if SaveFontHeight then
-    ADumpView.Font.Height := DoubleToDpi(FDumpSettings.FontHeight, ADumpView);
+  ADumpView.Font.Height := DoubleToDpi(FDumpSettings.FontHeight, ADumpView);
   ADumpView.ByteViewMode := FDumpSettings.ByteViewMode;
   ADumpView.Encoder.EncodeType := FDumpSettings.EncodeType;
   ADumpView.Encoder.CodePage := FDumpSettings.CodePage;
@@ -969,85 +928,17 @@ end;
 
 procedure TCpuViewSettins.SetSettingsToRegView(ARegView: TRegView);
 begin
-  if ARegView = nil then Exit;
   RestoreViewDefSettings(ARegView);
-  if SaveFontHeight then
-    ARegView.Font.Height := DoubleToDpi(FRegFontHeight, ARegView);
+  ARegView.Font.Height := DoubleToDpi(FRegFontHeight, ARegView);
   SaveToRegColorMap(ARegView.ColorMap);
-  FRegSettings.SaveToContext(ARegView.Context);
 end;
 
 procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);
 begin
-  if AStackView = nil then Exit;
   RestoreViewDefSettings(AStackView);
-  if SaveFontHeight then
-    AStackView.Font.Height := DoubleToDpi(FStackFontHeight, AStackView);
+  AStackView.Font.Height := DoubleToDpi(FStackFontHeight, AStackView);
   SaveToStackColorMap(AStackView.ColorMap);
 end;
 
-{ TIntelCpuViewSettins }
-
-function TIntelCpuViewSettins.GetRegisterContextName: string;
-begin
-  Result := xmlName;
-end;
-
-procedure TIntelCpuViewSettins.LoadRegisterContext(Root: IXMLNode);
-var
-  Ctx: TIntelCpuContext;
-  Flags, Regs, ItemNode: IXMLNode;
-  I, RegID: Integer;
-begin
-//  Ctx := RegView.Context as TIntelCpuContext;
-//  Flags := FindNode(Root, xmlFlags);
-//  if Flags = nil then Exit;
-//  Ctx.FPUMode := TFPUMode(
-//    GetEnumValue(TypeInfo(TFPUMode), GetNodeAttr(Flags, xmlFPUMode)));
-//  Ctx.MapMode := TIntelCpuMapMode(
-//    GetEnumValue(TypeInfo(TIntelCpuMapMode), GetNodeAttr(Flags, xmlMapMode)));
-//  Ctx.ShowDebug := GetNodeAttr(Flags, xmlShowDebug);
-//  Ctx.ShowFPU := GetNodeAttr(Flags, xmlShowFPU);
-//  Ctx.ShowXMM := GetNodeAttr(Flags, xmlShowXMM);
-//  Ctx.ShowYMM := GetNodeAttr(Flags, xmlShowYMM);
-//  Regs := FindNode(Root, xmlRegList);
-//  if Regs = nil then Exit;
-//  for I := 0 to Regs.ChildNodes.Count - 1 do
-//  begin
-//    ItemNode := GetChildNode(Regs, I);
-//    RegID := GetNodeAttr(ItemNode, xmlRegID);
-//    Ctx.ViewMode[RegID] := TRegViewMode(
-//      GetEnumValue(TypeInfo(TRegViewMode), GetNodeAttr(ItemNode, xmlMode)));
-//  end;
-end;
-
-procedure TIntelCpuViewSettins.SaveRegisterContext(Root: IXMLNode);
-var
-  Ctx: TIntelCpuContext;
-  Flags, Regs, ItemNode: IXMLNode;
-  I: Integer;
-begin
-//  Ctx := RegView.Context as TIntelCpuContext;
-//  Flags := NewChild(Root, xmlFlags);
-//  SetNodeAttr(Flags, xmlFPUMode,
-//    GetEnumName(TypeInfo(TFPUMode), Integer(Ctx.FPUMode)));
-//  SetNodeAttr(Flags, xmlMapMode,
-//    GetEnumName(TypeInfo(TIntelCpuMapMode), Integer(Ctx.MapMode)));
-//  SetNodeAttr(Flags, xmlShowDebug, Ctx.ShowDebug);
-//  SetNodeAttr(Flags, xmlShowFPU, Ctx.ShowFPU);
-//  SetNodeAttr(Flags, xmlShowXMM, Ctx.ShowXMM);
-//  SetNodeAttr(Flags, xmlShowYMM, Ctx.ShowYMM);
-//  Regs := nil;
-//  for I in [0..7, 9..16, 33, 41, 49, 58, 74] do
-//  begin
-//    if Ctx.ViewMode[I] = rvmHex then Continue;
-//    if Regs = nil then
-//      Regs := NewChild(Root, xmlRegList);
-//    ItemNode := NewChild(Regs, xmlItem);
-//    SetNodeAttr(ItemNode, xmlRegID, I);
-//    SetNodeAttr(ItemNode, xmlMode,
-//      GetEnumName(TypeInfo(TRegViewMode), Integer(Ctx.ViewMode[I])));
-//  end;
-end;
-
 end.
+

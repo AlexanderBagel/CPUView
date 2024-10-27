@@ -119,6 +119,7 @@ type
     FLockSelChange: Boolean;
     FLastCtx: TCommonCpuContext;
     FRegView: TRegView;
+    FSettings: TCpuViewSettins;
     FShowCallFuncName: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
@@ -167,7 +168,7 @@ type
       AColumn: TColumnType; var AComment: string);
     procedure UpdateStreamsProcessID;
   public
-    constructor Create;
+    constructor Create(ASettings: TCpuViewSettins);
     destructor Destroy; override;
     function AddrInAsm(AddrVA: Int64): Boolean;
     function AddrInDump(AddrVA: Int64): Boolean;
@@ -177,13 +178,14 @@ type
     procedure ShowDumpAtAddr(AddrVA: Int64);
     procedure ShowStackAtAddr(AddrVA: Int64);
     function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean;
+  public
     property AsmView: TAsmView read FAsmView write SetAsmView;
+    property DBase: TCpuViewDBase read FDBase;
     property Debugger: TAbstractDebugger read FDebugger write SetDebugger;
     property DumpViewList: TDumpViewList read FDumpViewList;
     property RegView: TRegView read FRegView write SetRegView;
+    property Settings: TCpuViewSettins read FSettings;
     property StackView: TStackView read FStackView write SetStackView;
-  public
-    property DBase: TCpuViewDBase read FDBase;
     property ShowCallFuncName: Boolean read FShowCallFuncName write SetShowCallFuncName;
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
@@ -420,7 +422,7 @@ begin
     Result := 0;
 end;
 
-constructor TCpuViewCore.Create;
+constructor TCpuViewCore.Create(ASettings: TCpuViewSettins);
 var
   RemoteStream: TRemoteStream;
 begin
@@ -440,6 +442,7 @@ begin
   FShowCallFuncName := True;
   FJmpStack := TList<Int64>.Create;
   FDBase := TCpuViewDBase.Create;
+  FSettings := ASettings;
 end;
 
 destructor TCpuViewCore.Destroy;
