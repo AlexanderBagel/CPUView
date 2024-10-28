@@ -141,7 +141,7 @@ const
 type
   TAsmSettings = record
     ColumnWidth: array [TColumnType] of Double;
-    DisplayFuncNameInsteadCallAddr: Boolean;
+    DisplayFunc: Boolean;
     ShowOpcodes: Boolean;
     ShowSourceLines: Boolean;
     FontHeight: Double;
@@ -163,6 +163,11 @@ type
     SplitterPos: array [TSplitters] of Double;
   end;
 
+  TColorMapItem = record
+    Id: string;
+    Description: string;
+  end;
+
   { TCpuViewSettins }
 
   TCpuViewSettins = class
@@ -170,6 +175,7 @@ type
     FAsmSettings: TAsmSettings;
     FColorMode: TColorMode;
     FColors: TDictionary<string, TColor>;
+    FColorsMap: TList<TColorMapItem>;
     FCpuViewDlgSettings: TCpuViewDlgSettings;
     FDumpSettings: TDumpSettings;
     FFontName: string;
@@ -215,13 +221,14 @@ type
     procedure SaveToXML_RegSettings(Root: IXMLNode);
     procedure SaveToXML_StackSettings(Root: IXMLNode);
   protected
+    procedure InitColorMap;
     procedure InitDefault;
     procedure InitDefaultColors;
     function GetRegisterContextName: string; virtual; abstract;
     procedure LoadRegisterContext(Root: IXMLNode); virtual; abstract;
     procedure SaveRegisterContext(Root: IXMLNode); virtual; abstract;
   public
-    constructor Create(ARegSettings: TContextAbstractSettings);
+    constructor Create;
     destructor Destroy; override;
 
     procedure ColorsExport(const FilePath: string);
@@ -243,12 +250,16 @@ type
     procedure SetSettingsToRegView(ARegView: TRegView);
     procedure SetSettingsToStackView(AStackView: TStackView);
 
+    property ColorsMap: TList<TColorMapItem> read FColorsMap;
     property ColorMode: TColorMode read FColorMode write FColorMode;
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
+    property DisplayFunc: Boolean read FAsmSettings.DisplayFunc write FAsmSettings.DisplayFunc;
     property FontName: string read FFontName write FFontName;
     property SaveFormSession: Boolean read FSaveFormSession write FSaveFormSession;
     property SaveViewersSession: Boolean read FSaveViewersSession write FSaveViewersSession;
+    property ShowOpcodes: Boolean read FAsmSettings.ShowOpcodes write FAsmSettings.ShowOpcodes;
+    property ShowSourceLines: Boolean read FAsmSettings.ShowSourceLines write FAsmSettings.ShowSourceLines;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
@@ -308,15 +319,18 @@ begin
   end;
 end;
 
-constructor TCpuViewSettins.Create(ARegSettings: TContextAbstractSettings);
+constructor TCpuViewSettins.Create;
 begin
-  FRegSettings := ARegSettings;
+  FRegSettings := GetContextSettingsClass.Create;
   FColors := TDictionary<string, TColor>.Create;
+  FColorsMap := TList<TColorMapItem>.Create;
+  InitColorMap;
   InitDefault;
 end;
 
 destructor TCpuViewSettins.Destroy;
 begin
+  FColorsMap.Free;
   FColors.Free;
   FRegSettings.Free;
   inherited;
@@ -390,7 +404,7 @@ begin
   FAsmSettings.ColumnWidth[ctOpcode] := 170;
   FAsmSettings.ColumnWidth[ctDescription] := 250;
   FAsmSettings.ColumnWidth[ctComment] := 440;
-  FAsmSettings.DisplayFuncNameInsteadCallAddr := True;
+  FAsmSettings.DisplayFunc := True;
   FAsmSettings.ShowOpcodes := True;
   FAsmSettings.ShowSourceLines := True;
   FAsmSettings.FontHeight := DefaultFontHeight;
@@ -556,7 +570,7 @@ var
   Column: TColumnType;
 begin
   FAsmSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
-  FAsmSettings.DisplayFuncNameInsteadCallAddr := GetNodeAttr(Root, xmlShowFuncName);
+  FAsmSettings.DisplayFunc := GetNodeAttr(Root, xmlShowFuncName);
   FAsmSettings.ShowOpcodes := GetNodeAttr(Root, xmlShowOpcodes);
   FAsmSettings.ShowSourceLines := GetNodeAttr(Root, xmlShowSrc);
 
@@ -794,7 +808,7 @@ var
   Columns: TFWHexViewColumnTypes;
 begin
   XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
-  SetNodeAttr(Root, xmlShowFuncName, FAsmSettings.DisplayFuncNameInsteadCallAddr);
+  SetNodeAttr(Root, xmlShowFuncName, FAsmSettings.DisplayFunc);
   SetNodeAttr(Root, xmlShowOpcodes, FAsmSettings.ShowOpcodes);
   SetNodeAttr(Root, xmlShowSrc, FAsmSettings.ShowSourceLines);
 
@@ -890,6 +904,11 @@ end;
 procedure TCpuViewSettins.SaveToXML_StackSettings(Root: IXMLNode);
 begin
   XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
+end;
+
+procedure TCpuViewSettins.InitColorMap;
+begin
+
 end;
 
 procedure TCpuViewSettins.SetColor(const Index: string; Value: TColor);

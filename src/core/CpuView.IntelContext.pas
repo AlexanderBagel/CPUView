@@ -60,7 +60,7 @@ type
     procedure InternalLoadFromXML(Root: IXMLNode); override;
     procedure InternalSaveToXML(Root: IXMLNode); override;
   public
-    constructor Create;
+    constructor Create; override;
     destructor Destroy; override;
     procedure InitDefault; override;
     // load/save session settings
@@ -2164,5 +2164,9 @@ begin
     AddReg(LastReg.RegName, RegValue.QwordValue);
   end;
 end;
+
+initialization
+
+  RegisterContextSettingsClass(TIntelCtxSettings);
 
 end.

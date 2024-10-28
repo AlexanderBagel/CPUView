@@ -82,7 +82,6 @@ type
     procedure AfterDbgGateCreate; override;
     procedure BeforeDbgGateDestroy; override;
     function GetContext: TCommonCpuContext; override;
-    function GetContextSettings: TContextAbstractSettings; override;
   public
 
   end;
@@ -357,11 +356,6 @@ begin
   if FContext = nil then
     FContext := TIntelCpuContext.Create(Self);
   Result := FContext;
-end;
-
-function TfrmCpuViewIntel.GetContextSettings: TContextAbstractSettings;
-begin
-  Result := TIntelCtxSettings.Create;
 end;
 
 end.

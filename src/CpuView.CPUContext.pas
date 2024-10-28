@@ -103,12 +103,15 @@ type
 
   { TRegAbstractSettings }
 
+  { TContextAbstractSettings }
+
   TContextAbstractSettings = class
   protected
     function GetContextName: string; virtual; abstract;
     procedure InternalLoadFromXML(Root: IXMLNode); virtual; abstract;
     procedure InternalSaveToXML(Root: IXMLNode); virtual; abstract;
   public
+    constructor Create; virtual;
     procedure InitDefault; virtual; abstract;
     procedure LoadFromContext(ACtx: TAbstractCPUContext); virtual; abstract;
     procedure SaveToContext(ACtx: TAbstractCPUContext); virtual; abstract;
@@ -116,7 +119,7 @@ type
     procedure SaveToXML(Root: IXMLNode);
   end;
 
-  TRegAbstractSettingsClass = class of TContextAbstractSettings;
+  TContextSettingsClass = class of TContextAbstractSettings;
 
   { TAbstractCPUContext }
 
@@ -260,7 +263,23 @@ type
 
   TCommonCpuContextClass = class of TCommonCpuContext;
 
+  procedure RegisterContextSettingsClass(AValue: TContextSettingsClass);
+  function GetContextSettingsClass: TContextSettingsClass;
+
 implementation
+
+var
+  _ContextSettingsClass: TContextSettingsClass;
+
+procedure RegisterContextSettingsClass(AValue: TContextSettingsClass);
+begin
+  _ContextSettingsClass := AValue;
+end;
+
+function GetContextSettingsClass: TContextSettingsClass;
+begin
+  Result := _ContextSettingsClass;
+end;
 
 { TRegParam }
 
@@ -282,6 +301,11 @@ begin
 end;
 
 { TContextAbstractSettings }
+
+constructor TContextAbstractSettings.Create;
+begin
+  // do nothing...
+end;
 
 procedure TContextAbstractSettings.LoadFromXML(Root: IXMLNode);
 var

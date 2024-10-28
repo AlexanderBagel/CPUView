@@ -6,7 +6,6 @@ interface
 
 uses
   Classes,
-
 {$IFDEF FPC}
   ActnList,
   LCLType,
@@ -16,18 +15,18 @@ uses
   MenuIntf,
   BaseDebugManager,
   IdeDebuggerBase,
-
+  IDEOptEditorIntf,
+  IDEOptionsIntf,
   {$IFDEF USE_INTEL_CTX}
   dlgCpuViewIntel,
   {$ENDIF}
-
   dlgCpuView,
+  frmCpuViewOptions,
 {$ELSE}
   Actions,
   DesignIntf,
   DesignEditors,
 {$ENDIF}
-
   CpuView.Actions,
   CpuView.Viewers;
 
@@ -62,11 +61,14 @@ var
   Key: TIDEShortCut;
   Cat: TIDECommandCategory;
   CmdCpuView: TIDECommand;
+  MainEditorID: Integer;
 begin
-  Key := IDEShortCut(VK_C, [ssAlt, ssCtrl],VK_UNKNOWN,[]);
+  Key := IDEShortCut(VK_C, [ssAlt, ssCtrl], VK_UNKNOWN, []);
   Cat := IDECommandList.FindCategoryByName(CommandCategoryViewName);
   CmdCpuView := RegisterIDECommand(Cat, 'CPU-View', '', Key, nil, @StartCpuView);
   RegisterIDEMenuCommand(itmViewDebugWindows, 'CPU-View', 'CPU-View', nil, nil, CmdCpuView);
+  MainEditorID := RegisterIDEOptionsEditor(GroupEnvironment,
+    TCpuViewMainOptionsFrame, 14041979)^.Index;
 end;
 {$ENDIF}
 

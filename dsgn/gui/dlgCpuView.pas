@@ -9,8 +9,6 @@ uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
   ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList,
 
-  LazIDEIntf,
-
   FWHexView,
   FWHexView.Actions,
   FWHexView.MappedView,
@@ -311,7 +309,6 @@ type
     function ActiveViewerSelectedValue: UInt64;
     function CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
     function CheckRegCallback(ANewAddrVA: UInt64): Boolean;
-    function ConfigPath: string;
     procedure InternalShowInDump(AddrVA: Int64);
   protected
     function ActiveDumpView: TDumpView;
@@ -319,7 +316,6 @@ type
     procedure AfterDbgGateCreate; virtual; abstract;
     procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
-    function GetContextSettings: TContextAbstractSettings; virtual; abstract;
     function ToDpi(Value: Integer): Integer;
     function ToDefaultDpi(Value: Integer): Integer;
     procedure LockZOrder;
@@ -341,6 +337,7 @@ var
 implementation
 
 uses
+  CpuView.Design.Common,
   dlgCpuView.TemporaryLocker,
   dlgInputBox,
   IDEImagesIntf,
@@ -352,7 +349,7 @@ uses
 
 procedure TfrmCpuView.FormCreate(Sender: TObject);
 begin
-  FSettings := TCpuViewSettins.Create(GetContextSettings);
+  FSettings := TCpuViewSettins.Create;
   FCore := TCpuViewCore.Create(FSettings);
   FDbgGate := TCpuViewDebugGate.Create(Self);
   FDbgGate.Context := GetContext;
@@ -470,11 +467,6 @@ end;
 function TfrmCpuView.CheckRegCallback(ANewAddrVA: UInt64): Boolean;
 begin
   Result := True;
-end;
-
-function TfrmCpuView.ConfigPath: string;
-begin
-  Result := IncludeTrailingPathDelimiter(LazarusIDE.GetPrimaryConfigPath) + 'cpuview.xml';
 end;
 
 procedure TfrmCpuView.InternalShowInDump(AddrVA: Int64);

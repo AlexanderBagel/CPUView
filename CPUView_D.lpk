@@ -44,6 +44,10 @@
         <Filename Value="src\CpuView.Viewers.pas"/>
         <UnitName Value="CpuView.Viewers"/>
       </Item>
+	  <Item>
+        <Filename Value="src\CpuView.XML.pas"/>
+        <UnitName Value="CpuView.XML"/>
+      </Item>	  
       <Item>
         <Filename Value="src\CpuViewCfg.inc"/>
         <Type Value="Include"/>
@@ -78,9 +82,9 @@
         <UnitName Value="CpuView.Reg"/>
       </Item>
       <Item>
-        <Filename Value="src\CpuView.XML.pas"/>
-        <UnitName Value="CpuView.XML"/>
-      </Item>	  
+        <Filename Value="dsgn\CpuView.Design.Common.pas"/>
+        <UnitName Value="CpuView.Design.Common"/>
+      </Item>	        
       <Item>
         <Filename Value="dsgn\gui\dlgCpuView.lfm"/>
         <Type Value="LFM"/>
@@ -88,6 +92,14 @@
       <Item>
         <Filename Value="dsgn\gui\dlgCpuView.pas"/>
         <UnitName Value="dlgCpuView"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\frmCpuViewOptions.lfm"/>
+        <Type Value="LFM"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\frmCpuViewOptions.pas"/>
+        <UnitName Value="frmCpuViewOptions"/>
       </Item>
     </Files>
     <RequiredPkgs>
