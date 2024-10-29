@@ -43,7 +43,9 @@ type
     procedure btnImportClick(Sender: TObject);
     procedure btnResetClick(Sender: TObject);
     procedure cbColorChange(Sender: TObject);
+    procedure clbColorsSelectionChange(Sender: TObject; User: boolean);
   private
+    FLockColorChange: Boolean;
     FSettings: TCpuViewSettins;
     procedure UpdateCurrentFont(const AFontName: string);
     procedure UpdateFrameControl;
@@ -99,9 +101,25 @@ procedure TCpuViewMainOptionsFrame.cbColorChange(Sender: TObject);
 var
   Index: Integer;
 begin
+  if FLockColorChange then Exit;
   Index := clbColors.ItemIndex;
   if Index < 0 then Exit;
   clbColors.Colors[Index] := cbColor.Selected;
+  cbColorMode.ItemIndex := Integer(cmCustom);
+end;
+
+procedure TCpuViewMainOptionsFrame.clbColorsSelectionChange(Sender: TObject;
+  User: boolean);
+begin
+  if User then
+  begin
+    FLockColorChange := True;
+    try
+      cbColor.Selected := clbColors.Selected;
+    finally
+      FLockColorChange := False;
+    end;
+  end;
 end;
 
 procedure TCpuViewMainOptionsFrame.UpdateCurrentFont(const AFontName: string);

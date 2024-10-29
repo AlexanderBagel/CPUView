@@ -156,6 +156,7 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       Style = [cbCustomColors]
       Anchors = [akTop, akLeft, akRight, akBottom]
       ItemHeight = 0
+      OnSelectionChange = clbColorsSelectionChange
       TabOrder = 0
     end
     object cbColor: TColorBox

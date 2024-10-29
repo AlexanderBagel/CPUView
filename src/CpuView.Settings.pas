@@ -282,7 +282,7 @@ begin
   try
     Node := XMLDocument.CreateElement(xmlColor);
     XMLDocument.AppendChild(Node);
-    SaveToXML_Full(Node);
+    SaveToXML_Colors(Node);
     WriteXML(XMLDocument, FilePath);
   finally
     XMLDocument.Free;
@@ -619,6 +619,8 @@ var
   ColorValue: TColor;
   AttrList: TArray<string>;
 begin
+  FColorMode := TColorMode(
+    GetEnumValue(TypeInfo(TColorMode), GetNodeAttr(Root, xmlMode)));
   AttrList := FColors.Keys.ToArray;
   for I := 0 to Length(AttrList) - 1 do
   begin
@@ -727,6 +729,7 @@ end;
 
 procedure TCpuViewSettins.SaveToAsmColorMap(Value: TAsmColorMap);
 begin
+  if ColorMode <> cmCustom then Exit;
   Value.ActiveJmpColor := Color[xmlActiveJumpColor];
   Value.ArrowDownColor := Color[xmlArrowDownColor];
   Value.ArrowDownSelectedColor := Color[xmlArrowDownSelectedColor];
@@ -760,6 +763,8 @@ end;
 
 procedure TCpuViewSettins.SaveToDefaultColorMap(Value: THexViewColorMap);
 begin
+  Value.ColorMode := ColorMode;
+  if ColorMode <> cmCustom then Exit;
   Value.BackgroundColor := Color[xmlBackgroundColor];
   Value.BookmarkBackgroundColor := Color[xmlBookmarkBackgroundColor];
   Value.BookmarkBorderColor := Color[xmlBookmarkBorderColor];
@@ -784,6 +789,7 @@ end;
 
 procedure TCpuViewSettins.SaveToRegColorMap(Value: TRegistersColorMap);
 begin
+  if ColorMode <> cmCustom then Exit;
   Value.HintColor := Color[xmlHintColor];
   Value.RegColor := Color[xmlRegColor];
   Value.ValueColor := Color[xmlValueColor];
@@ -792,6 +798,7 @@ end;
 
 procedure TCpuViewSettins.SaveToStackColorMap(Value: TStackColorMap);
 begin
+  if ColorMode <> cmCustom then Exit;
   Value.AddrPCColor := Color[xmlAddrPCColor];
   Value.AddrPCFontColor := Color[xmlAddrPCFontColor];
   Value.EmptyStackColor := Color[xmlEmptyStackColor];
@@ -907,13 +914,85 @@ begin
 end;
 
 procedure TCpuViewSettins.InitColorMap;
-begin
 
+  procedure Add(const ID, Description: string);
+  var
+    Item: TColorMapItem;
+  begin
+    Item.Description := Description;
+    Item.Id := Id;
+    FColorsMap.Add(Item);
+  end;
+
+begin
+  Add(xmlBackgroundColor, 'Background');
+  Add(xmlBookmarkBackgroundColor, 'Bookmark Background');
+  Add(xmlBookmarkBorderColor, 'Bookmark Border');
+  Add(xmlBookmarkTextColor, 'Bookmark Text');
+  Add(xmlCaretColor, 'Caret');
+  Add(xmlCaretTextColor, 'Caret Text');
+  Add(xmlGroupColor, 'Group');
+  Add(xmlInfoBackgroundColor, 'Info Background');
+  Add(xmlInfoBorderColor, 'Info Border');
+  Add(xmlInfoTextColor, 'Info Text');
+  Add(xmlHeaderBackgroundColor, 'Header Background');
+  Add(xmlHeaderBorderColor, 'Header Border');
+  Add(xmlHeaderColumnSeparatorColor, 'Header Column Separator');
+  Add(xmlHeaderTextColor, 'Header Text');
+  Add(xmlRowSeparatorColor, 'Row Separator');
+  Add(xmlSelectColor, 'Select');
+  Add(xmlSelectInactiveColor, 'Select Inactive');
+  Add(xmlTextColor, 'Text');
+  Add(xmlTextCommentColor, 'Comment');
+  Add(xmlWorkSpaceTextColor, 'WorkSpace Text');
+
+  Add(xmlActiveJumpColor, 'Asm: Active Jmp');
+  Add(xmlArrowDownColor, 'Asm: Arrow Down');
+  Add(xmlArrowDownSelectedColor, 'Asm: Arrow Down Selected');
+  Add(xmlArrowUpColor, 'Asm: Arrow Up');
+  Add(xmlArrowUpSelectedColor, 'Asm: Arrow Up Selected');
+  Add(xmlBpActiveColor, 'Asm: BreakPoint Active');
+  Add(xmlBpActiveFontColor, 'Asm: BreakPoint Active Font');
+  Add(xmlBpColor, 'Asm: BreakPoint');
+  Add(xmlBpDisabledColor, 'Asm: BreakPoint Disabled');
+  Add(xmlBpDisabledFontColor, 'Asm: BreakPoint Disabled Font');
+  Add(xmlBpFontColor, 'Asm: BreakPoint Font');
+  Add(xmlJmpMarkColor, 'Asm: Jmp Mark');
+  Add(xmlJmpMarkTextColor, 'Asm: Jmp Mark Text');
+  Add(xmlSeparatorBackgroundColor, 'Asm: Separator Background');
+  Add(xmlSeparatorBorderColor, 'Asm: Separator Border');
+  Add(xmlSeparatorTextColor, 'Asm: Separator Text');
+  Add(xmlNumberColor, 'Asm: Number');
+  Add(xmlInstructionColor, 'Asm: Instruction');
+  Add(xmlInsRegColor, 'Asm: Reg');
+  Add(xmlPrefixColor, 'Asm: Prefix');
+  Add(xmlJmpColor, 'Asm: Jmp');
+  Add(xmlKernelColor, 'Asm: Kernel');
+  Add(xmlNopColor, 'Asm: Nop');
+  Add(xmlRegHighlightBackColor, 'Asm: Register Highlight Background');
+  Add(xmlRegHighlightFontColor, 'Asm: Register Highlight Font');
+  Add(xmlRIPBackgroundColor, 'Asm: RIP Background');
+  Add(xmlRIPBackgroundFontColor, 'Asm: RIP Background Font');
+  Add(xmlSizePfxColor, 'Asm: Size Prefix');
+  Add(xmlSourceLineColor, 'Asm: Source Line');
+
+  Add(xmlHintColor, 'Reg: Hint');
+  Add(xmlRegColor, 'Reg: Register');
+  Add(xmlValueColor, 'Reg: Value');
+  Add(xmlValueModifiedColor, 'Reg: Modified Value');
+
+  Add(xmlAddrPCColor, 'Stack: AddrPC');
+  Add(xmlAddrPCFontColor, 'Stack: AddrPC Font');
+  Add(xmlEmptyStackColor, 'Stack: Empty Stack');
+  Add(xmlFrameColor, 'Stack: Frame');
+  Add(xmlFrameActiveColor, 'Stack: Active Frame');
+  Add(xmlStackPointColor, 'Stack: Stack Point');
+  Add(xmlStackPointFontColor, 'Stack: Stack Point Font');
 end;
 
 procedure TCpuViewSettins.SetColor(const Index: string; Value: TColor);
 begin
-  FColors.TryAdd(Index, Value);
+  FColors.AddOrSetValue(Index, Value);
 end;
 
 procedure TCpuViewSettins.SetSettingsToAsmView(AAsmView: TAsmView);
