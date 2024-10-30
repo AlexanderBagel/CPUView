@@ -14,6 +14,12 @@
         <OtherUnitFiles Value="src;src\core;dsgn;dsgn\gui"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
+      <Conditionals Value="if TargetCPU = &apos;i386&apos; then
+  UnitPath += &apos;;dsgn\gui\processors\intel&apos;;
+if TargetCPU = &apos;x86_64&apos; then
+  UnitPath += &apos;;dsgn\gui\processors\intel&apos;;
+if TargetCPU = &apos;arm&apos; then
+  UnitPath += &apos;;dsgn\gui\processors\arm&apos;;"/>
       <Other>
         <CompilerMessages>
           <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4046="True"/>
@@ -44,10 +50,10 @@
         <Filename Value="src\CpuView.Viewers.pas"/>
         <UnitName Value="CpuView.Viewers"/>
       </Item>
-	  <Item>
+      <Item>
         <Filename Value="src\CpuView.XML.pas"/>
         <UnitName Value="CpuView.XML"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="src\CpuViewCfg.inc"/>
         <Type Value="Include"/>
@@ -84,7 +90,15 @@
       <Item>
         <Filename Value="dsgn\CpuView.Design.Common.pas"/>
         <UnitName Value="CpuView.Design.Common"/>
-      </Item>	        
+      </Item>
+      <Item>
+        <Filename Value="dsgn\CpuView.Design.CrashDump.pas"/>
+        <UnitName Value="CpuView.Design.CrashDump"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\CpuView.Design.DbgLog.pas"/>
+        <UnitName Value="CpuView.Design.DbgLog"/>
+      </Item>	  
       <Item>
         <Filename Value="dsgn\gui\dlgCpuView.lfm"/>
         <Type Value="LFM"/>

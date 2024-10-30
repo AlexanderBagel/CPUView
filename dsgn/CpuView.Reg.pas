@@ -17,10 +17,8 @@ uses
   IdeDebuggerBase,
   IDEOptEditorIntf,
   IDEOptionsIntf,
-  {$IFDEF USE_INTEL_CTX}
-  dlgCpuViewIntel,
-  {$ENDIF}
   dlgCpuView,
+  dlgCpuViewImplementation,
   frmCpuViewOptions,
 {$ELSE}
   Actions,
@@ -47,11 +45,7 @@ procedure StartCpuView(Sender: TObject);
 begin
   if DebugBoss = nil then Exit;
   if frmCpuView = nil then
-    {$IFDEF USE_INTEL_CTX}
-    frmCpuView := TfrmCpuViewIntel.Create(DebugBoss);
-    {$ELSE}
-    frmCpuView := TfrmCpuView.Create(DebugBoss);
-    {$ENDIF}
+    frmCpuView := TfrmCpuViewImpl.Create(DebugBoss);
   frmCpuView.BringToFront;
   frmCpuView.Show;
 end;
@@ -61,14 +55,15 @@ var
   Key: TIDEShortCut;
   Cat: TIDECommandCategory;
   CmdCpuView: TIDECommand;
-  MainEditorID: Integer;
+  //MainEditorID: Integer;
 begin
   Key := IDEShortCut(VK_C, [ssAlt, ssCtrl], VK_UNKNOWN, []);
   Cat := IDECommandList.FindCategoryByName(CommandCategoryViewName);
   CmdCpuView := RegisterIDECommand(Cat, 'CPU-View', '', Key, nil, @StartCpuView);
   RegisterIDEMenuCommand(itmViewDebugWindows, 'CPU-View', 'CPU-View', nil, nil, CmdCpuView);
-  MainEditorID := RegisterIDEOptionsEditor(GroupEnvironment,
-    TCpuViewMainOptionsFrame, 14041979)^.Index;
+  //MainEditorID := RegisterIDEOptionsEditor(GroupEnvironment,
+  //  TCpuViewMainOptionsFrame, 14041979)^.Index;
+  RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewMainOptionsFrame, 14041979);
 end;
 {$ENDIF}
 

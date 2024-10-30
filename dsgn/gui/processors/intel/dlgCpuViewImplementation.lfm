@@ -1,4 +1,4 @@
-inherited frmCpuViewIntel: TfrmCpuViewIntel
+inherited frmCpuViewImpl: TfrmCpuViewImpl
   Left = 1048
   Top = 549
   OnCreate = FormCreate
@@ -15,6 +15,14 @@ inherited frmCpuViewIntel: TfrmCpuViewIntel
     end
     inherited RegView: TRegView
       PopupMenu = pmIntelReg
+    end
+  end
+  inherited ToolBar: TToolBar
+    inherited tbSep1: TToolButton
+      Height = 33
+    end
+    inherited tbSep2: TToolButton
+      Height = 33
     end
   end
   inherited pnDumps: TPanel

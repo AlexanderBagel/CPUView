@@ -35,7 +35,6 @@ uses
   FWHexView.MappedView,
   CpuView.Common,
   CpuView.Viewers,
-  CpuView.Settings,
   CpuView.Stream,
   {$IFDEF MSWINDOWS}
   CpuView.Windows,
@@ -117,9 +116,9 @@ type
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
     FLockPushToJmpStack: Boolean;
     FLockSelChange: Boolean;
+    FLastCachedAddrVA: UInt64;
     FLastCtx: TCommonCpuContext;
     FRegView: TRegView;
-    FSettings: TCpuViewSettins;
     FShowCallFuncName: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
@@ -133,33 +132,33 @@ type
     procedure OnAsmCacheEnd(Sender: TObject);
     procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
       AJmpState: TJmpState; var Handled: Boolean);
+    procedure OnAsmQueryComment(Sender: TObject; AddrVA: UInt64;
+      AColumn: TColumnType; var AComment: string);
     procedure OnAsmScroll(Sender: TObject; AStep: TScrollStepDirection);
     procedure OnAsmSelectionChange(Sender: TObject);
     procedure OnBreakPointsChange(Sender: TObject);
     procedure OnContextChange(Sender: TObject);
     procedure OnDebugerChage(Sender: TObject);
     procedure OnDebugerStateChange(Sender: TObject);
+    procedure OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
+      AColumn: TColumnType; var AComment: string);
+    procedure OnRegQueryExternalComment(Sender: TObject;
+      const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure SetAsmView(const Value: TAsmView);
     procedure SetDebugger(const Value: TAbstractDebugger);
     procedure SetRegView(const Value: TRegView);
-    procedure SetShowCallFuncName(AValue: Boolean);
     procedure SetStackView(const Value: TStackView);
     procedure SynhronizeViewersWithContext;
   protected
-    procedure AsmViewQueryComment(Sender: TObject; AddrVA: UInt64;
-      AColumn: TColumnType; var AComment: string);
     procedure BuildAsmWindow(AAddress: Int64);
     function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
     procedure LoadFromCache(AIndex: Integer);
-    procedure RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
-      AColumn: TColumnType; var AComment: string);
-    procedure RegViewQueryExternalComment(Sender: TObject;
-      const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
     // Forced - означает принудительную перестройку вьювера
-    // Необходимо при изменении настроек онображения
+    // Необходимо при изменении настроек отображения
+    // -------------------------------------------------------------------------
     // Forced - means forced rebuilding of the viewer
     // Necessary when changing Viewer settings
     procedure RefreshAsmView(Forced: Boolean);
@@ -168,7 +167,7 @@ type
       AColumn: TColumnType; var AComment: string);
     procedure UpdateStreamsProcessID;
   public
-    constructor Create(ASettings: TCpuViewSettins);
+    constructor Create;
     destructor Destroy; override;
     function AddrInAsm(AddrVA: Int64): Boolean;
     function AddrInDump(AddrVA: Int64): Boolean;
@@ -177,16 +176,22 @@ type
     procedure ShowDisasmAtAddr(AddrVA: Int64);
     procedure ShowDumpAtAddr(AddrVA: Int64);
     procedure ShowStackAtAddr(AddrVA: Int64);
+    procedure UpdateAfterSettingsChange;
     function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean;
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
     property DBase: TCpuViewDBase read FDBase;
     property Debugger: TAbstractDebugger read FDebugger write SetDebugger;
     property DumpViewList: TDumpViewList read FDumpViewList;
+    // Адрес от которого был построен последний кэш.
+    // Необходим для правильного выполнения операций Undo/Redo в кэше переходов.
+    // -------------------------------------------------------------------------
+    // Address on the basis of which the current cache was built.
+    // Necessary for proper Undo/Redo operations in the transition cache.
+    property LastCachedAddrVA: UInt64 read FLastCachedAddrVA;
     property RegView: TRegView read FRegView write SetRegView;
-    property Settings: TCpuViewSettins read FSettings;
     property StackView: TStackView read FStackView write SetStackView;
-    property ShowCallFuncName: Boolean read FShowCallFuncName write SetShowCallFuncName;
+    property ShowCallFuncName: Boolean read FShowCallFuncName write FShowCallFuncName;
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
 
@@ -365,18 +370,11 @@ begin
   begin
     Result := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
     // держим кэш на 1024 адреса, этого будет достаточно
+    // -------------------------------------------------------------------------
     // keep the cache for 1024 addresses, this will be enough
     if FKnownFunctionAddrVA.Count > 1024 then
       FKnownFunctionAddrVA.Clear;
     FKnownFunctionAddrVA.Add(AddrVA, Result);
-  end;
-end;
-
-procedure TCpuViewCore.AsmViewQueryComment(Sender: TObject; AddrVA: UInt64;
-  AColumn: TColumnType; var AComment: string);
-begin
-  case AColumn of
-    ctWorkSpace: AComment := FDebugger.Context.RegQueryNamesAtAddr(AddrVA);
   end;
 end;
 
@@ -395,7 +393,10 @@ begin
     begin
       CacheIndex := GenerateCache(AAddress);
       if CacheIndex >= 0 then
+      begin
+        FLastCachedAddrVA := AAddress;
         AAddress := FCacheList[CacheIndex].AddrVA;
+      end;
     end;
     if CanWork and (FDebugger.PointerSize = 4) then
       StreamSize := MM_HIGHEST_USER_ADDRESS32
@@ -422,7 +423,7 @@ begin
     Result := 0;
 end;
 
-constructor TCpuViewCore.Create(ASettings: TCpuViewSettins);
+constructor TCpuViewCore.Create;
 var
   RemoteStream: TRemoteStream;
 begin
@@ -442,7 +443,6 @@ begin
   FShowCallFuncName := True;
   FJmpStack := TList<Int64>.Create;
   FDBase := TCpuViewDBase.Create;
-  FSettings := ASettings;
 end;
 
 destructor TCpuViewCore.Destroy;
@@ -598,24 +598,6 @@ begin
   end;
 end;
 
-procedure TCpuViewCore.RegViewQueryComment(Sender: TObject; AddrVA: UInt64;
-  AColumn: TColumnType; var AComment: string);
-begin
-  AComment := QuerySymbolAtAddr(AddrVA);
-end;
-
-procedure TCpuViewCore.RegViewQueryExternalComment(Sender: TObject;
-  const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
-begin
-  AComment := '';
-  case ARegType of
-    ertLastError: AComment := DBase.GetLastErrorStr(AValue.IntValue);
-    ertLastStatus: AComment := DBase.GetLastStatusStr(AValue.DwordValue);
-  end;
-  if AComment <> '' then
-    AComment := '(' + AComment + ')';
-end;
-
 procedure TCpuViewCore.RefreshBreakPoints;
 var
   I: Integer;
@@ -697,6 +679,14 @@ begin
         FLockPushToJmpStack := False;
       end;
     end;
+  end;
+end;
+
+procedure TCpuViewCore.OnAsmQueryComment(Sender: TObject; AddrVA: UInt64;
+  AColumn: TColumnType; var AComment: string);
+begin
+  case AColumn of
+    ctWorkSpace: AComment := FDebugger.Context.RegQueryNamesAtAddr(AddrVA);
   end;
 end;
 
@@ -807,6 +797,24 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
+  AColumn: TColumnType; var AComment: string);
+begin
+  AComment := QuerySymbolAtAddr(AddrVA);
+end;
+
+procedure TCpuViewCore.OnRegQueryExternalComment(Sender: TObject;
+  const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
+begin
+  AComment := '';
+  case ARegType of
+    ertLastError: AComment := DBase.GetLastErrorStr(AValue.IntValue);
+    ertLastStatus: AComment := DBase.GetLastStatusStr(AValue.DwordValue);
+  end;
+  if AComment <> '' then
+    AComment := '(' + AComment + ')';
+end;
+
 procedure TCpuViewCore.RefreshView(Forced: Boolean);
 var
   StackLim: TStackLimit;
@@ -880,7 +888,7 @@ begin
     FAsmView.OnCacheEnd := OnAsmCacheEnd;
     FAsmView.OnJmpTo := OnAsmJmpTo;
     FAsmView.OnSelectionChange := OnAsmSelectionChange;
-    FAsmView.OnQueryComment := AsmViewQueryComment;
+    FAsmView.OnQueryComment := OnAsmQueryComment;
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;
     FAsmView.FitColumnsToBestSize;
@@ -920,19 +928,9 @@ begin
   begin
     FRegView := Value;
     if Value = nil then Exit;
-    FRegView.OnQueryComment := RegViewQueryComment;
-    FRegView.OnQueryExternalHint := RegViewQueryExternalComment;
+    FRegView.OnQueryComment := OnRegQueryComment;
+    FRegView.OnQueryExternalHint := OnRegQueryExternalComment;
     RefreshView;
-  end;
-end;
-
-procedure TCpuViewCore.SetShowCallFuncName(AValue: Boolean);
-begin
-  if ShowCallFuncName <> AValue then
-  begin
-    FShowCallFuncName := AValue;
-    ResetCache;
-    RefreshView(True);
   end;
 end;
 
@@ -998,6 +996,12 @@ procedure TCpuViewCore.ShowStackAtAddr(AddrVA: Int64);
 begin
   if Assigned(FStackView) then
     FStackView.FocusOnAddress(AddrVA, ccmSelectRow);
+end;
+
+procedure TCpuViewCore.UpdateAfterSettingsChange;
+begin
+  ResetCache;
+  RefreshView(True);
 end;
 
 function TCpuViewCore.UpdateRegValue(RegID: Integer;

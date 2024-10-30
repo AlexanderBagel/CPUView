@@ -1,4 +1,4 @@
-unit dlgCpuViewIntel;
+unit dlgCpuViewImplementation;
 
 {$mode Delphi}
 {$WARN 5024 off : Parameter "$1" not used}
@@ -21,9 +21,9 @@ uses
 
 type
 
-  { TfrmCpuViewIntel }
+  { TfrmCpuViewImpl }
 
-  TfrmCpuViewIntel = class(TfrmCpuView)
+  TfrmCpuViewImpl = class(TfrmCpuView)
     acFPU_MMX: TAction;
     acFPU_R: TAction;
     acFPU_ST: TAction;
@@ -90,54 +90,54 @@ implementation
 
 {$R *.lfm}
 
-{ TfrmCpuViewIntel }
+{ TfrmCpuViewImpl }
 
-procedure TfrmCpuViewIntel.acFPU_MMXUpdate(Sender: TObject);
+procedure TfrmCpuViewImpl.acFPU_MMXUpdate(Sender: TObject);
 begin
   TAction(Sender).Checked := FContext.FPUMode = TFPUMode(TAction(Sender).Tag);
 end;
 
-procedure TfrmCpuViewIntel.acRegShowDebugExecute(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowDebugExecute(Sender: TObject);
 begin
   FContext.ShowDebug := not FContext.ShowDebug;
 end;
 
-procedure TfrmCpuViewIntel.acRegShowDebugUpdate(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowDebugUpdate(Sender: TObject);
 begin
   TAction(Sender).Checked := FContext.ShowDebug;
 end;
 
-procedure TfrmCpuViewIntel.acRegShowFPUExecute(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowFPUExecute(Sender: TObject);
 begin
   FContext.ShowFPU := not FContext.ShowFPU;
 end;
 
-procedure TfrmCpuViewIntel.acRegShowFPUUpdate(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowFPUUpdate(Sender: TObject);
 begin
   TAction(Sender).Checked := FContext.ShowFPU;
 end;
 
-procedure TfrmCpuViewIntel.acRegShowXMMExecute(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowXMMExecute(Sender: TObject);
 begin
   FContext.ShowXMM := not FContext.ShowXMM;
 end;
 
-procedure TfrmCpuViewIntel.acRegShowXMMUpdate(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowXMMUpdate(Sender: TObject);
 begin
   TAction(Sender).Checked := FContext.ShowXMM;
 end;
 
-procedure TfrmCpuViewIntel.acRegShowYMMExecute(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowYMMExecute(Sender: TObject);
 begin
   FContext.ShowYMM := not FContext.ShowYMM;
 end;
 
-procedure TfrmCpuViewIntel.acRegShowYMMUpdate(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegShowYMMUpdate(Sender: TObject);
 begin
   TAction(Sender).Checked := FContext.ShowYMM;
 end;
 
-procedure TfrmCpuViewIntel.acRegSimpleModeExecute(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegSimpleModeExecute(Sender: TObject);
 begin
   if FContext.MapMode = icmDetailed then
     FContext.MapMode := icmSimple
@@ -145,12 +145,12 @@ begin
     FContext.MapMode := icmDetailed;
 end;
 
-procedure TfrmCpuViewIntel.acRegSimpleModeUpdate(Sender: TObject);
+procedure TfrmCpuViewImpl.acRegSimpleModeUpdate(Sender: TObject);
 begin
   TAction(Sender).Checked := FContext.MapMode = icmSimple;
 end;
 
-procedure TfrmCpuViewIntel.AsmViewSelectionChange(Sender: TObject);
+procedure TfrmCpuViewImpl.AsmViewSelectionChange(Sender: TObject);
 var
   ExecuteResult, ValueAccess, MemValueAccess, Symbol, MemSymbol: string;
   I, Idx: Integer;
@@ -220,7 +220,7 @@ begin
   end;
 end;
 
-procedure TfrmCpuViewIntel.edCommandsKeyPress(Sender: TObject; var Key: char);
+procedure TfrmCpuViewImpl.edCommandsKeyPress(Sender: TObject; var Key: char);
 var
   ExecuteResult: string;
   Expression: TExpression;
@@ -239,7 +239,7 @@ begin
   StatusBar.Panels[2].Text := ExecuteResult;
 end;
 
-procedure TfrmCpuViewIntel.pmHintPopup(Sender: TObject);
+procedure TfrmCpuViewImpl.pmHintPopup(Sender: TObject);
 
   function AddMenuItem(AParent: TMenuItem; const ACaption: string;
     ATag: Integer): TMenuItem;
@@ -279,7 +279,7 @@ begin
   end;
 end;
 
-procedure TfrmCpuViewIntel.OnHintMenuClick(Sender: TObject);
+procedure TfrmCpuViewImpl.OnHintMenuClick(Sender: TObject);
 
   function GetMnuParam: THintMenuParam;
   begin
@@ -322,7 +322,7 @@ begin
   end;
 end;
 
-procedure TfrmCpuViewIntel.OnReset(Sender: TObject);
+procedure TfrmCpuViewImpl.OnReset(Sender: TObject);
 begin
   FHintMenuData.Clear;
   edCommands.Text := '';
@@ -330,7 +330,7 @@ begin
   UpdateStatusBar;
 end;
 
-procedure TfrmCpuViewIntel.AfterDbgGateCreate;
+procedure TfrmCpuViewImpl.AfterDbgGateCreate;
 begin
   FScript := TIntelScriptExecutor.Create;
   FScript.Context := FContext;
@@ -339,19 +339,19 @@ begin
   Core.OnReset := OnReset;
 end;
 
-procedure TfrmCpuViewIntel.BeforeDbgGateDestroy;
+procedure TfrmCpuViewImpl.BeforeDbgGateDestroy;
 begin
   FScript.Free;
   FContext.Free;
   FHintMenuData.Free;
 end;
 
-procedure TfrmCpuViewIntel.acFPU_MMXExecute(Sender: TObject);
+procedure TfrmCpuViewImpl.acFPU_MMXExecute(Sender: TObject);
 begin
   FContext.FPUMode := TFPUMode(TAction(Sender).Tag);
 end;
 
-function TfrmCpuViewIntel.GetContext: TCommonCpuContext;
+function TfrmCpuViewImpl.GetContext: TCommonCpuContext;
 begin
   if FContext = nil then
     FContext := TIntelCpuContext.Create(Self);

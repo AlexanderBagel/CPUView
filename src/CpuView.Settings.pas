@@ -67,6 +67,9 @@ const
   xmlShowFuncName = 'showFuncName';
   xmlShowOpcodes = 'showOpcodes';
   xmlShowSrc = 'showSrc';
+  xmlUseDebugInfo = 'useDbgInfo';
+  xmlDbgLog = 'DbgLog';
+  xmlDbgDump = 'CrashDmp';
   xmlBackgroundColor = 'back';
   xmlBookmarkBackgroundColor = 'bookmarkBack';
   xmlBookmarkBorderColor = 'bookmarkBorder';
@@ -254,7 +257,7 @@ type
     property ColorMode: TColorMode read FColorMode write FColorMode;
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
-    property DisplayFunc: Boolean read FAsmSettings.DisplayFunc write FAsmSettings.DisplayFunc;
+    property ShowCallFuncName: Boolean read FAsmSettings.DisplayFunc write FAsmSettings.DisplayFunc;
     property FontName: string read FFontName write FFontName;
     property SaveFormSession: Boolean read FSaveFormSession write FSaveFormSession;
     property SaveViewersSession: Boolean read FSaveViewersSession write FSaveViewersSession;
@@ -593,6 +596,9 @@ begin
   FSaveFormSession := GetNodeAttr(Root, xmlSaveFormSession);
   FSaveViewersSession := GetNodeAttr(Root, xmlSaveViewersSession);
   FFontName := GetNodeAttr(Root, xmlFont);
+  FUseDebugInfo := GetNodeAttr(Root, xmlUseDebugInfo);
+  FUseDebugLog := GetNodeAttr(Root, xmlDbgLog);
+  FUseCrashDump := GetNodeAttr(Root, xmlDbgDump);
   if FSaveFormSession then
   begin
     FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
@@ -840,6 +846,9 @@ begin
   SetNodeAttr(Root, xmlSaveFormSession, FSaveFormSession);
   SetNodeAttr(Root, xmlSaveViewersSession, FSaveViewersSession);
   SetNodeAttr(Root, xmlFont, FFontName);
+  SetNodeAttr(Root, xmlUseDebugInfo, FUseDebugInfo);
+  SetNodeAttr(Root, xmlDbgLog, FUseDebugLog);
+  SetNodeAttr(Root, xmlDbgDump, FUseCrashDump);
   if FSaveFormSession then
   begin
     SetNodeAttr(Root, xmlLeft, FCpuViewDlgSettings.BoundsRect.Left);

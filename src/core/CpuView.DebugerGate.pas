@@ -50,6 +50,7 @@ type
     FUtils: TCommonAbstractUtils;
     FChange: TNotifyEvent;
     FErrorMessage: string;
+    FShowSourceLines, FUseDebugInfo: Boolean;
     FBreakPointsChange, FCtxChange, FStateChange: TNotifyEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
@@ -96,6 +97,8 @@ type
     property Context: TCommonCpuContext read FCtx write SetCtx;
     property CpuViewForm: TCustomForm read FCpuViewForm;
     property ErrorMessage: string read FErrorMessage;
+    property ShowSourceLines: Boolean read FShowSourceLines write FShowSourceLines;
+    property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property Utils: TCommonAbstractUtils read FUtils;
     property OnChange: TNotifyEvent read FChange write FChange;
     property OnContextChange: TNotifyEvent read FCtxChange write FCtxChange;

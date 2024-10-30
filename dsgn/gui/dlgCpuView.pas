@@ -20,7 +20,9 @@ uses
   CpuView.DebugerGate,
   CpuView.FpDebug,
   CpuView.Actions,
-  CpuView.Settings;
+  CpuView.Settings,
+  CpuView.Design.CrashDump,
+  CpuView.Design.DbgLog, Types;
 
 type
 
@@ -100,6 +102,7 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miDebugGenException: TMenuItem;
     miDumpsCloseRight: TMenuItem;
     miAsmRunTo: TMenuItem;
     miStackShowInNewDump: TMenuItem;
@@ -220,6 +223,7 @@ type
     pmRegSelected: TPopupMenu;
     pmHint: TPopupMenu;
     pmDumps: TPopupMenu;
+    pmDebug: TPopupMenu;
     RegView: TRegView;
     miRegSep1: TMenuItem;
     miAsmSep3: TMenuItem;
@@ -284,6 +288,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure miDebugGenExceptionClick(Sender: TObject);
     procedure pcDumpsChange(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
       RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
@@ -306,6 +311,7 @@ type
     FQweryAddrViewerIndex: Integer;
     FSourceLine: Integer;
     FLastBounds: TRect;
+    FCrashDump: TExceptionLogger;
     function ActiveViewerSelectedValue: UInt64;
     function CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
     function CheckRegCallback(ANewAddrVA: UInt64): Boolean;
@@ -349,8 +355,10 @@ uses
 
 procedure TfrmCpuView.FormCreate(Sender: TObject);
 begin
+  FCrashDump := TExceptionLogger.Create;
+  FCrashDump.Enabled := True;
   FSettings := TCpuViewSettins.Create;
-  FCore := TCpuViewCore.Create(FSettings);
+  FCore := TCpuViewCore.Create;
   FDbgGate := TCpuViewDebugGate.Create(Self);
   FDbgGate.Context := GetContext;
   AfterDbgGateCreate;
@@ -390,6 +398,12 @@ begin
   FCore.Free;
   FDbgGate.Free;
   FSettings.Free;
+  FCrashDump.Free;
+end;
+
+procedure TfrmCpuView.miDebugGenExceptionClick(Sender: TObject);
+begin
+  raise Exception.Create('Test exception');
 end;
 
 procedure TfrmCpuView.pcDumpsChange(Sender: TObject);
@@ -532,6 +546,18 @@ begin
   RegView.Width := Round(Settings.CpuViewDlgSettings.SplitterPos[spTopHorz] * (ClientWidth / 100));
   StackView.Width := Round(Settings.CpuViewDlgSettings.SplitterPos[spBottomHorz] * (ClientWidth / 100));
   pnDumps.Height := Round(Settings.CpuViewDlgSettings.SplitterPos[spCenterVert] * (ClientHeight / 100));
+
+  if (Core.ShowCallFuncName <> Settings.ShowCallFuncName) or
+    (DbgGate.ShowSourceLines <> Settings.ShowSourceLines) or
+    (DbgGate.UseDebugInfo <> Settings.UseDebugInfo) then
+  begin
+    Core.ShowCallFuncName := Settings.ShowCallFuncName;
+    DbgGate.ShowSourceLines := Settings.ShowSourceLines;
+    DbgGate.UseDebugInfo := Settings.UseDebugInfo;
+    Core.UpdateAfterSettingsChange;
+  end;
+
+  FCrashDump.Enabled := Settings.UseCrashDump;
 end;
 
 procedure TfrmCpuView.SaveSettings;

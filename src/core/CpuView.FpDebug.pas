@@ -677,14 +677,17 @@ begin
   if Disasm = nil then Exit;
   while nSize > 0 do
   begin
-    Instruction.AsString := QuerySymbolAtAddr(AddrVA, qsSourceLine);
-    if Instruction.AsString <> '' then
+    if ShowSourceLines then
     begin
-      Instruction.AddrVA := AddrVA;
-      Instruction.Hint := '';
-      Instruction.JmpTo := 0;
-      Instruction.Len := 0;
-      Result.Add(Instruction);
+      Instruction.AsString := QuerySymbolAtAddr(AddrVA, qsSourceLine);
+      if Instruction.AsString <> '' then
+      begin
+        Instruction.AddrVA := AddrVA;
+        Instruction.Hint := '';
+        Instruction.JmpTo := 0;
+        Instruction.Len := 0;
+        Result.Add(Instruction);
+      end;
     end;
     PrevVA := {%H-}Int64(pBuff);
     Disasm.Disassemble(pBuff, ACodeBytes, ACode, AnInfo);
@@ -806,6 +809,7 @@ var
   ASrcFileName: string;
 begin
   Result := '';
+  if not UseDebugInfo then Exit;
   if FDbgController = nil then Exit;
   Sym := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
   if Sym = nil then Exit;

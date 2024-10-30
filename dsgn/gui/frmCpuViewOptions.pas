@@ -137,7 +137,7 @@ var
   I: Integer;
 begin
   UpdateCurrentFont(FSettings.FontName);
-  cbDisplayFuncName.Checked := FSettings.DisplayFunc;
+  cbDisplayFuncName.Checked := FSettings.ShowCallFuncName;
   cbShowOpcodes.Checked :=  FSettings.ShowOpcodes;
   cbShowSourceLines.Checked := FSettings.ShowSourceLines;
   cbSymbols.Checked := FSettings.UseDebugInfo;
@@ -197,7 +197,7 @@ var
   I: Integer;
 begin
   FSettings.FontName := cbFont.Text;
-  FSettings.DisplayFunc := cbDisplayFuncName.Checked;
+  FSettings.ShowCallFuncName := cbDisplayFuncName.Checked;
   FSettings.ShowOpcodes := cbShowOpcodes.Checked;
   FSettings.ShowSourceLines := cbShowSourceLines.Checked;
   FSettings.UseDebugInfo := cbSymbols.Checked;

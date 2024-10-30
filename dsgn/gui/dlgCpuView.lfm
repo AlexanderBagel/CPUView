@@ -106,6 +106,7 @@ object frmCpuView: TfrmCpuView
     Top = 0
     Width = 2096
     Caption = 'ToolBar'
+    PopupMenu = pmDebug
     TabOrder = 2
     object tbStepIn: TToolButton
       Left = 1
@@ -979,6 +980,14 @@ object frmCpuView: TfrmCpuView
     end
     object miDumpsCloseRight: TMenuItem
       Action = acDumpsCloseAllToTheRight
+    end
+  end
+  object pmDebug: TPopupMenu
+    Left = 984
+    Top = 112
+    object miDebugGenException: TMenuItem
+      Caption = 'miDebugGenException'
+      OnClick = miDebugGenExceptionClick
     end
   end
 end
