@@ -68,7 +68,8 @@ uses
   CpuView.Common,
   CpuView.Stream,
   CpuView.CPUContext,
-  CpuView.DebugerGate;
+  CpuView.DebugerGate,
+  CpuView.Design.DbgLog;
 
 type
 
@@ -126,8 +127,6 @@ type
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
     function IsMainThreadId: Boolean;
-    procedure OnActivateIDEForm(Sender: TObject; var AHandled: Boolean);
-    procedure OnActivateSourceEditor(Sender: TObject; var AHandled: Boolean);
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
     procedure StopAllWorkers;
@@ -220,6 +219,8 @@ var
   BBP: TBasicBreakPoint;
   DuplicateController: TDictionary<UInt64, Boolean>;
 begin
+  CpuViewDebugLog.Log('DebugGate: BreakPointChanged start', True);
+
   BreakPointList.Clear;
   if FBreakPoints = nil then Exit;
   if FProcess = nil then Exit;
@@ -260,12 +261,18 @@ begin
   end;
 
   DoBreakPointsChange;
+
+  CpuViewDebugLog.Log('DebugGate: BreakPointChanged end', False);
 end;
 
 procedure TCpuViewDebugGate.CallStackCtxChanged(Sender: TObject);
 begin
+  CpuViewDebugLog.Log('DebugGate: CallStackCtxChanged start', True);
+
   UpdateContext;
   DoStateChange;
+
+  CpuViewDebugLog.Log('DebugGate: CallStackCtxChanged end', False);
 end;
 
 function TCpuViewDebugGate.CurrentInstruction: TInstruction;
@@ -296,7 +303,11 @@ end;
 
 procedure TCpuViewDebugGate.DoDebuggerDestroy(Sender: TObject);
 begin
+  CpuViewDebugLog.Log('DebugGate: DoDebuggerDestroy start', True);
+
   Reset;
+
+  CpuViewDebugLog.Log('DebugGate: DoDebuggerDestroy end', False);
 end;
 
 function TCpuViewDebugGate.FormatAsmCode(const Value: string;
@@ -419,50 +430,40 @@ begin
     Result := True;
 end;
 
-procedure TCpuViewDebugGate.OnActivateIDEForm(Sender: TObject;
-  var AHandled: Boolean);
-var
-  AFormClassName: string;
-begin
-  if not (Sender is TCustomForm) then Exit;
-  AFormClassName := TCustomForm(Sender).ClassName;
-  AHandled :=
-    AnsiSameText('TAssemblerDlg', AFormClassName) or
-    AnsiSameText('TSourceNotebook', AFormClassName);
-end;
-
-procedure TCpuViewDebugGate.OnActivateSourceEditor(Sender: TObject;
-  var AHandled: Boolean);
-begin
-  AHandled := Assigned(FDebugger) and (FDebugger.State = dsPause) and
-    CpuViewForm.Visible and CpuViewForm.Active;
-end;
-
 procedure TCpuViewDebugGate.OnState(ADebugger: TDebuggerIntf;
   AOldState: TDBGState);
 begin
-  {$IFDEF DEBUG_LOG}
-  DebugLn(['State: ', dbgs(ADebugger.State)]);
-  {$ENDIF}
-  if ADebugger.State in [dsStop, dsDestroying, dsError, dsNone] then
-    Reset
-  else
-  begin
-    FTemporaryIP.Clear;
-    if FDebugger <> ADebugger then
-      UpdateDebugger(ADebugger)
-    else
-      UpdateContext;
+  CpuViewDebugLog.Log(Format('DebugGate: OnState(%s, %s)', [dbgs(ADebugger.State), dbgs(AOldState)]), True);
+
+  case ADebugger.State of
+    dsNone,
+    dsStop,
+    dsError,
+    dsDestroying:
+      Reset;
+    dsIdle, dsRun, dsInternalPause:;
+    dsPause,
+    dsInit:
+    begin
+      FTemporaryIP.Clear;
+      if FDebugger <> ADebugger then
+        UpdateDebugger(ADebugger)
+      else
+        UpdateContext;
+    end;
   end;
   DoStateChange;
+
+  CpuViewDebugLog.Log('DebugGate: OnState end', False);
 end;
 
 procedure TCpuViewDebugGate.Reset;
 begin
+  CpuViewDebugLog.Log('DebugGate: Reset start', True);
+
   FTemporaryIP.Clear;
   if Assigned(FDebugger) then
   begin
-    //FDebugger.OnActivateSourceEditor := nil;
     if FRegisterDestroyNotification then
     begin
       FDebugger.RemoveNotifyEvent(dnrDestroy, DoDebuggerDestroy);
@@ -477,8 +478,6 @@ begin
   FDbgController := nil;
   FProcess := nil;
   Utils.ProcessID := 0;
-  //if Assigned(IDEWindowCreators) then
-    //IDEWindowCreators.OnActivateIDEForm := nil;
   if Assigned(FBreakPoints) then
   begin
     FBreakPoints.RemoveNotification(FBreakpointsNotification);
@@ -490,16 +489,24 @@ begin
     FThreadsMonitor := nil;
   end;
   FSnapshotManager := nil;
+
+  CpuViewDebugLog.Log('DebugGate: Reset end', False);
 end;
 
 procedure TCpuViewDebugGate.StopAllWorkers;
 begin
+  CpuViewDebugLog.Log('DebugGate: StopAllWorkers start', True);
+
   if Assigned(FDebugger) then
-    TFpDebugDebuggerAccess(FDebugger).StopAllWorkers(True)
+    TFpDebugDebuggerAccess(FDebugger).StopAllWorkers(True);
+
+  CpuViewDebugLog.Log('DebugGate: StopAllWorkers end', False);
 end;
 
 procedure TCpuViewDebugGate.UpdateDebugger(ADebugger: TDebuggerIntf);
 begin
+  CpuViewDebugLog.Log('DebugGate: UpdateDebugger start', True);
+
   FDebugger := ADebugger;
   if Assigned(FDebugger) then
   begin
@@ -516,9 +523,6 @@ begin
       begin
         FDebugger.AddNotifyEvent(dnrDestroy, DoDebuggerDestroy);
         FRegisterDestroyNotification := True;
-        //if Assigned(IDEWindowCreators) then
-        //  IDEWindowCreators.OnActivateIDEForm := OnActivateIDEForm;
-        //FDebugger.OnActivateSourceEditor := OnActivateSourceEditor;
         if Assigned(DebugBoss) then
         begin
           if Assigned(DebugBoss.BreakPoints) then
@@ -538,6 +542,7 @@ begin
         Utils.ProcessID := ProcessID;
         if ADebugger.State = dsPause then
           UpdateContext;
+        CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);
         Exit;
       end;
     end
@@ -549,6 +554,8 @@ begin
   end;
 
   Reset;
+
+  CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);
 end;
 
 function TCpuViewDebugGate.GetUtilsClass: TCommonAbstractUtilsClass;
@@ -669,6 +676,8 @@ var
   AnInfo: TDbgInstInfo;
   ExternalAddr, RipAddr: Int64;
 begin
+  CpuViewDebugLog.Log(Format('DebugGate: Disassembly(AddrVA: 0x%x, nSize: %d)', [AddrVA, nSize]), True);
+
   Result := TListEx<TInstruction>.Create;
   if FDbgController = nil then Exit;
   Process := FDbgController.CurrentProcess;
@@ -730,6 +739,8 @@ begin
     if nSize >= 0 then
       Result.Add(Instruction);
   end;
+
+  CpuViewDebugLog.Log('DebugGate: Disassembly end', False);
 end;
 
 function TCpuViewDebugGate.IsActive: Boolean;
@@ -781,7 +792,11 @@ end;
 
 procedure TCpuViewDebugGate.Pause;
 begin
+  CpuViewDebugLog.Log('DebugGate: Pause start', True);
+
   FDebugger.Pause;
+
+  CpuViewDebugLog.Log('DebugGate: Pause end', False);
 end;
 
 function TCpuViewDebugGate.PointerSize: Integer;
@@ -876,17 +891,29 @@ end;
 
 procedure TCpuViewDebugGate.Run;
 begin
+  CpuViewDebugLog.Log('DebugGate: Run start', True);
+
   FDebugger.Run;
+
+  CpuViewDebugLog.Log('DebugGate: Run end', False);
 end;
 
 procedure TCpuViewDebugGate.Stop;
 begin
+  CpuViewDebugLog.Log('DebugGate: Stop start', True);
+
   FDebugger.Stop;
+
+  CpuViewDebugLog.Log('DebugGate: Stop end', False);
 end;
 
 procedure TCpuViewDebugGate.SetNewIP(AddrVA: UInt64);
 begin
+  CpuViewDebugLog.Log(Format('DebugGate: SetNewIP(0x%x)', [AddrVA]), True);
+
   UpdateRegValue(Context.InstructonPointID, AddrVA);
+
+  CpuViewDebugLog.Log('DebugGate: SetNewIP end', False);
 end;
 
 procedure TCpuViewDebugGate.ToggleBreakPoint(AddrVA: UInt64);
@@ -898,6 +925,7 @@ var
   BPList: TDBGPtrArray;
   AddrIsSourceLine: Boolean;
 begin
+  CpuViewDebugLog.Log(Format('DebugGate: ToggleBreakPoint(0x%x)', [AddrVA]), True);
   if FDbgController = nil then Exit;
   AFileName := '';
   ALine := -1;
@@ -929,6 +957,7 @@ begin
   if Assigned(Bp) then
   begin
     Bp.ReleaseReference;
+    CpuViewDebugLog.Log('DebugGate: ToggleBreakPoint end', False);
     Exit;
   end;
   DebugBoss.LockCommandProcessing;
@@ -940,6 +969,8 @@ begin
   finally
     DebugBoss.UnLockCommandProcessing;
   end;
+
+  CpuViewDebugLog.Log('DebugGate: ToggleBreakPoint end', False);
 end;
 
 function TCpuViewDebugGate.ThreadStackLimit: TStackLimit;
@@ -973,19 +1004,31 @@ end;
 
 procedure TCpuViewDebugGate.TraceIn;
 begin
+  CpuViewDebugLog.Log('DebugGate: TraceIn start', True);
+
   FLockTimeOut := GetTickCount64;
   FDebugger.StepIntoInstr;
+
+  CpuViewDebugLog.Log('DebugGate: TraceIn end', False);
 end;
 
 procedure TCpuViewDebugGate.TraceOut;
 begin
+  CpuViewDebugLog.Log('DebugGate: TraceOut start', True);
+
   FLockTimeOut := GetTickCount64;
   FDebugger.StepOverInstr;
+
+  CpuViewDebugLog.Log('DebugGate: TraceOut end', False);
 end;
 
 procedure TCpuViewDebugGate.TraceTilReturn;
 begin
+  CpuViewDebugLog.Log('DebugGate: TraceTilReturn start', True);
+
   FDebugger.StepOut;
+
+  CpuViewDebugLog.Log('DebugGate: TraceTilReturn end', False);
 end;
 
 procedure TCpuViewDebugGate.TraceTo(AddrVA: Int64);
@@ -996,12 +1039,16 @@ begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
 
+  CpuViewDebugLog.Log(Format('DebugGate: TraceTo(0x%x)', [AddrVA]), True);
+
   StopAllWorkers;
 
   SetLength(ALocation{%H-}, 1);
   ALocation[0] := QWord(AddrVA);
   FDbgController.InitializeCommand(TDbgControllerRunToCmd.Create(FDbgController, ALocation));
   TFpDebugDebuggerAccess(FDebugger).StartDebugLoop;
+
+  CpuViewDebugLog.Log('DebugGate: TraceTo end', False);
 end;
 
 function TCpuViewDebugGate.UpdateRegValue(RegID: Integer; ANewRegValue: UInt64
@@ -1013,6 +1060,8 @@ var
 begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
+
+  CpuViewDebugLog.Log(Format('DebugGate: UpdateRegValue(RegID: %d, ANewRegValue: 0x%x)', [RegID, ANewRegValue]), True);
 
   StopAllWorkers;
 
@@ -1038,6 +1087,8 @@ begin
   finally
     Context.EndUpdate;
   end;
+
+  CpuViewDebugLog.Log('DebugGate: UpdateRegValue end', False);
 end;
 
 procedure TCpuViewDebugGate.UpdateRemoteStream(pBuff: PByte; AAddrVA: UInt64;
@@ -1048,6 +1099,8 @@ var
 begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
+
+  CpuViewDebugLog.Log(Format('DebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
 
   // Вызов опасен, если оставить его то будет AV при остановке процесса через паузу
   // The call is dangerous, if leave it there will be AV when stop the process via pause
@@ -1062,6 +1115,8 @@ begin
     WorkQueue.WaitForItem(WorkItem, True);
     WorkItem.DecRef;
   end;
+
+  CpuViewDebugLog.Log('DebugGate: UpdateRemoteStream end', False);
 end;
 
 end.

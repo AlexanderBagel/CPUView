@@ -42,18 +42,20 @@ var
     except
       Result := SysBackTraceStr(Addr);
     end;
-    TCpuViewDebugLog.Log(Result);
+    CpuViewDebugLog.Log(Result);
   end;
 
 var
   FrameCount, FrameNumber: Integer;
   Frames: PPointer;
 begin
+  CpuViewDebugLog.Log('================== CRASH DUMP START ==================');
   Dump := DumpAddr(ExceptAddr);
   FrameCount := ExceptFrameCount;
   Frames := ExceptFrames;
   for FrameNumber := 0 to FrameCount - 1 do
     Dump := Dump + sLineBreak + DumpAddr(Frames[FrameNumber]);
+  CpuViewDebugLog.Log('=================== CRASH DUMP END ===================');
   AException.Message := AException.Message + sLineBreak + Dump;
   Application.ShowException(AException);
 end;

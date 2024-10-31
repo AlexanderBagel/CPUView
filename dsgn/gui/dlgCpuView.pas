@@ -356,7 +356,6 @@ uses
 procedure TfrmCpuView.FormCreate(Sender: TObject);
 begin
   FCrashDump := TExceptionLogger.Create;
-  FCrashDump.Enabled := True;
   FSettings := TCpuViewSettins.Create;
   FCore := TCpuViewCore.Create;
   FDbgGate := TCpuViewDebugGate.Create(Self);
@@ -378,6 +377,8 @@ begin
   miAsmCurrentIP.ImageIndex := IDEImages.LoadImage('debugger_show_execution_point');
   SetHooks;
   LoadSettings;
+  CpuViewDebugLog.Reset;
+  CpuViewDebugLog.Log('TfrmCpuView: start', True, False);
 end;
 
 procedure TfrmCpuView.FormDeactivate(Sender: TObject);
@@ -399,6 +400,8 @@ begin
   FDbgGate.Free;
   FSettings.Free;
   FCrashDump.Free;
+  CpuViewDebugLog.Log('TfrmCpuView: end', False);
+  CpuViewDebugLog.Enabled := False;
 end;
 
 procedure TfrmCpuView.miDebugGenExceptionClick(Sender: TObject);
@@ -558,6 +561,7 @@ begin
   end;
 
   FCrashDump.Enabled := Settings.UseCrashDump;
+  CpuViewDebugLog.Enabled := Settings.UseDebugLog;
 end;
 
 procedure TfrmCpuView.SaveSettings;
