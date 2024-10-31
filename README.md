@@ -10,6 +10,12 @@ Attention - BETA, version!!!
 4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
 5. Enjoy
 
+### Known issues:
+If during rebuild Lazarus writes "Fatal: Can't find unit dlgCpuViewImplementation used by CpuView.Reg", is necessary:
+1. Compile the CPUView_D package again
+2. Rebuild the IDE again
+The reasons for this error are not yet clear.
+
 ### Debug Log and Crash Dump
 The debug log is stored in the following path: “lazarus_path\config_lazarus\cpuview\debug.log”.  
 It is created when the CPU-View dialog is first opened, and contains all logs added during the session (i.e. until Lazarus is finally closed).  
@@ -18,12 +24,6 @@ If an exception occurs, CallStack is saved to the current log.
   
 You can disable logging or crash dump collection in the settings "Tools->Options->Environment->CPU-View".  
 ![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/settings.png)
-
-### Known issues:
-If during rebuild Lazarus writes "Fatal: Can't find unit dlgCpuViewImplementation used by CpuView.Reg", is necessary:
-1. Compile the CPUView_D package again
-2. Rebuild the IDE again
-The reasons for this error are not yet clear.
 
 ### Five active editors:
 1. Disassembler
