@@ -16,7 +16,7 @@ If during rebuild Lazarus writes "Fatal: Can't find unit dlgCpuViewImplementatio
 2. Rebuild the IDE again
 The reasons for this error are not yet clear.
 
-### Debug Log and Crash Dump
+### Debug Log and Crash Dump:
 The debug log is stored in the following path: “lazarus_path\config_lazarus\cpuview\debug.log”.  
 It is created when the CPU-View dialog is first opened, and contains all logs added during the session (i.e. until Lazarus is finally closed).  
 The previous session's log is deleted on startup, so if an error occurs, you should save the log file for later analysis.  
