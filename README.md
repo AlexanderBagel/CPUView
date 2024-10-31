@@ -11,11 +11,11 @@ Attention - BETA, version!!!
 5. Enjoy
 
 ### Debug Log and Crash Dump
-The debug log is stored in the following path: “lazarus_path\config_lazarus\cpuview\debug.log”.
-It is created when the CPU-View dialog is first opened, and contains all logs added during the session (i.e. until Lazarus is finally closed).
-The previous session's log is deleted on startup, so if an error occurs, you should save the log file for later analysis.
-If an exception occurs, CallStack is saved to the current log.
-You can disable logging or crash dump collection in the settings "Tools->Options->Environment->CPU-View".
+The debug log is stored in the following path: “lazarus_path\config_lazarus\cpuview\debug.log”.  
+It is created when the CPU-View dialog is first opened, and contains all logs added during the session (i.e. until Lazarus is finally closed).  
+The previous session's log is deleted on startup, so if an error occurs, you should save the log file for later analysis.  
+If an exception occurs, CallStack is saved to the current log.  
+You can disable logging or crash dump collection in the settings "Tools->Options->Environment->CPU-View".  
 ![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/settings.png)
 
 ### Known issues:
