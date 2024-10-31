@@ -32,7 +32,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 4. Stack
 5. Script and Hint
 
-Common features:
+### Common features:
 * OS: Windows and Linux support via Gtk2 or Qt5
 * Proc: Intel x86_64 (ARM not yet implemented)
 * Thread context (Basic, x87 and SIMD register) full support on Windows and Linux
@@ -41,7 +41,7 @@ Common features:
 * Supports thread switching with instantaneous change of displayed information about the active thread
 * Command to jump the selected address in any of the windows
 
-The disassembler supports:
+### The disassembler supports:
 * Output debugging information
 * Jump direction display
 * Active jump highlighting
@@ -53,7 +53,7 @@ The disassembler supports:
 * Breakpoints (display and modify)
 * Bookmarks synchronization (not yet implemented)
 
-Register window:
+### Register window:
 * Contains debugging information for each register (RAX..R15)
 * Display SIMD registers (XMM and YMM) with 12 display mode
 * Three display modes for x87 registers (ST-R-M)
@@ -64,13 +64,13 @@ Register window:
 * LastError and LastStatus code with description (Windows only)
 * Highlight of changed registers
 
-Stack supports:
+### Stack supports:
 * Debug information
 * Active and previous frames highlighting
 * Return address highlighting
 * Offsets
 
-Dump supports:
+### Dump supports:
 * Offsets
 * Multiple dump windows
 * 17 display mode (include Long Double 80 bit)
