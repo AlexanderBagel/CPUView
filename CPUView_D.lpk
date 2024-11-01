@@ -43,10 +43,6 @@ if TargetCPU = &apos;arm&apos; then
         <UnitName Value="CpuView.CPUContext"/>
       </Item>
       <Item>
-        <Filename Value="src\CpuView.Settings.pas"/>
-        <UnitName Value="CpuView.Settings"/>
-      </Item>
-      <Item>
         <Filename Value="src\CpuView.Viewers.pas"/>
         <UnitName Value="CpuView.Viewers"/>
       </Item>
@@ -75,6 +71,10 @@ if TargetCPU = &apos;arm&apos; then
         <UnitName Value="CpuView.FpDebug"/>
       </Item>
       <Item>
+        <Filename Value="src\core\CpuView.Settings.pas"/>
+        <UnitName Value="CpuView.Settings"/>
+      </Item>	  
+      <Item>
         <Filename Value="src\core\CpuView.ScriptExecutor.pas"/>
         <UnitName Value="CpuView.ScriptExecutor"/>
       </Item>
@@ -98,7 +98,7 @@ if TargetCPU = &apos;arm&apos; then
       <Item>
         <Filename Value="dsgn\CpuView.Design.DbgLog.pas"/>
         <UnitName Value="CpuView.Design.DbgLog"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="dsgn\gui\dlgCpuView.lfm"/>
         <Type Value="LFM"/>
