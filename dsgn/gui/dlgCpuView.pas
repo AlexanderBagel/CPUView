@@ -298,6 +298,7 @@ type
     procedure DefaultActionUpdate(Sender: TObject);
   private
     FCore: TCpuViewCore;
+    FContext: TCommonCpuContext;
     FDbgGate: TCpuViewDebugGate;
     FSettings: TCpuViewSettins;
     FAsmViewSelectedAddr,
@@ -357,11 +358,11 @@ procedure TfrmCpuView.FormCreate(Sender: TObject);
 begin
   FCrashDump := TExceptionLogger.Create;
   FSettings := TCpuViewSettins.Create;
-  FCore := TCpuViewCore.Create;
-  FDbgGate := TCpuViewDebugGate.Create(Self);
-  FDbgGate.Context := GetContext;
+  FCore := TCpuViewCore.Create(TCpuViewDebugGate);
+  FContext := GetContext;
+  FDbgGate := FCore.Debugger as TCpuViewDebugGate;
+  FDbgGate.Context := FContext;
   AfterDbgGateCreate;
-  FCore.Debugger := FDbgGate;
   FCore.AsmView := AsmView;
   FCore.RegView := RegView;
   FCore.DumpViewList.Add(DumpView);
@@ -396,8 +397,8 @@ begin
   SaveSettings;
   BeforeDbgGateDestroy;
   FDbgGate.Context := nil;
+  FContext.Free;
   FCore.Free;
-  FDbgGate.Free;
   FSettings.Free;
   FCrashDump.Free;
   CpuViewDebugLog.Log('TfrmCpuView: end', False);

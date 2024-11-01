@@ -45,7 +45,6 @@ type
   TAbstractDebugger = class(TComponent)
   private
     FBreakPointList: TList<TBasicBreakPoint>;
-    FCpuViewForm: TCustomForm;
     FCtx: TCommonCpuContext;
     FUtils: TCommonAbstractUtils;
     FChange: TNotifyEvent;
@@ -59,11 +58,10 @@ type
     procedure DoChange;
     procedure DoError(const AMessage: string);
     procedure DoStateChange;
-    function GetUtilsClass: TCommonAbstractUtilsClass; virtual; abstract;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure UpdateContext; virtual;
   public
-    constructor Create(ACpuViewForm: TCustomForm); reintroduce; virtual;
+    constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); reintroduce; virtual;
     destructor Destroy; override;
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; virtual; abstract;
     function CurrentInstructionPoint: UInt64; virtual; abstract;
@@ -95,7 +93,6 @@ type
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: UInt64; ASize: Int64); virtual; abstract;
     property BreakPointList: TList<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
-    property CpuViewForm: TCustomForm read FCpuViewForm;
     property ErrorMessage: string read FErrorMessage;
     property ShowSourceLines: Boolean read FShowSourceLines write FShowSourceLines;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
@@ -105,6 +102,8 @@ type
     property OnStateChange: TNotifyEvent read FStateChange write FStateChange;
     property OnBreakPointsChange: TNotifyEvent read FBreakPointsChange write FBreakPointsChange;
   end;
+
+  TAbstractDebuggerClass = class of TAbstractDebugger;
 
 implementation
 
@@ -140,7 +139,6 @@ end;
 destructor TAbstractDebugger.Destroy;
 begin
   FBreakPointList.Free;
-  FUtils.Free;
   inherited;
 end;
 
@@ -225,11 +223,11 @@ begin
   end;
 end;
 
-constructor TAbstractDebugger.Create(ACpuViewForm: TCustomForm);
+constructor TAbstractDebugger.Create(AOwner: TComponent;
+  AUtils: TCommonAbstractUtils);
 begin
-  inherited Create(ACpuViewForm);
-  FUtils := GetUtilsClass.Create;
-  FCpuViewForm := ACpuViewForm;
+  inherited Create(AOwner);
+  FUtils := AUtils;
   FBreakPointList := TList<TBasicBreakPoint>.Create;
 end;
 

@@ -46,9 +46,6 @@ uses
   FpDbgClasses,
   FpDbgInfo,
   FpDbgUtil,
-  {$IFDEF MSWINDOWS}
-  FpDbgWinClasses,
-  {$ENDIF}
 
   // LazUtils
   LazLoggerBase,
@@ -131,10 +128,8 @@ type
     procedure Reset;
     procedure StopAllWorkers;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
-  protected
-    function GetUtilsClass: TCommonAbstractUtilsClass; override;
   public
-    constructor Create(ACpuViewForm: TCustomForm); override;
+    constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); override;
     destructor Destroy; override;
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; override;
     function CurrentInstructionPoint: UInt64; override;
@@ -170,9 +165,6 @@ implementation
 type
   TDbgProcessAccess = class(TDbgProcess);
   TFpDebugDebuggerAccess = class(TFpDebugDebugger);
-  {$IFDEF MSWINDOWS}
-  TDebugThreadAcces = class(TDbgWinThread);
-  {$ENDIF}
 
 { TThreadWorkerMaskBreakpoints }
 
@@ -558,12 +550,8 @@ begin
   CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);
 end;
 
-function TCpuViewDebugGate.GetUtilsClass: TCommonAbstractUtilsClass;
-begin
-  Result := TCommonUtils;
-end;
-
-constructor TCpuViewDebugGate.Create(ACpuViewForm: TCustomForm);
+constructor TCpuViewDebugGate.Create(AOwner: TComponent;
+  AUtils: TCommonAbstractUtils);
 begin
   inherited;
   FTemporaryIP := TDictionary<Integer, UInt64>.Create;

@@ -13,12 +13,14 @@ interface
 }
 
 
-{$message 'При Run не чистятся данные стека, висит return остаток от фрейма'}
-{$message 'В Linux есть проблемы со стеком, он периодически попадает на невалидную страницу и не отображается'}
-{$message 'Подключить все 10 букмарков на AsmView'}
-{$message 'Анализ дампа с валидацией адресов. Найденые адреса выделять подчеркиванием и добавить хинт'}
-{$message 'В дамп добавить возможность выделения, чтобы можно было следить за несколькими рядом стоящими буферами'}
-{$message 'x87/SIMD регистры не редактируются'}
+{$message 'Add button to toolbar Option -> Editor Toolbar'}
+{$message 'Wrong viwewers size after change DPI'}
+{$message 'Viewer scroll interferes with splitter movement'}
+{$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
+{$message 'Connect all 10 bookmarks on AsmView'}
+{$message 'Analyze dump with address validation. Underscore the found addresses and add them hint'}
+{$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
+{$message 'The x87/SIMD registers are not editable'}
 
 uses
   {$IFDEF FPC}
@@ -145,7 +147,6 @@ type
     procedure OnRegQueryExternalComment(Sender: TObject;
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure SetAsmView(const Value: TAsmView);
-    procedure SetDebugger(const Value: TAbstractDebugger);
     procedure SetRegView(const Value: TRegView);
     procedure SetStackView(const Value: TStackView);
     procedure SynhronizeViewersWithContext;
@@ -167,7 +168,7 @@ type
       AColumn: TColumnType; var AComment: string);
     procedure UpdateStreamsProcessID;
   public
-    constructor Create;
+    constructor Create(ADebuggerClass: TAbstractDebuggerClass);
     destructor Destroy; override;
     function AddrInAsm(AddrVA: Int64): Boolean;
     function AddrInDump(AddrVA: Int64): Boolean;
@@ -181,7 +182,7 @@ type
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
     property DBase: TCpuViewDBase read FDBase;
-    property Debugger: TAbstractDebugger read FDebugger write SetDebugger;
+    property Debugger: TAbstractDebugger read FDebugger;
     property DumpViewList: TDumpViewList read FDumpViewList;
     // Адрес от которого был построен последний кэш.
     // Необходим для правильного выполнения операций Undo/Redo в кэше переходов.
@@ -423,7 +424,7 @@ begin
     Result := 0;
 end;
 
-constructor TCpuViewCore.Create;
+constructor TCpuViewCore.Create(ADebuggerClass: TAbstractDebuggerClass);
 var
   RemoteStream: TRemoteStream;
 begin
@@ -439,6 +440,15 @@ begin
   FDisassemblyStream.BufferSize := DisasmBuffSize;
   RemoteStream := TRemoteStream.Create(FUtils);
   FStackStream := TBufferedROStream.Create(RemoteStream, soOwned);
+  FDebugger := ADebuggerClass.Create(nil, FUtils);
+  FDebugger.OnChange := OnDebugerChage;
+  FDebugger.OnContextChange := OnContextChange;
+  FDebugger.OnStateChange := OnDebugerStateChange;
+  FDebugger.OnBreakPointsChange := OnBreakPointsChange;
+  FAsmStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+  FDisassemblyStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+  FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
+  FStackStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
   FShowCallFuncName := True;
   FJmpStack := TList<Int64>.Create;
@@ -456,6 +466,7 @@ begin
   FStackStream.Free;
   FKnownFunctionAddrVA.Free;
   FJmpStack.Free;
+  FDebugger.Free;
   FUtils.Free;
   inherited;
 end;
@@ -895,31 +906,6 @@ begin
     RefreshBreakPoints;
     RefreshView;
   end;
-end;
-
-procedure TCpuViewCore.SetDebugger(const Value: TAbstractDebugger);
-begin
-  FDebugger := Value;
-  if Assigned(Value) then
-  begin
-    FDebugger.OnChange := OnDebugerChage;
-    FDebugger.OnContextChange := OnContextChange;
-    FDebugger.OnStateChange := OnDebugerStateChange;
-    FDebugger.OnBreakPointsChange := OnBreakPointsChange;
-    FAsmStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
-    FDisassemblyStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
-    FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
-    FStackStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
-  end
-  else
-  begin
-    FAsmStream.Stream.OnUpdated := nil;
-    FDisassemblyStream.Stream.OnUpdated := nil;
-    FDumpViewList.OnUpdated := nil;
-    FStackStream.Stream.OnUpdated := nil;
-  end;
-  UpdateStreamsProcessID;
-  RefreshBreakPoints;
 end;
 
 procedure TCpuViewCore.SetRegView(const Value: TRegView);

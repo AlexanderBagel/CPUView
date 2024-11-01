@@ -333,7 +333,7 @@ end;
 procedure TfrmCpuViewImpl.AfterDbgGateCreate;
 begin
   FScript := TIntelScriptExecutor.Create;
-  FScript.Context := FContext;
+  FScript.Context := GetContext;
   FScript.Debugger := DbgGate;
   FHintMenuData := TList<THintMenuParam>.Create;
   Core.OnReset := OnReset;
@@ -342,7 +342,6 @@ end;
 procedure TfrmCpuViewImpl.BeforeDbgGateDestroy;
 begin
   FScript.Free;
-  FContext.Free;
   FHintMenuData.Free;
 end;
 
