@@ -13,10 +13,12 @@ uses
   Forms,
   IDECommands,
   MenuIntf,
+  ToolBarIntf,
   BaseDebugManager,
   IdeDebuggerBase,
   IDEOptEditorIntf,
   IDEOptionsIntf,
+  IDEImagesIntf,
   dlgCpuView,
   dlgCpuViewImplementation,
   frmCpuViewOptions,
@@ -53,14 +55,19 @@ end;
 procedure DoLCLRegister;
 var
   Key: TIDEShortCut;
-  Cat: TIDECommandCategory;
-  CmdCpuView: TIDECommand;
+  ViewCategory: TIDECommandCategory;
+  IDECommand: TIDECommand;
+  MenuCommand: TIDEMenuCommand;
+  ToolBarCategory: TIDEToolButtonCategory;
   //MainEditorID: Integer;
 begin
   Key := IDEShortCut(VK_C, [ssAlt, ssCtrl], VK_UNKNOWN, []);
-  Cat := IDECommandList.FindCategoryByName(CommandCategoryViewName);
-  CmdCpuView := RegisterIDECommand(Cat, 'CPU-View', '', Key, nil, @StartCpuView);
-  RegisterIDEMenuCommand(itmViewDebugWindows, 'CPU-View', 'CPU-View', nil, nil, CmdCpuView);
+  ViewCategory := IDECommandList.FindCategoryByName(CommandCategoryViewName);
+  IDECommand := RegisterIDECommand(ViewCategory, 'CPU-View', '', Key, nil, @StartCpuView);
+  MenuCommand := RegisterIDEMenuCommand(itmViewDebugWindows, 'CPU-View', 'CPU-View', nil, nil, IDECommand);
+  MenuCommand.ImageIndex := IDEImages.LoadImage('debugger');
+  ToolBarCategory := IDEToolButtonCategories.FindCategory(CommandCategoryViewName);
+  RegisterIDEButtonCommand(ToolBarCategory, 'CPU-View', IDECommand).ImageIndex := MenuCommand.ImageIndex;
   //MainEditorID := RegisterIDEOptionsEditor(GroupEnvironment,
   //  TCpuViewMainOptionsFrame, 14041979)^.Index;
   RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewMainOptionsFrame, 14041979);

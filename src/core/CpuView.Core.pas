@@ -12,10 +12,6 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
-
-{$message 'Add button to toolbar Option -> Editor Toolbar'}
-{$message 'Wrong viwewers size after change DPI'}
-{$message 'Viewer scroll interferes with splitter movement'}
 {$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Analyze dump with address validation. Underscore the found addresses and add them hint'}
