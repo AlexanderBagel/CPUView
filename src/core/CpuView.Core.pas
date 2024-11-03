@@ -12,6 +12,8 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
+{$message 'Add shortcuts settings'}
+{$message 'Need shortcut to close dialog. E.g. Esc to close dialog, BackSpace to jump stepback'}
 {$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Analyze dump with address validation. Underscore the found addresses and add them hint'}
@@ -899,6 +901,8 @@ begin
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;
     FAsmView.FitColumnsToBestSize;
+    FAsmView.ShortCuts.JmpBack.SecondaryShortCut.Add('Num -');
+    FAsmView.ShortCuts.JmpTo.SecondaryShortCut.Add('Num +');
     RefreshBreakPoints;
     RefreshView;
   end;

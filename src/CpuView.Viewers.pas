@@ -97,7 +97,7 @@ type
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
   published
-    property ActiveJmpColor: TColor read FActiveJmpColor write SetActiveJmpColor;
+    property ActiveJmpColor: TColor read FActiveJmpColor write SetActiveJmpColor stored IsColorStored;
     property BreakPointActiveColor: TColor read FBreakPointActiveColor write SetBreakPointActiveColor stored IsColorStored;
     property BreakPointActiveFontColor: TColor read FBreakPointActiveFontColor write SetBreakPointActiveFontColor stored IsColorStored;
     property BreakPointColor: TColor read FBreakPointColor write SetBreakPointColor stored IsColorStored;
@@ -156,6 +156,17 @@ type
 
   TOnVerticalScrollEvent = procedure(Sender: TObject; AStep: TScrollStepDirection) of object;
 
+  { TAsmViewHeader }
+
+  TAsmViewHeader = class(TCustomHexViewHeader)
+  protected
+    procedure InitDefault; override;
+  published
+    property Columns default [ctWorkSpace..ctComment];
+    property DrawColumnSeparator;
+    property Visible default False;
+  end;
+
   { TCustomAsmView }
 
   TCustomAsmView = class(TCustomMappedHexView)
@@ -171,6 +182,7 @@ type
     FCacheEnd: TNotifyEvent;
     procedure DoScrollStep(AStep: TScrollStepDirection);
     function GetColorMap: TAsmColorMap;
+    procedure SetColorMap(const Value: TAsmColorMap);
     procedure SetCurrentIPIsActiveJmp(const Value: Boolean);
     procedure SetInstructionPoint(const Value: Int64);
     procedure SetHighlightReg(const Value: string);
@@ -186,8 +198,8 @@ type
     function GetCaretNextRowIndex(FromIndex: Int64;
       AColumn: TColumnType = ctNone): Int64; override;
     function GetColorMapClass: THexViewColorMapClass; override;
+    function GetHeaderClass: THeaderClass; override;
     function GetOverloadPainterClass(Value: TPrimaryRowPainterClass): TPrimaryRowPainterClass; override;
-    procedure InitDefault; override;
     procedure InitPainters; override;
   protected
     // Lock Vertical Scroll
@@ -207,7 +219,7 @@ type
     property InstructionPoint: Int64 read FInstructionPoint write SetInstructionPoint;
     property HighlightReg: string read FHighlightReg write SetHighlightReg;
   protected
-    property ColorMap: TAsmColorMap read GetColorMap;
+    property ColorMap: TAsmColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property OnCacheEnd: TNotifyEvent read FCacheEnd write FCacheEnd;
     property OnVerticalScroll: TOnVerticalScrollEvent read FOnScroll write FOnScroll;
   end;
@@ -240,6 +252,7 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
+    property ShortCuts;
     property ShowHint;
     property TabOrder;
     property TabStop;
@@ -435,6 +448,7 @@ type
     FFrames: TListEx<TStackFrame>;
     FAddrPCDict: TDictionary<Int64, UInt64>;
     function GetColorMap: TStackColorMap;
+    procedure SetColorMap(const Value: TStackColorMap);
     procedure UpdateFrameDescriptions;
   protected
     function ByteViewModeCommandEnabled(Value: TByteViewMode; var AChecked: Boolean): Boolean; override;
@@ -453,7 +467,7 @@ type
     function IsAddrPCRow(AIndex: Int64; out AddrVA: UInt64): Boolean;
     property Frames: TListEx<TStackFrame> read FFrames;
   protected
-    property ColorMap: TStackColorMap read GetColorMap;
+    property ColorMap: TStackColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
   end;
 
   { TStackView }
@@ -597,6 +611,7 @@ type
     FQueryExternalHint: TContextQueryExternalRegHintEvent;
     procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
     function GetColorMap: TRegistersColorMap;
+    procedure SetColorMap(const Value: TRegistersColorMap);
     procedure SetContext(const Value: TAbstractCPUContext);
   protected
     function ByteViewModeCommandEnabled(Value: TByteViewMode; var AChecked: Boolean): Boolean; override;
@@ -627,7 +642,7 @@ type
     property SelectedRegister: TRegister read FSelectedRegister;
     property SelectedRegName: string read FSelectedRegName;
   protected
-    property ColorMap: TRegistersColorMap read GetColorMap;
+    property ColorMap: TRegistersColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property OnQueryExternalHint: TContextQueryExternalRegHintEvent read FQueryExternalHint write FQueryExternalHint;
     property OnSelectedContextPopup: TOnSelectedContextPopupEvent read FPopup write FPopup;
   end;
@@ -650,7 +665,7 @@ type
     property BorderStyle;
     property ColorMap;
     property Constraints;
-    property Cursor default crIBeam;
+    property Cursor;
     property Enabled;
     property Encoder;
     property Font;
@@ -1069,6 +1084,16 @@ begin
   end;
 end;
 
+
+{ TAsmViewHeader }
+
+procedure TAsmViewHeader.InitDefault;
+begin
+  inherited;
+  Columns := [ctWorkSpace..ctComment];
+  Visible := False;
+end;
+
 { TCustomAsmView }
 
 function TCustomAsmView.CalculateJmpToRow(JmpFromRow: Int64): Int64;
@@ -1250,6 +1275,11 @@ begin
   Result := TAsmColorMap;
 end;
 
+function TCustomAsmView.GetHeaderClass: THeaderClass;
+begin
+  Result := TAsmViewHeader;
+end;
+
 function TCustomAsmView.GetOverloadPainterClass(
   Value: TPrimaryRowPainterClass): TPrimaryRowPainterClass;
 begin
@@ -1260,13 +1290,6 @@ begin
       Result := TAsmViewSrcLineRow
     else
       Result := Value;
-end;
-
-procedure TCustomAsmView.InitDefault;
-begin
-  inherited InitDefault;
-  Header.Columns := [ctWorkSpace..ctComment];
-  Header.Visible := False;
 end;
 
 procedure TCustomAsmView.InitPainters;
@@ -1298,6 +1321,11 @@ begin
   RowIndex := SelectedRowIndex;
   if RowIndex >= 0 then
     Result := RawData[RowIndex].Address;
+end;
+
+procedure TCustomAsmView.SetColorMap(const Value: TAsmColorMap);
+begin
+
 end;
 
 procedure TCustomAsmView.SetCurrentIPIsActiveJmp(const Value: Boolean);
@@ -1776,6 +1804,11 @@ end;
 function TCustomStackView.IsAddrPCRow(AIndex: Int64; out AddrVA: UInt64): Boolean;
 begin
   Result := FAddrPCDict.TryGetValue(AIndex, AddrVA);
+end;
+
+procedure TCustomStackView.SetColorMap(const Value: TStackColorMap);
+begin
+
 end;
 
 procedure TCustomStackView.UpdateFrameDescriptions;
@@ -2315,6 +2348,11 @@ begin
     Result := Min(nSize, FSelectedRegValue.ValueSize);
     Move(FSelectedRegValue.ByteValue, pBuffer, Result);
   end;
+end;
+
+procedure TCustomRegView.SetColorMap(const Value: TRegistersColorMap);
+begin
+
 end;
 
 procedure TCustomRegView.SetContext(const Value: TAbstractCPUContext);
