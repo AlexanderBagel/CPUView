@@ -22,6 +22,7 @@ interface
 
 uses
   {$IFDEF FPC}
+  LCLType, LCLProc,
   {$ELSE}
   Windows,
   {$ENDIF}
@@ -30,6 +31,7 @@ uses
   SysUtils,
   Controls,
   Generics.Collections,
+  Menus,
   FWHexView.Common,
   FWHexView,
   FWHexView.MappedView,
@@ -901,8 +903,8 @@ begin
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;
     FAsmView.FitColumnsToBestSize;
-    FAsmView.ShortCuts.JmpBack.SecondaryShortCut.Add('Num -');
-    FAsmView.ShortCuts.JmpTo.SecondaryShortCut.Add('Num +');
+    FAsmView.ShortCuts.JmpBack.SecondaryShortCut.Add(ShortCutToText(VK_SUBTRACT));
+    FAsmView.ShortCuts.JmpTo.SecondaryShortCut.Add(ShortCutToText(VK_ADD));
     RefreshBreakPoints;
     RefreshView;
   end;
