@@ -94,6 +94,7 @@ type
     procedure SetSourceLineColor(AValue: TColor);
     procedure SetSizePfxColor(const Value: TColor);
   protected
+    procedure AssignTo(Dest: TPersistent); override;
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
   published
@@ -406,6 +407,7 @@ type
     procedure SetStackPointColor(const Value: TColor);
     procedure SetStackPointFontColor(const Value: TColor);
   protected
+    procedure AssignTo(Dest: TPersistent); override;
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
   published
@@ -585,6 +587,7 @@ type
     procedure SetValueColor(const Value: TColor);
     procedure SetValueModifiedColor(const Value: TColor);
   protected
+    procedure AssignTo(Dest: TPersistent); override;
     procedure InitLightMode; override;
     procedure InitDarkMode; override;
   published
@@ -711,6 +714,34 @@ type
 implementation
 
 { TAsmColorMap }
+
+procedure TAsmColorMap.AssignTo(Dest: TPersistent);
+begin
+  inherited;
+  if Dest is TAsmColorMap then
+  begin
+    TAsmColorMap(Dest).FActiveJmpColor := FActiveJmpColor;
+    TAsmColorMap(Dest).FBreakPointActiveColor := FBreakPointActiveColor;
+    TAsmColorMap(Dest).FBreakPointActiveFontColor := FBreakPointActiveFontColor;
+    TAsmColorMap(Dest).FBreakPointColor := FBreakPointColor;
+    TAsmColorMap(Dest).FBreakPointDisabledColor := FBreakPointDisabledColor;
+    TAsmColorMap(Dest).FBreakPointDisabledFontColor := FBreakPointDisabledFontColor;
+    TAsmColorMap(Dest).FBreakPointFontColor := FBreakPointFontColor;
+    TAsmColorMap(Dest).FInstructionColor := FInstructionColor;
+    TAsmColorMap(Dest).FJmpColor := FJmpColor;
+    TAsmColorMap(Dest).FKernelColor := FKernelColor;
+    TAsmColorMap(Dest).FNopColor := FNopColor;
+    TAsmColorMap(Dest).FNumberColor := FNumberColor;
+    TAsmColorMap(Dest).FPrefixColor := FPrefixColor;
+    TAsmColorMap(Dest).FRegColor := FRegColor;
+    TAsmColorMap(Dest).FRegHighlightBackColor := FRegHighlightBackColor;
+    TAsmColorMap(Dest).FRegHighlightFontColor := FRegHighlightFontColor;
+    TAsmColorMap(Dest).FRIPBackgroundColor := FRIPBackgroundColor;
+    TAsmColorMap(Dest).FRIPBackgroundFontColor := FRIPBackgroundFontColor;
+    TAsmColorMap(Dest).FSourceLineColor := FSourceLineColor;
+    TAsmColorMap(Dest).FSizePfxColor := FSizePfxColor;
+  end;
+end;
 
 procedure TAsmColorMap.InitDarkMode;
 begin
@@ -1325,7 +1356,7 @@ end;
 
 procedure TCustomAsmView.SetColorMap(const Value: TAsmColorMap);
 begin
-
+  ColorMap.Assign(Value);
 end;
 
 procedure TCustomAsmView.SetCurrentIPIsActiveJmp(const Value: Boolean);
@@ -1499,6 +1530,21 @@ begin
 end;
 
 { TStackColorMap }
+
+procedure TStackColorMap.AssignTo(Dest: TPersistent);
+begin
+  inherited;
+  if Dest is TStackColorMap then
+  begin
+    TStackColorMap(Dest).FAddrPCColor := FAddrPCColor;
+    TStackColorMap(Dest).FAddrPCFontColor := FAddrPCFontColor;
+    TStackColorMap(Dest).FEmptyStackColor := FEmptyStackColor;
+    TStackColorMap(Dest).FFrameColor := FFrameColor;
+    TStackColorMap(Dest).FFrameActiveColor := FFrameActiveColor;
+    TStackColorMap(Dest).FStackPointFontColor := FStackPointFontColor;
+    TStackColorMap(Dest).FStackPointColor := FStackPointColor;
+  end;
+end;
 
 procedure TStackColorMap.InitDarkMode;
 begin
@@ -1808,7 +1854,7 @@ end;
 
 procedure TCustomStackView.SetColorMap(const Value: TStackColorMap);
 begin
-
+  ColorMap.Assign(Value);
 end;
 
 procedure TCustomStackView.UpdateFrameDescriptions;
@@ -2050,6 +2096,18 @@ begin
 end;
 
 { TRegistersColorMap }
+
+procedure TRegistersColorMap.AssignTo(Dest: TPersistent);
+begin
+  inherited;
+  if Dest is TRegistersColorMap then
+  begin
+    TRegistersColorMap(Dest).FHintColor := FHintColor;
+    TRegistersColorMap(Dest).FRegColor := FRegColor;
+    TRegistersColorMap(Dest).FValueColor := FValueColor;
+    TRegistersColorMap(Dest).FValueModifiedColor := FValueModifiedColor;
+  end;
+end;
 
 procedure TRegistersColorMap.InitDarkMode;
 begin
@@ -2352,7 +2410,7 @@ end;
 
 procedure TCustomRegView.SetColorMap(const Value: TRegistersColorMap);
 begin
-
+  ColorMap.Assign(Value);
 end;
 
 procedure TCustomRegView.SetContext(const Value: TAbstractCPUContext);

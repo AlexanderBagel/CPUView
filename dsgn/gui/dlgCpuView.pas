@@ -288,6 +288,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormKeyPress(Sender: TObject; var Key: char);
     procedure miDebugGenExceptionClick(Sender: TObject);
     procedure pcDumpsChange(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
@@ -403,6 +404,12 @@ begin
   FCrashDump.Free;
   CpuViewDebugLog.Log('TfrmCpuView: end', False);
   CpuViewDebugLog.Enabled := False;
+end;
+
+procedure TfrmCpuView.FormKeyPress(Sender: TObject; var Key: char);
+begin
+  if Ord(Key) = VK_ESCAPE then
+    Close;
 end;
 
 procedure TfrmCpuView.miDebugGenExceptionClick(Sender: TObject);

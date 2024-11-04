@@ -86,6 +86,8 @@ const
   xmlHeaderTextColor = 'headerText';
   xmlRowSeparatorColor = 'rowSeparator';
   xmlSelectColor = 'select';
+  xmlSelectTextContrastDarkColor = 'selectContrastDark';
+  xmlSelectTextContrastLightColor = 'selectContrastLight';
   xmlSelectInactiveColor = 'selectInactive';
   xmlTextColor = 'text';
   xmlTextCommentColor = 'textComment';
@@ -542,6 +544,8 @@ begin
   FColors.Add(xmlRowSeparatorColor, Value.RowSeparatorColor);
   FColors.Add(xmlSelectColor, Value.SelectColor);
   FColors.Add(xmlSelectInactiveColor, Value.SelectInactiveColor);
+  FColors.Add(xmlSelectTextContrastDarkColor, Value.SelectTextContrastDarkColor);
+  FColors.Add(xmlSelectTextContrastLightColor, Value.SelectTextContrastLightColor);
   FColors.Add(xmlTextColor, Value.TextColor);
   FColors.Add(xmlTextCommentColor, Value.TextCommentColor);
   FColors.Add(xmlWorkSpaceTextColor, Value.WorkSpaceTextColor);
@@ -788,6 +792,8 @@ begin
   Value.RowSeparatorColor := Color[xmlRowSeparatorColor];
   Value.SelectColor := Color[xmlSelectColor];
   Value.SelectInactiveColor := Color[xmlSelectInactiveColor];
+  Value.SelectTextContrastDarkColor := Color[xmlSelectTextContrastDarkColor];
+  Value.SelectTextContrastLightColor := Color[xmlSelectTextContrastLightColor];
   Value.TextColor := Color[xmlTextColor];
   Value.TextCommentColor := Color[xmlTextCommentColor];
   Value.WorkSpaceTextColor := Color[xmlWorkSpaceTextColor];
@@ -951,6 +957,8 @@ begin
   Add(xmlRowSeparatorColor, 'Row Separator');
   Add(xmlSelectColor, 'Select');
   Add(xmlSelectInactiveColor, 'Select Inactive');
+  Add(xmlSelectTextContrastDarkColor, 'Select Text Contrast Dark');
+  Add(xmlSelectTextContrastLightColor, 'Select Text Contrast Light');
   Add(xmlTextColor, 'Text');
   Add(xmlTextCommentColor, 'Comment');
   Add(xmlWorkSpaceTextColor, 'WorkSpace Text');

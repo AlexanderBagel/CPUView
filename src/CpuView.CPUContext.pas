@@ -12,6 +12,7 @@ uses
 {$ELSE}
   LCLIntf, LCLType,
 {$ENDIF}
+  Math,
   SysUtils,
   Classes,
   Generics.Collections,
@@ -555,6 +556,24 @@ end;
 
 function TCommonCpuContext.RegValue(Value: PByte; ValueLen: Integer;
   AValueFmt: TRegViewMode): string;
+
+  function RawBufToBase(ABase: Byte): string;
+  const
+    DigitBuff: string = '0123456789';
+  var
+    DecimalVal: UInt64;
+  begin
+    Result := '';
+    DecimalVal := 0;
+    Move(Value^, DecimalVal, Min(SizeOf(DecimalVal), ValueLen));
+    if DecimalVal = 0 then Exit('0');
+    while DecimalVal > 0 do
+    begin
+      Result := DigitBuff[(DecimalVal and ABase) + 1] + Result;
+      DecimalVal := DecimalVal div (ABase + 1);
+    end;
+  end;
+
 begin
   Result := '';
   case AValueFmt of
@@ -566,9 +585,10 @@ begin
       Result := RawBufToViewMode(Value, ValueLen, DefValueMetric(bvmHex32), bvmHex32, RegFormatMode);
     rvmHexQ:
       Result := RawBufToViewMode(Value, ValueLen, DefValueMetric(bvmHex64), bvmHex64, RegFormatMode);
-      {$message 'Not yet implemented'}
-    rvmOct: ;
-    rvmBin:;
+    rvmOct:
+      Result := RawBufToBase(7);
+    rvmBin:
+      Result := RawBufToBase(1);
     rvmIntW:
       Result := RawBufToViewMode(Value, ValueLen, DefValueMetric(bvmInt16), bvmInt16, RegFormatMode);
     rvmIntD:

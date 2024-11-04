@@ -97,6 +97,9 @@ type
     constructor Create(ADbgIntf: TCpuViewDebugGate);
   end;
 
+  TUpdateWaitingState = (uwsBreakpoint, uwsContext);
+  TUpdateWaitingStates = set of TUpdateWaitingState;
+
   { TCpuViewDebugGate }
 
   TCpuViewDebugGate = class(TAbstractDebugger)
@@ -116,17 +119,21 @@ type
     FTemporaryIP: TDictionary<Integer, UInt64>;
     FThreadsMonitor: TIdeThreadsMonitor;
     FThreadsNotification: TThreadsNotification;
-    procedure BreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
-      const {%H-}ABreakpoint: TIDEBreakPoint);
-    procedure CallStackCtxChanged(Sender: TObject);
+    FUpdateWaiting: TUpdateWaitingStates;
+    function CheckCanWork: Boolean;
+    procedure BreakPointChanged;
     function CurrentInstruction: TInstruction;
     procedure DoDebuggerDestroy(Sender: TObject);
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
     function IsMainThreadId: Boolean;
+    procedure OnBreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
+      const {%H-}ABreakpoint: TIDEBreakPoint);
+    procedure OnCallStackCtxChanged(Sender: TObject);
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
     procedure StopAllWorkers;
+    procedure UpdateContext; override;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
   public
     constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); override;
@@ -202,16 +209,32 @@ end;
 
 { TCpuViewDebugGate }
 
-procedure TCpuViewDebugGate.BreakPointChanged(const ASender: TIDEBreakPoints;
-  const ABreakpoint: TIDEBreakPoint);
+function TCpuViewDebugGate.CheckCanWork: Boolean;
+begin
+  Result := False;
+  if FDbgController = nil then Exit;
+  if FDebugger = nil then Exit;
+  if FDebugger.State <> dsPause then Exit;
+  Result := True;
+end;
+
+procedure TCpuViewDebugGate.BreakPointChanged;
 var
   I, A: Integer;
   BP: TIDEBreakPoint;
   BPList: TDBGPtrArray;
   BBP: TBasicBreakPoint;
   DuplicateController: TDictionary<UInt64, Boolean>;
+  LineAddressesPresent: Boolean;
 begin
   CpuViewDebugLog.Log('DebugGate: BreakPointChanged start', True);
+
+  if not CheckCanWork then
+  begin
+    Include(FUpdateWaiting, uwsBreakpoint);
+    CpuViewDebugLog.Log('DebugGate: BreakPointChanged not ready yet.', False);
+    Exit;
+  end;
 
   BreakPointList.Clear;
   if FBreakPoints = nil then Exit;
@@ -234,7 +257,12 @@ begin
         bpkSource:
         begin
           BPList := nil;
-          if not FProcess.GetLineAddresses(BP.Source, BP.Line, BPList) then
+
+          // Can raise an exception: "String list does not allow duplicates"
+          // Investigate the problem, possibly due to a previously missing pause test
+          LineAddressesPresent := FProcess.GetLineAddresses(BP.Source, BP.Line, BPList);
+
+          if not LineAddressesPresent then
             Continue;
           for A := 0 to Length(BPList) - 1 do
           begin
@@ -252,19 +280,10 @@ begin
     DuplicateController.Free;
   end;
 
+  Exclude(FUpdateWaiting, uwsBreakpoint);
   DoBreakPointsChange;
 
   CpuViewDebugLog.Log('DebugGate: BreakPointChanged end', False);
-end;
-
-procedure TCpuViewDebugGate.CallStackCtxChanged(Sender: TObject);
-begin
-  CpuViewDebugLog.Log('DebugGate: CallStackCtxChanged start', True);
-
-  UpdateContext;
-  DoStateChange;
-
-  CpuViewDebugLog.Log('DebugGate: CallStackCtxChanged end', False);
 end;
 
 function TCpuViewDebugGate.CurrentInstruction: TInstruction;
@@ -422,6 +441,29 @@ begin
     Result := True;
 end;
 
+procedure TCpuViewDebugGate.OnBreakPointChanged(const ASender: TIDEBreakPoints;
+  const ABreakpoint: TIDEBreakPoint);
+begin
+  BreakPointChanged;
+end;
+
+procedure TCpuViewDebugGate.OnCallStackCtxChanged(Sender: TObject);
+begin
+  CpuViewDebugLog.Log('DebugGate: OnCallStackCtxChanged start', True);
+
+  if not CheckCanWork then
+  begin
+    Include(FUpdateWaiting, uwsContext);
+    CpuViewDebugLog.Log('DebugGate: OnCallStackCtxChanged not ready yet.', False);
+    Exit;
+  end;
+
+  UpdateContext;
+  DoStateChange;
+
+  CpuViewDebugLog.Log('DebugGate: OnCallStackCtxChanged end', False);
+end;
+
 procedure TCpuViewDebugGate.OnState(ADebugger: TDebuggerIntf;
   AOldState: TDBGState);
 begin
@@ -442,6 +484,8 @@ begin
         UpdateDebugger(ADebugger)
       else
         UpdateContext;
+      if uwsBreakpoint in FUpdateWaiting then
+        BreakPointChanged;
     end;
   end;
   DoStateChange;
@@ -495,6 +539,22 @@ begin
   CpuViewDebugLog.Log('DebugGate: StopAllWorkers end', False);
 end;
 
+procedure TCpuViewDebugGate.UpdateContext;
+begin
+  CpuViewDebugLog.Log('DebugGate: UpdateContext start', True);
+
+  if not CheckCanWork then
+  begin
+    Include(FUpdateWaiting, uwsContext);
+    CpuViewDebugLog.Log('DebugGate: UpdateContext not ready yet.', False);
+    Exit;
+  end;
+  inherited UpdateContext;
+  Exclude(FUpdateWaiting, uwsContext);
+
+  CpuViewDebugLog.Log('DebugGate: UpdateContext end', False);
+end;
+
 procedure TCpuViewDebugGate.UpdateDebugger(ADebugger: TDebuggerIntf);
 begin
   CpuViewDebugLog.Log('DebugGate: UpdateDebugger start', True);
@@ -521,7 +581,7 @@ begin
           begin
             FBreakPoints := DebugBoss.BreakPoints;
             FBreakPoints.AddNotification(FBreakpointsNotification);
-            BreakPointChanged(FBreakPoints, nil);
+            BreakPointChanged;
           end;
           if Assigned(DebugBoss.Threads) then
           begin
@@ -559,12 +619,12 @@ begin
   FSupportStream.OnUpdated := UpdateRemoteStream;
   FBreakpointsNotification := TIDEBreakPointsNotification.Create;
   FBreakpointsNotification.AddReference;
-  FBreakpointsNotification.OnAdd := BreakPointChanged;
-  FBreakpointsNotification.OnUpdate := BreakPointChanged;
-  FBreakpointsNotification.OnRemove := BreakPointChanged;
+  FBreakpointsNotification.OnAdd := OnBreakPointChanged;
+  FBreakpointsNotification.OnUpdate := OnBreakPointChanged;
+  FBreakpointsNotification.OnRemove := OnBreakPointChanged;
   FThreadsNotification := TThreadsNotification.Create;
   FThreadsNotification.AddReference;
-  FThreadsNotification.OnChange := CallStackCtxChanged;
+  FThreadsNotification.OnChange := OnCallStackCtxChanged;
   if Assigned(DebugBoss) then
   begin
     DebugBoss.RegisterStateChangeHandler(OnState);
@@ -614,7 +674,7 @@ var
   AEntry: TThreadEntry;
 begin
   Result := 0;
-  if Assigned(FDebugger) and (FDebugger.State = dsPause) then
+  if CheckCanWork then
   begin
     if not FTemporaryIP.TryGetValue(ThreadID, Result) then
     begin
@@ -1023,9 +1083,7 @@ procedure TCpuViewDebugGate.TraceTo(AddrVA: Int64);
 var
   ALocation: TDBGPtrArray;
 begin
-  if FDbgController = nil then Exit;
-  if FDebugger = nil then Exit;
-  if FDebugger.State <> dsPause then Exit;
+  if not CheckCanWork then Exit;
 
   CpuViewDebugLog.Log(Format('DebugGate: TraceTo(0x%x)', [AddrVA]), True);
 
@@ -1046,8 +1104,7 @@ var
   WorkItem: TThreadWorkerChangeThreadContext;
   RegValue: TRegValue;
 begin
-  if FDebugger = nil then Exit;
-  if FDebugger.State <> dsPause then Exit;
+  if not CheckCanWork then Exit;
 
   CpuViewDebugLog.Log(Format('DebugGate: UpdateRegValue(RegID: %d, ANewRegValue: 0x%x)', [RegID, ANewRegValue]), True);
 
@@ -1085,8 +1142,7 @@ var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerMaskBreakpoints;
 begin
-  if FDebugger = nil then Exit;
-  if FDebugger.State <> dsPause then Exit;
+  if not CheckCanWork then Exit;
 
   CpuViewDebugLog.Log(Format('DebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
 

@@ -105,12 +105,22 @@ begin
 end;
 
 constructor TCpuViewDebugLog.Create;
+const
+  DefLogName: string = 'debug.log';
+var
+  LoggerFolder, BackupPath: string;
 begin
-  FLoggerPath := IncludeTrailingPathDelimiter(LazarusIDE.GetPrimaryConfigPath) + 'cpuview' + PathDelim;
-  ForceDirectories(FLoggerPath);
-  FLoggerPath := FLoggerPath + 'debug.log';
+  LoggerFolder := IncludeTrailingPathDelimiter(LazarusIDE.GetPrimaryConfigPath) + 'cpuview' + PathDelim;
+  ForceDirectories(LoggerFolder);
+  FLoggerPath := LoggerFolder + DefLogName;
   if FileExists(FLoggerPath) then
-    DeleteFile(FLoggerPath);
+  begin
+    BackupPath := LoggerFolder + 'backup' + PathDelim + DefLogName;
+    ForceDirectories(ExtractFilePath(BackupPath));
+    if FileExists(BackupPath) then
+      DeleteFile(BackupPath);
+    RenameFile(FLoggerPath, BackupPath);
+  end;
   FStopWatch := specialize TStack<Int64>.Create;
   {$IFDEF MSWINDOWS}
   QueryPerformanceFrequency(FFrequency);
