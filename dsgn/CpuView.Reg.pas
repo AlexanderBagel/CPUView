@@ -42,6 +42,8 @@ type
 
 implementation
 
+{$R cpuview.res}
+
 {$IFDEF FPC}
 procedure StartCpuView(Sender: TObject);
 begin
