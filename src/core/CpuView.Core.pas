@@ -1,4 +1,21 @@
-﻿unit CpuView.Core;
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  ****************************************************************************
+//  * Project   : CPU-View
+//  * Unit Name : CpuView.Core.pas
+//  * Purpose   : CPU-View mode kernel automates most of the utility actions.
+//  * Author    : Alexander (Rouse_) Bagel
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Version   : 1.0
+//  * Home Page : http://rouse.drkb.ru
+//  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//
+
+unit CpuView.Core;
 
 {$IFDEF FPC}
   {$MODE Delphi}
@@ -129,6 +146,7 @@ type
     FUtils: TCommonUtils;
     FReset: TNotifyEvent;
     function CanWork: Boolean;
+    function DisasmBuffSize: Integer;
     procedure DoReset;
     function GetAddrMode: TAddressMode;
     procedure OnAsmCacheEnd(Sender: TObject);
@@ -197,9 +215,6 @@ type
   end;
 
 implementation
-
-const
-  DisasmBuffSize = 384;
 
 { TDumpViewList }
 
@@ -630,6 +645,11 @@ begin
   Result := Assigned(FDebugger) and (FDebugger.DebugState = adsPaused);
 end;
 
+function TCpuViewCore.DisasmBuffSize: Integer;
+begin
+  Result := Max(400, CacheVisibleRows * 8);
+end;
+
 procedure TCpuViewCore.DoReset;
 begin
   if Assigned(FReset) then
@@ -718,12 +738,12 @@ begin
   end;
   if NewCacheIndex < 0 then
     NewCacheIndex := GenerateCache(FCacheList[0].AddrVA);
-  if NewCacheIndex >= FCacheList.Count - CacheVisibleRows then
+  if NewCacheIndex >= FCacheList.Count - FAsmView.VisibleRowCount then
   begin
     if NewCacheIndex < FCacheList.Count then
       NewCacheIndex := GenerateCache(FCacheList[NewCacheIndex].AddrVA)
     else
-      NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - CacheVisibleRows].AddrVA);
+      NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - FAsmView.VisibleRowCount].AddrVA);
   end;
   FLockSelChange := True;
   if (NewCacheIndex >= 0) and (NewCacheIndex < FCacheList.Count) then

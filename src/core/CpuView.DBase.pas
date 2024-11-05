@@ -1,4 +1,21 @@
-﻿unit CpuView.DBase;
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  ****************************************************************************
+//  * Project   : CPU-View
+//  * Unit Name : CpuView.DBase.pas
+//  * Purpose   : Work with external information databases for CPU-View.
+//  * Author    : Alexander (Rouse_) Bagel
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Version   : 1.0
+//  * Home Page : http://rouse.drkb.ru
+//  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//
+
+unit CpuView.DBase;
 
 {$IFDEF FPC}
   {$MODE DELPHI}

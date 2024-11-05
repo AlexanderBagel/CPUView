@@ -980,5 +980,13 @@ object frmCpuView: TfrmCpuView
       Caption = 'miDebugGenException'
       OnClick = miDebugGenExceptionClick
     end
+    object miResetProfiler: TMenuItem
+      Caption = 'miResetProfiler'
+      OnClick = miResetProfilerClick
+    end
+    object miProfilerSaveDump: TMenuItem
+      Caption = 'miProfilerSaveDump'
+      OnClick = miProfilerSaveDumpClick
+    end
   end
 end

@@ -1,4 +1,22 @@
-﻿unit dlgCpuView.TemporaryLocker;
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  ****************************************************************************
+//  * Project   : CPU-View
+//  * Unit Name : dlgCpuView.TemporaryLocker.pas
+//  * Purpose   : Temporary solution to disable passing focus
+//  *           : to other debugger windows for Lazarus in Windows mode.
+//  * Author    : Alexander (Rouse_) Bagel
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Version   : 1.0
+//  * Home Page : http://rouse.drkb.ru
+//  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//
+
+unit dlgCpuView.TemporaryLocker;
 
 {$IFDEF FPC}
   {$MODE Delphi}

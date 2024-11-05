@@ -2,13 +2,16 @@
 //
 //  ****************************************************************************
 //  * Project   : CPU-View
-//  * Unit Name : FWHexView.CpuView.pas
-//  * Purpose   : Набор классов для реализации режима CPU-View
-//  * Author    : Александр (Rouse_) Багель
+//  * Unit Name : CpuView.Viewers.pas
+//  * Purpose   : Set of Viewers to implement the CPU-View mode
+//  * Author    : Alexander (Rouse_) Bagel
 //  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
-//  * Version   : 2.0.14
+//  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
 //  ****************************************************************************
 //
 

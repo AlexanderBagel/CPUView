@@ -1,3 +1,20 @@
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  ****************************************************************************
+//  * Project   : CPU-View
+//  * Unit Name : dlgCpuView.pas
+//  * Purpose   : Basic GUI debugger class without CPU-specific implementation code
+//  * Author    : Alexander (Rouse_) Bagel
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Version   : 1.0
+//  * Home Page : http://rouse.drkb.ru
+//  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//
+
 unit dlgCpuView;
 
 {$mode Delphi}
@@ -22,7 +39,7 @@ uses
   CpuView.Actions,
   CpuView.Settings,
   CpuView.Design.CrashDump,
-  CpuView.Design.DbgLog, Types;
+  CpuView.Design.DbgLog;
 
 type
 
@@ -102,6 +119,8 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miProfilerSaveDump: TMenuItem;
+    miResetProfiler: TMenuItem;
     miDebugGenException: TMenuItem;
     miDumpsCloseRight: TMenuItem;
     miAsmRunTo: TMenuItem;
@@ -290,6 +309,8 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyPress(Sender: TObject; var Key: char);
     procedure miDebugGenExceptionClick(Sender: TObject);
+    procedure miProfilerSaveDumpClick(Sender: TObject);
+    procedure miResetProfilerClick(Sender: TObject);
     procedure pcDumpsChange(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
       RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
@@ -349,7 +370,8 @@ uses
   dlgCpuView.TemporaryLocker,
   dlgInputBox,
   IDEImagesIntf,
-  BaseDebugManager;
+  BaseDebugManager,
+  uni_profiler;
 
 {$R *.lfm}
 
@@ -415,6 +437,16 @@ end;
 procedure TfrmCpuView.miDebugGenExceptionClick(Sender: TObject);
 begin
   raise Exception.Create('Test exception');
+end;
+
+procedure TfrmCpuView.miProfilerSaveDumpClick(Sender: TObject);
+begin
+  uprof.SaveToFile(DebugFolder + 'profile.txt');
+end;
+
+procedure TfrmCpuView.miResetProfilerClick(Sender: TObject);
+begin
+  uprof.Reset;
 end;
 
 procedure TfrmCpuView.pcDumpsChange(Sender: TObject);

@@ -1,3 +1,20 @@
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  ****************************************************************************
+//  * Project   : CPU-View
+//  * Unit Name : CpuView.Design.DbgLog.pas
+//  * Purpose   : Debug log implementation.
+//  * Author    : Alexander (Rouse_) Bagel
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Version   : 1.0
+//  * Home Page : http://rouse.drkb.ru
+//  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//
+
 unit CpuView.Design.DbgLog;
 
 {$mode ObjFPC}{$H+}
@@ -47,6 +64,9 @@ type
   function CpuViewDebugLog: TCpuViewDebugLog;
 
 implementation
+
+uses
+  CpuView.Design.Common;
 
 function CpuViewDebugLog: TCpuViewDebugLog;
 begin
@@ -110,7 +130,7 @@ const
 var
   LoggerFolder, BackupPath: string;
 begin
-  LoggerFolder := IncludeTrailingPathDelimiter(LazarusIDE.GetPrimaryConfigPath) + 'cpuview' + PathDelim;
+  LoggerFolder := DebugFolder;
   ForceDirectories(LoggerFolder);
   FLoggerPath := LoggerFolder + DefLogName;
   if FileExists(FLoggerPath) then
