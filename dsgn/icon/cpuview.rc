@@ -1,0 +1,5 @@
+TASMVIEW BITMAP "tasmview.bmp"
+TDUMPVIEW BITMAP "tdumpview.bmp"
+TREGVIEW BITMAP "tregview.bmp"
+TSTACKVIEW BITMAP "tstackview.bmp"
+TEDITVIEW BITMAP "teditview.bmp"

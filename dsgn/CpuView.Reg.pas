@@ -42,7 +42,11 @@ type
 
 implementation
 
-{$R cpuview.res}
+{$IFNDEF FPC}
+  {$R cpuview.res}
+{$ELSE}
+  {$R cpuview_fpc.res}
+{$ENDIF}
 
 {$IFDEF FPC}
 procedure StartCpuView(Sender: TObject);
