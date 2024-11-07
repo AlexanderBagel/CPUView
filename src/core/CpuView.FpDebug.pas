@@ -1161,7 +1161,7 @@ var
 begin
   if not CheckCanWork then Exit;
 
-  CpuViewDebugLog.Log(Format('DebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
+  //CpuViewDebugLog.Log(Format('DebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
 
   // Вызов опасен, если оставить его то будет AV при остановке процесса через паузу
   // The call is dangerous, if leave it there will be AV when stop the process via pause
@@ -1177,7 +1177,7 @@ begin
     WorkItem.DecRef;
   end;
 
-  CpuViewDebugLog.Log('DebugGate: UpdateRemoteStream end', False);
+  //CpuViewDebugLog.Log('DebugGate: UpdateRemoteStream end', False);
 end;
 
 end.
