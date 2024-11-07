@@ -73,7 +73,7 @@ if TargetCPU = &apos;arm&apos; then
       <Item>
         <Filename Value="src\core\CpuView.Settings.pas"/>
         <UnitName Value="CpuView.Settings"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.ScriptExecutor.pas"/>
         <UnitName Value="CpuView.ScriptExecutor"/>
@@ -81,6 +81,10 @@ if TargetCPU = &apos;arm&apos; then
       <Item>
         <Filename Value="src\core\CpuView.Stream.pas"/>
         <UnitName Value="CpuView.Stream"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\CpuView.AllUnits.pas"/>
+        <UnitName Value="CpuView.AllUnits"/>
       </Item>
       <Item>
         <Filename Value="dsgn\CpuView.Reg.pas"/>
