@@ -33,8 +33,6 @@ interface
   CpuView.DBase,
   CpuView.DebugerGate,
   CpuView.FpDebug,
-  CpuView.IntelContext,
-  CpuView.IntelContext.Types,
   CpuView.Settings,
   CpuView.ScriptExecutor,
   CpuView.Stream,
@@ -48,6 +46,8 @@ interface
   {$ENDIF}
 
   {$IFDEF USE_INTEL_CTX}
+  CpuView.IntelContext,
+  CpuView.IntelContext.Types,
   CpuView.ScriptExecutor.Intel,
   dlgCpuViewImplementation,
   {$ENDIF}
