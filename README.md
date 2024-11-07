@@ -14,6 +14,7 @@ Attention - BETA, version!!!
 If during rebuild Lazarus writes "Fatal: Can't find unit dlgCpuViewImplementation used by CpuView.Reg", is necessary:
 1. Compile the CPUView_D package again
 2. Rebuild the IDE again  
+
 The reasons for this error are not yet clear.
 
 ### Debug Log and Crash Dump:
