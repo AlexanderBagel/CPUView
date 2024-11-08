@@ -1158,14 +1158,32 @@ procedure TCpuViewDebugGate.UpdateRemoteStream(pBuff: PByte; AAddrVA: UInt64;
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerMaskBreakpoints;
+  AddrVA, Limit: UInt64;
+  NeedUpdate: Boolean;
+  I: Integer;
 begin
   if not CheckCanWork then Exit;
 
-  //CpuViewDebugLog.Log(Format('DebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
+  NeedUpdate := False;
+  Limit := AAddrVA + ASize;
+  for I := 0 to BreakPointList.Count - 1 do
+  begin
+    AddrVA := BreakPointList.List[I].AddrVA;
+    if (AddrVA >= AAddrVA) and (AddrVA < Limit) then
+    begin
+      NeedUpdate := True;
+      Break;
+    end;
+  end;
+
+  if not NeedUpdate then Exit;
+
+  CpuViewDebugLog.Log(Format('DebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
 
   // Вызов опасен, если оставить его то будет AV при остановке процесса через паузу
   // The call is dangerous, if leave it there will be AV when stop the process via pause
   //StopAllWorkers;
+
 
   WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
   if Assigned(WorkQueue) then
@@ -1177,7 +1195,7 @@ begin
     WorkItem.DecRef;
   end;
 
-  //CpuViewDebugLog.Log('DebugGate: UpdateRemoteStream end', False);
+  CpuViewDebugLog.Log('DebugGate: UpdateRemoteStream end', False);
 end;
 
 end.

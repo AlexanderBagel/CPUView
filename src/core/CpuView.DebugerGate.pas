@@ -29,6 +29,7 @@ uses
   Classes,
   Forms,
   Generics.Collections,
+  FWHexView.Common,
   CpuView.Common,
   CpuView.CPUContext,
   CpuView.Stream,
@@ -61,7 +62,7 @@ type
 
   TAbstractDebugger = class(TComponent)
   private
-    FBreakPointList: TList<TBasicBreakPoint>;
+    FBreakPointList: TListEx<TBasicBreakPoint>;
     FCtx: TCommonCpuContext;
     FUtils: TCommonAbstractUtils;
     FChange: TNotifyEvent;
@@ -108,7 +109,7 @@ type
     procedure TraceTo(AddrVA: Int64); virtual; abstract;
     function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean; virtual; abstract;
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: UInt64; ASize: Int64); virtual; abstract;
-    property BreakPointList: TList<TBasicBreakPoint> read FBreakPointList;
+    property BreakPointList: TListEx<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
     property ErrorMessage: string read FErrorMessage;
     property ShowSourceLines: Boolean read FShowSourceLines write FShowSourceLines;
@@ -123,9 +124,6 @@ type
   TAbstractDebuggerClass = class of TAbstractDebugger;
 
 implementation
-
-uses
-  FWHexView.Common;
 
 { TAbstractDebugger }
 
@@ -245,7 +243,7 @@ constructor TAbstractDebugger.Create(AOwner: TComponent;
 begin
   inherited Create(AOwner);
   FUtils := AUtils;
-  FBreakPointList := TList<TBasicBreakPoint>.Create;
+  FBreakPointList := TListEx<TBasicBreakPoint>.Create;
 end;
 
 end.
