@@ -36,6 +36,8 @@ interface
 {$message 'Analyze dump with address validation. Underscore the found addresses and add them hint'}
 {$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
 {$message 'The x87/SIMD registers are not editable'}
+{$message 'View for Call param'}
+{$message 'Highlighting of identical selected values in the dump window'}
 
 uses
   {$IFDEF FPC}
