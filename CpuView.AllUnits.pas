@@ -60,6 +60,7 @@ interface
   dlgCpuView,
   dlgCpuView.TemporaryLocker,
   dlgInputBox,
+  frmCpuViewBaseOptions,
   frmCpuViewOptions;
 
 implementation

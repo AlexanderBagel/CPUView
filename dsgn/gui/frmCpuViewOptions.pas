@@ -23,13 +23,13 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, ColorBox,
-  IDEOptionsIntf, IDEOptEditorIntf,CpuView.Settings;
+  IDEOptionsIntf, IDEOptEditorIntf, frmCpuViewBaseOptions;
 
 type
 
   { TCpuViewMainOptionsFrame }
 
-  TCpuViewMainOptionsFrame = class(TAbstractIDEOptionsEditor)
+  TCpuViewMainOptionsFrame = class(TCpuViewBaseOptionsFrame)
     btnFontBrowse: TButton;
     btnReset: TButton;
     btnImport: TButton;
@@ -63,25 +63,20 @@ type
     procedure clbColorsSelectionChange(Sender: TObject; User: boolean);
   private
     FLockColorChange: Boolean;
-    FSettings: TCpuViewSettins;
     procedure UpdateCurrentFont(const AFontName: string);
     procedure UpdateFrameControl;
+  protected
+    procedure DoReadSettings; override;
+    procedure DoResetSettings; override;
+    procedure DoWriteSettings; override;
   public
-    constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
     function GetTitle: string; override;
     procedure Setup({%H-}ADialog: TAbstractOptionsEditorDialog); override;
-    procedure ReadSettings({%H-}AOptions: TAbstractIDEOptions); override;
-    procedure WriteSettings({%H-}AOptions: TAbstractIDEOptions); override;
-    procedure RestoreSettings({%H-}AOptions: TAbstractIDEOptions); override;
-    class function SupportedOptionsClass: TAbstractIDEOptionsClass; override;
   end;
 
 implementation
 
 uses
-  CpuView.Design.Common,
-  dlgCpuView,
   FWHexView;
 
 {$R *.lfm}
@@ -96,22 +91,21 @@ end;
 procedure TCpuViewMainOptionsFrame.btnExportClick(Sender: TObject);
 begin
   if SaveDialog.Execute then
-    FSettings.ColorsExport(SaveDialog.FileName);
+    Settings.ColorsExport(SaveDialog.FileName);
 end;
 
 procedure TCpuViewMainOptionsFrame.btnImportClick(Sender: TObject);
 begin
   if OpenDialog.Execute then
   begin
-    FSettings.ColorsImport(OpenDialog.FileName);
+    Settings.ColorsImport(OpenDialog.FileName);
     UpdateFrameControl;
   end;
 end;
 
 procedure TCpuViewMainOptionsFrame.btnResetClick(Sender: TObject);
 begin
-  FSettings.Reset;
-  UpdateFrameControl;
+  ResetSettings;
 end;
 
 procedure TCpuViewMainOptionsFrame.cbColorChange(Sender: TObject);
@@ -153,34 +147,50 @@ procedure TCpuViewMainOptionsFrame.UpdateFrameControl;
 var
   I: Integer;
 begin
-  UpdateCurrentFont(FSettings.FontName);
-  cbDisplayFuncName.Checked := FSettings.ShowCallFuncName;
-  cbShowOpcodes.Checked :=  FSettings.ShowOpcodes;
-  cbShowSourceLines.Checked := FSettings.ShowSourceLines;
-  cbSymbols.Checked := FSettings.UseDebugInfo;
-  cbForm.Checked := FSettings.SaveFormSession;
-  cbViewers.Checked := FSettings.SaveViewersSession;
-  cbDbgLog.Checked := FSettings.UseDebugLog;
-  cbDbgCrash.Checked := FSettings.UseCrashDump;
-  cbColorMode.ItemIndex := Integer(FSettings.ColorMode);
+  UpdateCurrentFont(Settings.FontName);
+  cbDisplayFuncName.Checked := Settings.ShowCallFuncName;
+  cbShowOpcodes.Checked :=  Settings.ShowOpcodes;
+  cbShowSourceLines.Checked := Settings.ShowSourceLines;
+  cbSymbols.Checked := Settings.UseDebugInfo;
+  cbForm.Checked := Settings.SaveFormSession;
+  cbViewers.Checked := Settings.SaveViewersSession;
+  cbDbgLog.Checked := Settings.UseDebugLog;
+  cbDbgCrash.Checked := Settings.UseCrashDump;
+  cbColorMode.ItemIndex := Integer(Settings.ColorMode);
   clbColors.Items.Clear;
-  for I := 0 to FSettings.ColorsMap.Count - 1 do
+  for I := 0 to Settings.ColorsMap.Count - 1 do
   begin
-    clbColors.Items.Add(FSettings.ColorsMap[I].Description);
-    clbColors.Colors[I] := FSettings.Color[FSettings.ColorsMap[I].Id];
+    clbColors.Items.Add(Settings.ColorsMap[I].Description);
+    clbColors.Colors[I] := Settings.Color[Settings.ColorsMap[I].Id];
   end;
 end;
 
-constructor TCpuViewMainOptionsFrame.Create(AOwner: TComponent);
+procedure TCpuViewMainOptionsFrame.DoReadSettings;
 begin
-  inherited;
-  FSettings := TCpuViewSettins.Create;
+  UpdateFrameControl;
 end;
 
-destructor TCpuViewMainOptionsFrame.Destroy;
+procedure TCpuViewMainOptionsFrame.DoResetSettings;
 begin
-  FSettings.Free;
-  inherited Destroy;
+  UpdateFrameControl;
+end;
+
+procedure TCpuViewMainOptionsFrame.DoWriteSettings;
+var
+  I: Integer;
+begin
+  Settings.FontName := cbFont.Text;
+  Settings.ShowCallFuncName := cbDisplayFuncName.Checked;
+  Settings.ShowOpcodes := cbShowOpcodes.Checked;
+  Settings.ShowSourceLines := cbShowSourceLines.Checked;
+  Settings.UseDebugInfo := cbSymbols.Checked;
+  Settings.SaveFormSession := cbForm.Checked;
+  Settings.SaveViewersSession := cbViewers.Checked;
+  Settings.UseDebugLog := cbDbgLog.Checked;
+  Settings.UseCrashDump := cbDbgCrash.Checked;
+  Settings.ColorMode := TColorMode(cbColorMode.ItemIndex);
+  for I := 0 to Settings.ColorsMap.Count - 1 do
+    Settings.Color[Settings.ColorsMap[I].Id] := clbColors.Colors[I];
 end;
 
 function TCpuViewMainOptionsFrame.GetTitle: string;
@@ -199,45 +209,6 @@ begin
   cbFont.Items.Add('Monospace');
   {$ENDIF}
   cbFont.ItemIndex := 0;
-  if frmCpuView <> nil then
-    frmCpuView.SaveSettings;
-end;
-
-procedure TCpuViewMainOptionsFrame.ReadSettings({%H-}AOptions: TAbstractIDEOptions);
-begin
-  FSettings.Load(ConfigPath);
-  UpdateFrameControl;
-end;
-
-procedure TCpuViewMainOptionsFrame.WriteSettings({%H-}AOptions: TAbstractIDEOptions);
-var
-  I: Integer;
-begin
-  FSettings.FontName := cbFont.Text;
-  FSettings.ShowCallFuncName := cbDisplayFuncName.Checked;
-  FSettings.ShowOpcodes := cbShowOpcodes.Checked;
-  FSettings.ShowSourceLines := cbShowSourceLines.Checked;
-  FSettings.UseDebugInfo := cbSymbols.Checked;
-  FSettings.SaveFormSession := cbForm.Checked;
-  FSettings.SaveViewersSession := cbViewers.Checked;
-  FSettings.UseDebugLog := cbDbgLog.Checked;
-  FSettings.UseCrashDump := cbDbgCrash.Checked;
-  FSettings.ColorMode := TColorMode(cbColorMode.ItemIndex);
-  for I := 0 to FSettings.ColorsMap.Count - 1 do
-    FSettings.Color[FSettings.ColorsMap[I].Id] := clbColors.Colors[I];
-  FSettings.Save(ConfigPath);
-  if frmCpuView <> nil then
-    frmCpuView.LoadSettings;
-end;
-
-procedure TCpuViewMainOptionsFrame.RestoreSettings({%H-}AOptions: TAbstractIDEOptions);
-begin
-  // do nothing...
-end;
-
-class function TCpuViewMainOptionsFrame.SupportedOptionsClass: TAbstractIDEOptionsClass;
-begin
-  Result := IDEEditorGroups.GetByIndex(GroupEnvironment)^.GroupClass;
 end;
 
 end.

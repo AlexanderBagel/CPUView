@@ -1,19 +1,5 @@
-object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
-  Left = 0
-  Height = 755
-  Top = 0
-  Width = 782
-  ClientHeight = 755
-  ClientWidth = 782
-  Constraints.MinHeight = 629
-  Constraints.MinWidth = 500
-  DesignTimePPI = 144
-  ParentBackground = False
-  ParentFont = False
-  TabOrder = 0
-  DesignLeft = 492
-  DesignTop = 232
-  object cbFont: TComboBox
+inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
+  object cbFont: TComboBox[0]
     Left = 67
     Height = 33
     Top = 8
@@ -23,14 +9,14 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Style = csDropDownList
     TabOrder = 0
   end
-  object lblFont: TLabel
+  object lblFont: TLabel[1]
     Left = 10
     Height = 25
     Top = 10
     Width = 40
     Caption = 'Font:'
   end
-  object btnFontBrowse: TButton
+  object btnFontBrowse: TButton[2]
     Left = 726
     Height = 33
     Top = 8
@@ -40,7 +26,7 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     TabOrder = 1
     OnClick = btnFontBrowseClick
   end
-  object gbAsmView: TGroupBox
+  object gbAsmView: TGroupBox[3]
     Left = 10
     Height = 168
     Top = 56
@@ -83,7 +69,7 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 3
     end
   end
-  object gbSessions: TGroupBox
+  object gbSessions: TGroupBox[4]
     Left = 10
     Height = 102
     Top = 240
@@ -110,7 +96,7 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 1
     end
   end
-  object cbDbgLog: TCheckBox
+  object cbDbgLog: TCheckBox[5]
     Left = 16
     Height = 29
     Top = 687
@@ -119,7 +105,7 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Caption = '(DEBUG) Use debug log'
     TabOrder = 4
   end
-  object cbDbgCrash: TCheckBox
+  object cbDbgCrash: TCheckBox[6]
     Left = 16
     Height = 29
     Top = 719
@@ -128,7 +114,7 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Caption = '(DEBUG) Generate crash dump'
     TabOrder = 5
   end
-  object btnReset: TButton
+  object btnReset: TButton[7]
     Left = 580
     Height = 38
     Top = 690
@@ -138,7 +124,7 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     TabOrder = 6
     OnClick = btnResetClick
   end
-  object gbColors: TGroupBox
+  object gbColors: TGroupBox[8]
     Left = 10
     Height = 320
     Top = 360
@@ -168,8 +154,8 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       ColorDialog = ColorDialog
       Anchors = [akLeft, akRight, akBottom]
       ItemHeight = 27
-      OnChange = cbColorChange
       TabOrder = 1
+      OnChange = cbColorChange
     end
     object lblColorMode: TLabel
       Left = 568
@@ -218,13 +204,13 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       OnClick = btnExportClick
     end
   end
-  object FontDialog: TFontDialog
+  object FontDialog: TFontDialog[9]
     MinFontSize = 0
     MaxFontSize = 0
     Left = 496
     Top = 88
   end
-  object ColorDialog: TColorDialog
+  object ColorDialog: TColorDialog[10]
     Color = clBlack
     CustomColors.Strings = (
       'ColorA=000000'
@@ -251,13 +237,13 @@ object CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Left = 384
     Top = 88
   end
-  object OpenDialog: TOpenDialog
+  object OpenDialog: TOpenDialog[11]
     DefaultExt = '.xml'
     Filter = 'XML Config file (*.xml)|*.xml|All Files (*.*)|*.*'
     Left = 384
     Top = 168
   end
-  object SaveDialog: TSaveDialog
+  object SaveDialog: TSaveDialog[12]
     DefaultExt = '.xml'
     Filter = 'XML Config file (*.xml)|*.xml|All Files (*.*)|*.*'
     Left = 496

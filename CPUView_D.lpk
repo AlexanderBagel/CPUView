@@ -31,6 +31,10 @@ if TargetCPU = &apos;arm&apos; then
     <Version Major="1"/>
     <Files>
       <Item>
+        <Filename Value="CpuView.AllUnits.pas"/>
+        <UnitName Value="CpuView.AllUnits"/>
+      </Item>	
+      <Item>
         <Filename Value="src\CpuView.Actions.pas"/>
         <UnitName Value="CpuView.Actions"/>
       </Item>
@@ -83,10 +87,6 @@ if TargetCPU = &apos;arm&apos; then
         <UnitName Value="CpuView.Stream"/>
       </Item>
       <Item>
-        <Filename Value="dsgn\CpuView.AllUnits.pas"/>
-        <UnitName Value="CpuView.AllUnits"/>
-      </Item>
-      <Item>
         <Filename Value="dsgn\CpuView.Reg.pas"/>
         <HasRegisterProc Value="True"/>
         <UnitName Value="CpuView.Reg"/>
@@ -110,6 +110,14 @@ if TargetCPU = &apos;arm&apos; then
       <Item>
         <Filename Value="dsgn\gui\dlgCpuView.pas"/>
         <UnitName Value="dlgCpuView"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\frmCpuViewBaseOptions.lfm"/>
+        <Type Value="LFM"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\frmCpuViewBaseOptions.pas"/>
+        <UnitName Value="frmCpuViewBaseOptions"/>
       </Item>
       <Item>
         <Filename Value="dsgn\gui\frmCpuViewOptions.lfm"/>
