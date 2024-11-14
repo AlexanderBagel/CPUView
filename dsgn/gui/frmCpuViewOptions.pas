@@ -23,7 +23,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, ColorBox,
-  IDEOptionsIntf, IDEOptEditorIntf, frmCpuViewBaseOptions;
+  IDEOptEditorIntf, frmCpuViewBaseOptions;
 
 type
 

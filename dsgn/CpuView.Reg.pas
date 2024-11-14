@@ -22,6 +22,8 @@ uses
   dlgCpuView,
   dlgCpuViewImplementation,
   frmCpuViewOptions,
+  frmCpuViewColors,
+  frmCpuViewShortCuts,
 {$ELSE}
   Actions,
   DesignIntf,
@@ -59,13 +61,16 @@ begin
 end;
 
 procedure DoLCLRegister;
+const
+  MainEditorID = 14041979;
+  ColorsEditorID = MainEditorID + 1;
+  ShortCutsEditorID = MainEditorID + 2;
 var
   Key: TIDEShortCut;
   ViewCategory: TIDECommandCategory;
   IDECommand: TIDECommand;
   MenuCommand: TIDEMenuCommand;
   ToolBarCategory: TIDEToolButtonCategory;
-  //MainEditorID: Integer;
 begin
   Key := IDEShortCut(VK_C, [ssAlt, ssCtrl], VK_UNKNOWN, []);
   ViewCategory := IDECommandList.FindCategoryByName(CommandCategoryViewName);
@@ -74,9 +79,9 @@ begin
   MenuCommand.ImageIndex := IDEImages.LoadImage('debugger');
   ToolBarCategory := IDEToolButtonCategories.FindCategory(CommandCategoryViewName);
   RegisterIDEButtonCommand(ToolBarCategory, 'CPU-View', IDECommand).ImageIndex := MenuCommand.ImageIndex;
-  //MainEditorID := RegisterIDEOptionsEditor(GroupEnvironment,
-  //  TCpuViewMainOptionsFrame, 14041979)^.Index;
-  RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewMainOptionsFrame, 14041979);
+  RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewMainOptionsFrame, MainEditorID);
+  RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewColorsFrame, ColorsEditorID, MainEditorID);
+  RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewShortCutsFrame, ShortCutsEditorID, MainEditorID);
 end;
 {$ENDIF}
 

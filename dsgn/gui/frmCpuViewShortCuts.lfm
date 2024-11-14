@@ -1,0 +1,6 @@
+inherited CpuViewShortCutsFrame: TCpuViewShortCutsFrame
+  Height = 629
+  Width = 500
+  DesignLeft = 964
+  DesignTop = 412
+end

@@ -13,7 +13,8 @@ uses
   CpuView.DebugerGate, CpuView.FpDebug, CpuView.Settings, 
   CpuView.ScriptExecutor, CpuView.Stream, CpuView.Reg, CpuView.Design.Common, 
   CpuView.Design.CrashDump, CpuView.Design.DbgLog, dlgCpuView, 
-  frmCpuViewBaseOptions, frmCpuViewOptions, LazarusPackageIntf;
+  frmCpuViewBaseOptions, frmCpuViewColors, frmCpuViewOptions, 
+  frmCpuViewShortCuts, LazarusPackageIntf;
 
 implementation
 
