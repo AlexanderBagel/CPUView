@@ -34,7 +34,6 @@ type
 
   protected
     procedure DoReadSettings; override;
-    procedure DoResetSettings; override;
     procedure DoWriteSettings; override;
   public
     function GetTitle: string; override;
@@ -48,11 +47,6 @@ implementation
 { TCpuViewShortCutsFrame }
 
 procedure TCpuViewShortCutsFrame.DoReadSettings;
-begin
-
-end;
-
-procedure TCpuViewShortCutsFrame.DoResetSettings;
 begin
 
 end;

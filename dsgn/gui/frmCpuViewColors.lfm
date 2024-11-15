@@ -1,6 +1,134 @@
 inherited CpuViewColorsFrame: TCpuViewColorsFrame
   Height = 629
-  Width = 500
-  DesignLeft = 964
-  DesignTop = 412
+  ClientHeight = 629
+  DesignLeft = 1557
+  DesignTop = 356
+  object gbColors: TGroupBox[0]
+    Left = 8
+    Height = 568
+    Top = 0
+    Width = 752
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    Caption = 'Colors:'
+    ClientHeight = 538
+    ClientWidth = 748
+    TabOrder = 0
+    object clbColors: TColorListBox
+      Left = 8
+      Height = 478
+      Top = 10
+      Width = 553
+      Style = [cbCustomColors]
+      Anchors = [akTop, akLeft, akRight, akBottom]
+      ItemHeight = 0
+      OnSelectionChange = clbColorsSelectionChange
+      TabOrder = 0
+    end
+    object cbColor: TColorBox
+      Left = 8
+      Height = 33
+      Top = 494
+      Width = 553
+      Style = [cbStandardColors, cbExtendedColors, cbSystemColors, cbIncludeNone, cbIncludeDefault, cbCustomColor, cbPrettyNames, cbCustomColors]
+      Anchors = [akLeft, akRight, akBottom]
+      ItemHeight = 27
+      TabOrder = 1
+      OnChange = cbColorChange
+    end
+    object lblColorMode: TLabel
+      Left = 571
+      Height = 25
+      Top = 6
+      Width = 94
+      Anchors = [akTop, akRight]
+      Caption = 'ColorMode:'
+    end
+    object cbColorMode: TComboBox
+      Left = 571
+      Height = 33
+      Top = 32
+      Width = 164
+      Anchors = [akTop, akRight]
+      ItemHeight = 25
+      ItemIndex = 0
+      Items.Strings = (
+        'Auto'
+        'Light'
+        'Dark'
+        'Custom'
+      )
+      Style = csDropDownList
+      TabOrder = 2
+      Text = 'Auto'
+    end
+    object btnImport: TButton
+      Left = 571
+      Height = 38
+      Top = 72
+      Width = 164
+      Anchors = [akTop, akRight]
+      Caption = 'Import Colors'
+      TabOrder = 3
+      OnClick = btnImportClick
+    end
+    object btnExport: TButton
+      Left = 571
+      Height = 38
+      Top = 116
+      Width = 164
+      Anchors = [akTop, akRight]
+      Caption = 'Export Colors'
+      TabOrder = 4
+      OnClick = btnExportClick
+    end
+  end
+  object btnReset: TButton[1]
+    Left = 596
+    Height = 38
+    Top = 576
+    Width = 164
+    Anchors = [akRight, akBottom]
+    Caption = 'Reset to Default'
+    TabOrder = 1
+    OnClick = btnResetClick
+  end
+  object ColorDialog: TColorDialog[2]
+    Color = clBlack
+    CustomColors.Strings = (
+      'ColorA=000000'
+      'ColorB=000080'
+      'ColorC=008000'
+      'ColorD=008080'
+      'ColorE=800000'
+      'ColorF=800080'
+      'ColorG=808000'
+      'ColorH=808080'
+      'ColorI=C0C0C0'
+      'ColorJ=0000FF'
+      'ColorK=00FF00'
+      'ColorL=00FFFF'
+      'ColorM=FF0000'
+      'ColorN=FF00FF'
+      'ColorO=FFFF00'
+      'ColorP=FFFFFF'
+      'ColorQ=C0DCC0'
+      'ColorR=F0CAA6'
+      'ColorS=F0FBFF'
+      'ColorT=A4A0A0'
+    )
+    Left = 40
+    Top = 64
+  end
+  object OpenDialog: TOpenDialog[3]
+    DefaultExt = '.xml'
+    Filter = 'XML Config file (*.xml)|*.xml|All Files (*.*)|*.*'
+    Left = 40
+    Top = 144
+  end
+  object SaveDialog: TSaveDialog[4]
+    DefaultExt = '.xml'
+    Filter = 'XML Config file (*.xml)|*.xml|All Files (*.*)|*.*'
+    Left = 152
+    Top = 144
+  end
 end

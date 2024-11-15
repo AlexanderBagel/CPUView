@@ -22,7 +22,7 @@ unit frmCpuViewOptions;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, ColorBox,
+  Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs,
   IDEOptEditorIntf, frmCpuViewBaseOptions;
 
 type
@@ -32,8 +32,6 @@ type
   TCpuViewMainOptionsFrame = class(TCpuViewBaseOptionsFrame)
     btnFontBrowse: TButton;
     btnReset: TButton;
-    btnImport: TButton;
-    btnExport: TButton;
     cbFont: TComboBox;
     cbDisplayFuncName: TCheckBox;
     cbShowOpcodes: TCheckBox;
@@ -43,32 +41,19 @@ type
     cbViewers: TCheckBox;
     cbDbgLog: TCheckBox;
     cbDbgCrash: TCheckBox;
-    cbColor: TColorBox;
-    clbColors: TColorListBox;
-    ColorDialog: TColorDialog;
-    cbColorMode: TComboBox;
     FontDialog: TFontDialog;
     gbAsmView: TGroupBox;
     gbSessions: TGroupBox;
-    gbColors: TGroupBox;
-    lblColorMode: TLabel;
     lblFont: TLabel;
-    OpenDialog: TOpenDialog;
-    SaveDialog: TSaveDialog;
-    procedure btnExportClick(Sender: TObject);
     procedure btnFontBrowseClick(Sender: TObject);
-    procedure btnImportClick(Sender: TObject);
     procedure btnResetClick(Sender: TObject);
-    procedure cbColorChange(Sender: TObject);
-    procedure clbColorsSelectionChange(Sender: TObject; User: boolean);
   private
-    FLockColorChange: Boolean;
     procedure UpdateCurrentFont(const AFontName: string);
     procedure UpdateFrameControl;
   protected
     procedure DoReadSettings; override;
-    procedure DoResetSettings; override;
     procedure DoWriteSettings; override;
+    function IsMainFrame: Boolean; override;
   public
     function GetTitle: string; override;
     procedure Setup({%H-}ADialog: TAbstractOptionsEditorDialog); override;
@@ -77,7 +62,8 @@ type
 implementation
 
 uses
-  FWHexView;
+  FWHexView,
+  CpuView.Settings;
 
 {$R *.lfm}
 
@@ -88,49 +74,10 @@ begin
     UpdateCurrentFont(FontDialog.Font.Name);
 end;
 
-procedure TCpuViewMainOptionsFrame.btnExportClick(Sender: TObject);
-begin
-  if SaveDialog.Execute then
-    Settings.ColorsExport(SaveDialog.FileName);
-end;
-
-procedure TCpuViewMainOptionsFrame.btnImportClick(Sender: TObject);
-begin
-  if OpenDialog.Execute then
-  begin
-    Settings.ColorsImport(OpenDialog.FileName);
-    UpdateFrameControl;
-  end;
-end;
-
 procedure TCpuViewMainOptionsFrame.btnResetClick(Sender: TObject);
 begin
-  ResetSettings;
-end;
-
-procedure TCpuViewMainOptionsFrame.cbColorChange(Sender: TObject);
-var
-  Index: Integer;
-begin
-  if FLockColorChange then Exit;
-  Index := clbColors.ItemIndex;
-  if Index < 0 then Exit;
-  clbColors.Colors[Index] := cbColor.Selected;
-  cbColorMode.ItemIndex := Integer(cmCustom);
-end;
-
-procedure TCpuViewMainOptionsFrame.clbColorsSelectionChange(Sender: TObject;
-  User: boolean);
-begin
-  if User then
-  begin
-    FLockColorChange := True;
-    try
-      cbColor.Selected := clbColors.Selected;
-    finally
-      FLockColorChange := False;
-    end;
-  end;
+  Settings.Reset(spSession);
+  UpdateFrameControl;
 end;
 
 procedure TCpuViewMainOptionsFrame.UpdateCurrentFont(const AFontName: string);
@@ -144,8 +91,6 @@ begin
 end;
 
 procedure TCpuViewMainOptionsFrame.UpdateFrameControl;
-var
-  I: Integer;
 begin
   UpdateCurrentFont(Settings.FontName);
   cbDisplayFuncName.Checked := Settings.ShowCallFuncName;
@@ -156,13 +101,6 @@ begin
   cbViewers.Checked := Settings.SaveViewersSession;
   cbDbgLog.Checked := Settings.UseDebugLog;
   cbDbgCrash.Checked := Settings.UseCrashDump;
-  cbColorMode.ItemIndex := Integer(Settings.ColorMode);
-  clbColors.Items.Clear;
-  for I := 0 to Settings.ColorsMap.Count - 1 do
-  begin
-    clbColors.Items.Add(Settings.ColorsMap[I].Description);
-    clbColors.Colors[I] := Settings.Color[Settings.ColorsMap[I].Id];
-  end;
 end;
 
 procedure TCpuViewMainOptionsFrame.DoReadSettings;
@@ -170,14 +108,7 @@ begin
   UpdateFrameControl;
 end;
 
-procedure TCpuViewMainOptionsFrame.DoResetSettings;
-begin
-  UpdateFrameControl;
-end;
-
 procedure TCpuViewMainOptionsFrame.DoWriteSettings;
-var
-  I: Integer;
 begin
   Settings.FontName := cbFont.Text;
   Settings.ShowCallFuncName := cbDisplayFuncName.Checked;
@@ -188,9 +119,11 @@ begin
   Settings.SaveViewersSession := cbViewers.Checked;
   Settings.UseDebugLog := cbDbgLog.Checked;
   Settings.UseCrashDump := cbDbgCrash.Checked;
-  Settings.ColorMode := TColorMode(cbColorMode.ItemIndex);
-  for I := 0 to Settings.ColorsMap.Count - 1 do
-    Settings.Color[Settings.ColorsMap[I].Id] := clbColors.Colors[I];
+end;
+
+function TCpuViewMainOptionsFrame.IsMainFrame: Boolean;
+begin
+  Result := True;
 end;
 
 function TCpuViewMainOptionsFrame.GetTitle: string;

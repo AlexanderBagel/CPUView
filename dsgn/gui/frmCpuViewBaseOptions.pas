@@ -36,8 +36,8 @@ type
     FOptionFrames: specialize TList<TCpuViewBaseOptionsFrame>;
   protected
     procedure DoReadSettings; virtual; abstract;
-    procedure DoResetSettings; virtual; abstract;
     procedure DoWriteSettings; virtual; abstract;
+    function IsMainFrame: Boolean; virtual;
     class constructor CreateCpuViewOptions;
     class destructor DestroyCpuViewOptions;
     class property Settings: TCpuViewSettins read FSettings;
@@ -45,7 +45,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure ReadSettings({%H-}AOptions: TAbstractIDEOptions); override;
-    procedure ResetSettings;
+    procedure Setup(ADialog: TAbstractOptionsEditorDialog); override;
     procedure WriteSettings({%H-}AOptions: TAbstractIDEOptions); override;
     class function SupportedOptionsClass: TAbstractIDEOptionsClass; override;
   end;
@@ -59,6 +59,11 @@ uses
 {$R *.lfm}
 
 { TCpuViewBaseOptionsFrame }
+
+function TCpuViewBaseOptionsFrame.IsMainFrame: Boolean;
+begin
+  Result := False;
+end;
 
 class constructor TCpuViewBaseOptionsFrame.CreateCpuViewOptions;
 begin
@@ -92,6 +97,7 @@ procedure TCpuViewBaseOptionsFrame.ReadSettings(AOptions: TAbstractIDEOptions);
 var
   I: Integer;
 begin
+  if not IsMainFrame then Exit;
   if frmCpuView <> nil then
     frmCpuView.SaveSettings;
   FSettings.Load(ConfigPath);
@@ -99,19 +105,16 @@ begin
     FOptionFrames[I].DoReadSettings;
 end;
 
-procedure TCpuViewBaseOptionsFrame.ResetSettings;
-var
-  I: Integer;
+procedure TCpuViewBaseOptionsFrame.Setup(ADialog: TAbstractOptionsEditorDialog);
 begin
-  FSettings.Reset;
-  for I := 0 to FOptionFrames.Count - 1 do
-    FOptionFrames[I].DoResetSettings;
+  // do nothing...
 end;
 
 procedure TCpuViewBaseOptionsFrame.WriteSettings(AOptions: TAbstractIDEOptions);
 var
   I: Integer;
 begin
+  if not IsMainFrame then Exit;
   for I := 0 to FOptionFrames.Count - 1 do
     FOptionFrames[I].DoWriteSettings;
   FSettings.Save(ConfigPath);

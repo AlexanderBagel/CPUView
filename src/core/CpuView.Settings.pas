@@ -190,6 +190,8 @@ type
     Description: string;
   end;
 
+  TSettingPart = (spAll, spSession, spColors, spShortCuts);
+
   { TCpuViewSettins }
 
   TCpuViewSettins = class
@@ -244,8 +246,9 @@ type
     procedure SaveToXML_StackSettings(Root: IXMLNode);
   protected
     procedure InitColorMap;
-    procedure InitDefault;
     procedure InitDefaultColors;
+    procedure InitDefaultSession;
+    procedure InitDefaultShortCuts;
     function GetRegisterContextName: string; virtual; abstract;
     procedure LoadRegisterContext(Root: IXMLNode); virtual; abstract;
     procedure SaveRegisterContext(Root: IXMLNode); virtual; abstract;
@@ -262,7 +265,7 @@ type
     procedure GetSessionFromRegView(ARegView: TRegView);
     procedure GetSessionFromStackView(AStackView: TStackView);
 
-    procedure Reset;
+    procedure Reset(APart: TSettingPart = spAll);
     procedure Load(const FilePath: string);
     procedure Save(const FilePath: string);
 
@@ -347,7 +350,7 @@ begin
   FColors := TDictionary<string, TColor>.Create;
   FColorsMap := TList<TColorMapItem>.Create;
   InitColorMap;
-  InitDefault;
+  Reset;
 end;
 
 destructor TCpuViewSettins.Destroy;
@@ -416,51 +419,6 @@ begin
   FStackFontHeight := DpiToDouble(AStackView.Font.Height, AStackView);
 end;
 
-procedure TCpuViewSettins.InitDefault;
-const
-  DefaultFontHeight = -12;
-begin
-  FAsmSettings := Default(TAsmSettings);
-  FAsmSettings.ColumnWidth[ctWorkSpace] := 32;
-  FAsmSettings.ColumnWidth[ctJmpLine] := 82;
-  FAsmSettings.ColumnWidth[ctOpcode] := 170;
-  FAsmSettings.ColumnWidth[ctDescription] := 250;
-  FAsmSettings.ColumnWidth[ctComment] := 440;
-  FAsmSettings.DisplayFunc := True;
-  FAsmSettings.ShowOpcodes := True;
-  FAsmSettings.ShowSourceLines := True;
-  FAsmSettings.FontHeight := DefaultFontHeight;
-
-  InitDefaultColors;
-
-  FCpuViewDlgSettings := Default(TCpuViewDlgSettings);
-  FCpuViewDlgSettings.SplitterPos[spTopHorz] := 34;
-  FCpuViewDlgSettings.SplitterPos[spBottomHorz] := 45;
-  FCpuViewDlgSettings.SplitterPos[spCenterVert] := 38;
-
-  FDumpSettings := Default(TDumpSettings);
-  FDumpSettings.FontHeight := DefaultFontHeight;
-
-  {$IFDEF MSWINDOWS}
-  FFontName := 'Consolas';
-  {$ENDIF}
-  {$IFDEF UNIX}
-  FFontName := 'DejaVu Sans Mono';
-  {$ENDIF}
-
-  FRegFontHeight := DefaultFontHeight;
-  FRegSettings.InitDefault;
-
-  FSaveFormSession := True;
-  FSaveViewersSession := True;
-
-  FStackFontHeight := DefaultFontHeight;
-
-  FUseDebugInfo := True;
-  FUseDebugLog := True;
-  FUseCrashDump := True;
-end;
-
 procedure TCpuViewSettins.InitDefaultColors;
 var
   AsmColorMap: TAsmColorMap;
@@ -492,6 +450,54 @@ begin
   end;
 end;
 
+procedure TCpuViewSettins.InitDefaultSession;
+const
+  DefaultFontHeight = -12;
+begin
+  FAsmSettings := Default(TAsmSettings);
+  FAsmSettings.ColumnWidth[ctWorkSpace] := 32;
+  FAsmSettings.ColumnWidth[ctJmpLine] := 82;
+  FAsmSettings.ColumnWidth[ctOpcode] := 170;
+  FAsmSettings.ColumnWidth[ctDescription] := 250;
+  FAsmSettings.ColumnWidth[ctComment] := 440;
+  FAsmSettings.DisplayFunc := True;
+  FAsmSettings.ShowOpcodes := True;
+  FAsmSettings.ShowSourceLines := True;
+  FAsmSettings.FontHeight := DefaultFontHeight;
+
+  FCpuViewDlgSettings := Default(TCpuViewDlgSettings);
+  FCpuViewDlgSettings.SplitterPos[spTopHorz] := 34;
+  FCpuViewDlgSettings.SplitterPos[spBottomHorz] := 45;
+  FCpuViewDlgSettings.SplitterPos[spCenterVert] := 38;
+
+  FDumpSettings := Default(TDumpSettings);
+  FDumpSettings.FontHeight := DefaultFontHeight;
+
+  {$IFDEF MSWINDOWS}
+  FFontName := 'Consolas';
+  {$ENDIF}
+  {$IFDEF UNIX}
+  FFontName := 'DejaVu Sans Mono';
+  {$ENDIF}
+
+  FRegFontHeight := DefaultFontHeight;
+  FRegSettings.InitDefault;
+
+  FSaveFormSession := True;
+  FSaveViewersSession := True;
+
+  FStackFontHeight := DefaultFontHeight;
+
+  FUseDebugInfo := True;
+  FUseDebugLog := True;
+  FUseCrashDump := True;
+end;
+
+procedure TCpuViewSettins.InitDefaultShortCuts;
+begin
+
+end;
+
 procedure TCpuViewSettins.Load(const FilePath: string);
 var
   XMLDocument: IXMLDocument;
@@ -505,7 +511,7 @@ begin
     {$ENDIF}
     LoadFromXML_Full(XMLDocument.DocumentElement);
   except
-    InitDefault;
+    Reset;
   end;
 end;
 
@@ -708,9 +714,19 @@ begin
   FStackFontHeight := XMLReadDouble(Root, xmlFontSize);
 end;
 
-procedure TCpuViewSettins.Reset;
+procedure TCpuViewSettins.Reset(APart: TSettingPart);
 begin
-  InitDefault;
+  case APart of
+    spAll:
+    begin
+      InitDefaultSession;
+      InitDefaultColors;
+      InitDefaultShortCuts;
+    end;
+    spSession: InitDefaultSession;
+    spColors: InitDefaultColors;
+    spShortCuts: InitDefaultShortCuts;
+  end;
 end;
 
 procedure TCpuViewSettins.RestoreViewDefSettings(AView: TFWCustomHexView);

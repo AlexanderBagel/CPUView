@@ -1,14 +1,13 @@
 object CpuViewBaseOptionsFrame: TCpuViewBaseOptionsFrame
   Left = 0
-  Height = 755
+  Height = 722
   Top = 0
   Width = 782
-  Constraints.MinHeight = 629
   Constraints.MinWidth = 500
   DesignTimePPI = 144
   ParentBackground = False
   ParentFont = False
   TabOrder = 0
-  DesignLeft = 492
-  DesignTop = 232
+  DesignLeft = 958
+  DesignTop = 292
 end
