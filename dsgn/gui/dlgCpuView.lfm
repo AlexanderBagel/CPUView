@@ -8,14 +8,14 @@ object frmCpuView: TfrmCpuView
   ClientWidth = 2096
   DesignTimePPI = 144
   KeyPreview = True
+  Position = poScreenCenter
+  LCLVersion = '4.99.0.0'
   OnChangeBounds = FormChangeBounds
   OnClose = FormClose
   OnCreate = FormCreate
   OnDeactivate = FormDeactivate
   OnDestroy = FormDestroy
   OnKeyPress = FormKeyPress
-  Position = poScreenCenter
-  LCLVersion = '3.4.0.0'
   object pnDebug: TPanel
     Left = 0
     Height = 79
@@ -479,15 +479,15 @@ object frmCpuView: TfrmCpuView
     object acHighlightReg: TAction
       Category = 'RegView Actions'
       Caption = 'Highlight'
+      ShortCut = 16456
       OnExecute = acHighlightRegExecute
       OnUpdate = acHighlightRegUpdate
-      ShortCut = 16456
     end
     object acStackFollowRSP: TAction
       Category = 'StackView Actions'
       Caption = 'Go to StackPoint'
       OnExecute = acStackFollowRSPExecute
-      OnUpdate = acShowInStackUpdate
+      OnUpdate = acStackFollowRSPUpdate
     end
     object acDMHex8: THexViewByteViewModeAction
       Category = 'Display Mode'
@@ -602,41 +602,41 @@ object frmCpuView: TfrmCpuView
       Category = 'Debugger'
       Caption = 'Step In'
       Hint = 'Step Into'
+      ShortCut = 118
       OnExecute = acDbgStepInExecute
       OnUpdate = DefaultActionUpdate
-      ShortCut = 118
     end
     object acDbgStepOut: TAction
       Category = 'Debugger'
       Caption = 'Step Out'
       Hint = 'Step Over'
+      ShortCut = 119
       OnExecute = acDbgStepOutExecute
       OnUpdate = DefaultActionUpdate
-      ShortCut = 119
     end
     object acDbgRunTilReturn: TAction
       Category = 'Debugger'
       Caption = 'Run Till Return'
       Hint = 'Step Out'
+      ShortCut = 16502
       OnExecute = acDbgRunTilReturnExecute
       OnUpdate = DefaultActionUpdate
-      ShortCut = 16502
     end
     object acDbgRunTo: TAction
       Category = 'Debugger'
       Caption = 'Run To'
       Hint = 'Run to Cursor'
+      ShortCut = 115
       OnExecute = acDbgRunToExecute
       OnUpdate = acDbgRunToUpdate
-      ShortCut = 115
     end
     object acDbgToggleBp: TAction
       Category = 'Debugger'
       Caption = 'Toggle BreakPoint'
       Hint = 'Toggle BreakPoint'
+      ShortCut = 113
       OnExecute = acDbgToggleBpExecute
       OnUpdate = acDbgRunToUpdate
-      ShortCut = 113
     end
     object acRegModifyInc: TAction
       Tag = 1
@@ -680,9 +680,9 @@ object frmCpuView: TfrmCpuView
     object acViewGoto: TAction
       Category = 'View Actions'
       Caption = 'Go to Address...'
+      ShortCut = 16455
       OnExecute = acViewGotoExecute
       OnUpdate = DefaultActionUpdate
-      ShortCut = 16455
     end
     object acAsmReturnToIP: TAction
       Category = 'AsmView Actions'

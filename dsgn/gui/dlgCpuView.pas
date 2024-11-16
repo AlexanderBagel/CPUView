@@ -295,6 +295,7 @@ type
     procedure acShowInStackExecute(Sender: TObject);
     procedure acShowInStackUpdate(Sender: TObject);
     procedure acStackFollowRSPExecute(Sender: TObject);
+    procedure acStackFollowRSPUpdate(Sender: TObject);
     procedure acTEAnsiExecute(Sender: TObject);
     procedure acTEAnsiUpdate(Sender: TObject);
     procedure ActionRegModifyUpdate(Sender: TObject);
@@ -818,6 +819,11 @@ procedure TfrmCpuView.acStackFollowRSPExecute(Sender: TObject);
 begin
   Core.ShowStackAtAddr(DbgGate.Context.StackPoint);
   ActiveControl := StackView;
+end;
+
+procedure TfrmCpuView.acStackFollowRSPUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
 end;
 
 procedure TfrmCpuView.acTEAnsiExecute(Sender: TObject);

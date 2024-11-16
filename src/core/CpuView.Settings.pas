@@ -34,6 +34,7 @@ uses
   Generics.Collections,
   {$IFDEF FPC}
   LCLIntf,
+  LCLType,
   DOM,
   XMLRead,
   XMLWrite,
@@ -190,6 +191,21 @@ type
     Description: string;
   end;
 
+  TCpuViewShortCut = record
+    Key1: Word;
+    Shift1: TShiftState;
+    Key2: Word;
+    Shift2: TShiftState;
+  end;
+
+  TShortCutType = (
+    sctOpenCpuView, sctCloseCpuView,
+    sctViewerJmpIn, sctViewerStepBack,
+    sctStepIn, sctStepOut, sctStepOver, sctToggleBP, sctRunTo, sctRunToUser,
+    sctNewIP, sctReturnToDef);
+
+  TShortCutMode = (scmDefault, scmMSVC, scmCustom);
+
   TSettingPart = (spAll, spSession, spColors, spShortCuts);
 
   { TCpuViewSettins }
@@ -206,6 +222,8 @@ type
     FRegFontHeight: Double;
     FSaveFormSession: Boolean;
     FSaveViewersSession: Boolean;
+    FShotCutMode: TShortCutMode;
+    FShortCuts: array [TShortCutType] of TCpuViewShortCut;
     FStackFontHeight: Double;
     FRegSettings: TContextAbstractSettings;
     FUseDebugInfo: Boolean;
@@ -213,6 +231,8 @@ type
     FUseCrashDump: Boolean;
     function GetColor(const Index: string): TColor;
     procedure SetColor(const Index: string; Value: TColor);
+    function GetShotCut(Index: TShortCutType): TCpuViewShortCut;
+    procedure SetShotCut(Index: TShortCutType; const AValue: TCpuViewShortCut);
   private
     function DpiToDouble(AValue: Integer; AView: TFWCustomHexView): Double;
     function DoubleToDpi(AValue: Double; AView: TFWCustomHexView): Integer;
@@ -283,6 +303,8 @@ type
     property FontName: string read FFontName write FFontName;
     property SaveFormSession: Boolean read FSaveFormSession write FSaveFormSession;
     property SaveViewersSession: Boolean read FSaveViewersSession write FSaveViewersSession;
+    property ShotCutMode: TShortCutMode read FShotCutMode write FShotCutMode;
+    property ShotCut[Index: TShortCutType]: TCpuViewShortCut read GetShotCut write SetShotCut;
     property ShowOpcodes: Boolean read FAsmSettings.ShowOpcodes write FAsmSettings.ShowOpcodes;
     property ShowSourceLines: Boolean read FAsmSettings.ShowSourceLines write FAsmSettings.ShowSourceLines;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
@@ -294,6 +316,22 @@ implementation
 
 type
   TViewAccess = class(TFWCustomHexView);
+
+const
+  DefaultShortCuts: array [TShortCutType] of TCpuViewShortCut = (
+    (Key1: VK_C; Shift1: [ssAlt, ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_ESCAPE; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_RETURN; Shift1: []; Key2: VK_ADD; Shift2: []),
+    (Key1: VK_BACK; Shift1: []; Key2: VK_SUBTRACT; Shift2: []),
+    (Key1: VK_F7; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F7; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F8; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F2; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F4; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F9; Shift1: [ssAlt]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_N; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_O; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: [])
+  );
 
 { TCpuViewSettins }
 
@@ -365,6 +403,30 @@ function TCpuViewSettins.DoubleToDpi(AValue: Double;
   AView: TFWCustomHexView): Integer;
 begin
   Result := Round(AValue * AView.CurrentPPI / 96);
+end;
+
+function TCpuViewSettins.GetShotCut(Index: TShortCutType): TCpuViewShortCut;
+const
+  MSVCShortCuts: array [TShortCutType] of TCpuViewShortCut = (
+    (Key1: VK_C; Shift1: [ssAlt, ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_ESCAPE; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_RETURN; Shift1: []; Key2: VK_ADD; Shift2: []),
+    (Key1: VK_BACK; Shift1: []; Key2: VK_SUBTRACT; Shift2: []),
+    (Key1: VK_F11; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F11; Shift1: [ssShift]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F10; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F9; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F10; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_UNKNOWN; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F10; Shift1: [ssCtrl, ssShift]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_MULTIPLY; Shift1: [ssAlt]; Key2: VK_UNKNOWN; Shift2: [])
+  );
+begin
+  case ShotCutMode of
+    scmDefault: Result := DefaultShortCuts[Index];
+    scmMSVC: Result := MSVCShortCuts[Index];
+    scmCustom: Result := FShortCuts[Index];
+  end;
 end;
 
 function TCpuViewSettins.DpiToDouble(AValue: Integer;
@@ -495,7 +557,7 @@ end;
 
 procedure TCpuViewSettins.InitDefaultShortCuts;
 begin
-
+  FShotCutMode := scmDefault;
 end;
 
 procedure TCpuViewSettins.Load(const FilePath: string);
@@ -959,6 +1021,12 @@ end;
 procedure TCpuViewSettins.SaveToXML_StackSettings(Root: IXMLNode);
 begin
   XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
+end;
+
+procedure TCpuViewSettins.SetShotCut(Index: TShortCutType;
+  const AValue: TCpuViewShortCut);
+begin
+  FShortCuts[Index] := AValue;
 end;
 
 procedure TCpuViewSettins.InitColorMap;
