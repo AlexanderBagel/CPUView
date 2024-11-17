@@ -146,6 +146,9 @@ if TargetCPU = &apos;arm&apos; then
     </Files>
     <RequiredPkgs>
       <Item>
+        <PackageName Value="ideinspector"/>
+      </Item>
+      <Item>
         <PackageName Value="FWHexView.LCL"/>
       </Item>
       <Item>

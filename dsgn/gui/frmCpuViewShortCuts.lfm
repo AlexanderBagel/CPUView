@@ -1,6 +1,100 @@
 inherited CpuViewShortCutsFrame: TCpuViewShortCutsFrame
-  Height = 629
-  Width = 500
-  DesignLeft = 964
-  DesignTop = 412
+  Height = 584
+  ClientHeight = 584
+  DesignLeft = 1208
+  DesignTop = 409
+  object gbShortCuts: TGroupBox[0]
+    Left = 8
+    Height = 523
+    Top = 0
+    Width = 752
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    Caption = 'ShortCuts:'
+    ClientHeight = 493
+    ClientWidth = 748
+    TabOrder = 0
+    object lblShortCutMode: TLabel
+      Left = 571
+      Height = 25
+      Top = 6
+      Width = 134
+      Anchors = [akTop, akRight]
+      Caption = 'ShortCuts Mode:'
+    end
+    object cbShortCutMode: TComboBox
+      Left = 571
+      Height = 33
+      Top = 32
+      Width = 164
+      Anchors = [akTop, akRight]
+      ItemHeight = 25
+      ItemIndex = 0
+      Items.Strings = (
+        'Default'
+        'Microsoft Visual Studio'
+        'Custom'
+      )
+      Style = csDropDownList
+      TabOrder = 0
+      Text = 'Default'
+      OnChange = cbShortCutModeChange
+    end
+    object tvShortCuts: TTreeView
+      Left = 8
+      Height = 429
+      Top = 10
+      Width = 553
+      Anchors = [akTop, akLeft, akRight, akBottom]
+      ReadOnly = True
+      RowSelect = True
+      TabOrder = 1
+      Options = [tvoAutoItemHeight, tvoHideSelection, tvoKeepCollapsedNodes, tvoReadOnly, tvoRowSelect, tvoShowButtons, tvoShowLines, tvoShowRoot, tvoToolTips, tvoThemedDraw]
+    end
+    object btnEditFirst: TButton
+      Left = 8
+      Height = 38
+      Top = 447
+      Width = 113
+      Anchors = [akLeft, akBottom]
+      Caption = 'Edit First'
+      TabOrder = 2
+    end
+    object btnClearFirst: TButton
+      Left = 128
+      Height = 38
+      Top = 447
+      Width = 113
+      Anchors = [akLeft, akBottom]
+      Caption = 'Clear First'
+      TabOrder = 3
+    end
+    object btnEditSecond: TButton
+      Left = 256
+      Height = 38
+      Top = 447
+      Width = 113
+      Anchors = [akLeft, akBottom]
+      Caption = 'Edit Second'
+      TabOrder = 4
+    end
+    object btnClearSecond: TButton
+      Left = 376
+      Height = 38
+      Top = 447
+      Width = 113
+      Anchors = [akLeft, akBottom]
+      Caption = 'Clear Second'
+      TabOrder = 5
+    end
+  end
+  object btnReset: TButton[1]
+    Left = 596
+    Height = 38
+    Top = 531
+    Width = 164
+    Anchors = [akRight, akBottom]
+    Caption = 'Reset to Default'
+    TabOrder = 1
+    OnClick = btnResetClick
+  end
 end
