@@ -346,7 +346,7 @@ var
 
   function IsNumber: Boolean;
   begin
-    Result := CharInSet(Value[I], ['1'..'9', 'a'..'f', 'A'..'F']);
+    Result := CharInSet(Value[I], ['0'..'9', 'a'..'f', 'A'..'F']);
   end;
 
   procedure AppendChar(var AResult: string);
