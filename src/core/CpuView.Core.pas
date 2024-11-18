@@ -29,7 +29,6 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
-{$message 'Add shortcuts settings'}
 {$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Analyze dump with address validation. Underscore the found addresses and add them hint'}
@@ -925,8 +924,8 @@ begin
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;
     FAsmView.FitColumnsToBestSize;
-    FAsmView.ShortCuts.JmpBack.SecondaryShortCut.Add(ShortCutToText(VK_SUBTRACT));
-    FAsmView.ShortCuts.JmpTo.SecondaryShortCut.Add(ShortCutToText(VK_ADD));
+    FAsmView.ShortCuts.JmpBack.SecondaryShortCuts.Add(ShortCutToText(VK_SUBTRACT));
+    FAsmView.ShortCuts.JmpTo.SecondaryShortCuts.Add(ShortCutToText(VK_ADD));
     RefreshBreakPoints;
     RefreshView;
   end;

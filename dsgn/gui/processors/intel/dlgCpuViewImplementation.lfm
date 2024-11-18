@@ -1,6 +1,6 @@
 inherited frmCpuViewImpl: TfrmCpuViewImpl
-  Left = 1048
-  Top = 549
+  Left = 1043
+  Top = 430
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   inherited pnDebug: TPanel
@@ -15,14 +15,6 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     end
     inherited RegView: TRegView
       PopupMenu = pmIntelReg
-    end
-  end
-  inherited ToolBar: TToolBar
-    inherited tbSep1: TToolButton
-      Height = 33
-    end
-    inherited tbSep2: TToolButton
-      Height = 33
     end
   end
   inherited pnDumps: TPanel
@@ -147,7 +139,7 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     end
     inherited acDbgStepOut: TAction[59]
     end
-    inherited acDbgRunTilReturn: TAction[60]
+    inherited acDbgStepOver: TAction[60]
     end
     inherited acDbgRunTo: TAction[61]
     end
@@ -179,6 +171,8 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     end
     inherited acDumpsCloseAllToTheRight: TAction[75]
     end
+    inherited acStackFollowRBP: TAction[76]
+    end
   end
   inherited pmDump: TPopupMenu
     Left = 176
@@ -186,7 +180,7 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   inherited pmHint: TPopupMenu
     OnPopup = pmHintPopup
   end
-  object pmIntelReg: TPopupMenu[13]
+  object pmIntelReg: TPopupMenu[14]
     Left = 1544
     Top = 112
     object miRegIntelViewMode: TMenuItem

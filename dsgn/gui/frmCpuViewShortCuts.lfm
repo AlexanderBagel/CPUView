@@ -1,20 +1,22 @@
 inherited CpuViewShortCutsFrame: TCpuViewShortCutsFrame
-  Height = 584
-  ClientHeight = 584
+  Height = 573
+  Width = 736
+  ClientHeight = 573
+  ClientWidth = 736
   DesignLeft = 1208
   DesignTop = 409
   object gbShortCuts: TGroupBox[0]
     Left = 8
-    Height = 523
+    Height = 512
     Top = 0
-    Width = 752
+    Width = 706
     Anchors = [akTop, akLeft, akRight, akBottom]
     Caption = 'ShortCuts:'
-    ClientHeight = 493
-    ClientWidth = 748
+    ClientHeight = 482
+    ClientWidth = 702
     TabOrder = 0
     object lblShortCutMode: TLabel
-      Left = 571
+      Left = 525
       Height = 25
       Top = 6
       Width = 134
@@ -22,7 +24,7 @@ inherited CpuViewShortCutsFrame: TCpuViewShortCutsFrame
       Caption = 'ShortCuts Mode:'
     end
     object cbShortCutMode: TComboBox
-      Left = 571
+      Left = 525
       Height = 33
       Top = 32
       Width = 164
@@ -41,9 +43,9 @@ inherited CpuViewShortCutsFrame: TCpuViewShortCutsFrame
     end
     object tvShortCuts: TTreeView
       Left = 8
-      Height = 429
+      Height = 418
       Top = 10
-      Width = 553
+      Width = 507
       Anchors = [akTop, akLeft, akRight, akBottom]
       ReadOnly = True
       RowSelect = True
@@ -53,48 +55,85 @@ inherited CpuViewShortCutsFrame: TCpuViewShortCutsFrame
     object btnEditFirst: TButton
       Left = 8
       Height = 38
-      Top = 447
+      Top = 436
       Width = 113
+      Action = acEditFirst
       Anchors = [akLeft, akBottom]
-      Caption = 'Edit First'
       TabOrder = 2
     end
     object btnClearFirst: TButton
       Left = 128
       Height = 38
-      Top = 447
+      Top = 436
       Width = 113
+      Action = acClearFirst
       Anchors = [akLeft, akBottom]
-      Caption = 'Clear First'
       TabOrder = 3
     end
     object btnEditSecond: TButton
       Left = 256
       Height = 38
-      Top = 447
+      Top = 436
       Width = 113
+      Action = acEditSecond
       Anchors = [akLeft, akBottom]
-      Caption = 'Edit Second'
       TabOrder = 4
     end
     object btnClearSecond: TButton
       Left = 376
       Height = 38
-      Top = 447
+      Top = 436
       Width = 113
+      Action = acClearSecond
       Anchors = [akLeft, akBottom]
-      Caption = 'Clear Second'
       TabOrder = 5
     end
   end
   object btnReset: TButton[1]
-    Left = 596
+    Left = 550
     Height = 38
-    Top = 531
+    Top = 520
     Width = 164
     Anchors = [akRight, akBottom]
     Caption = 'Reset to Default'
     TabOrder = 1
     OnClick = btnResetClick
+  end
+  object lblInfo: TLabel[2]
+    Left = 10
+    Height = 57
+    Top = 517
+    Width = 528
+    Anchors = [akLeft, akRight, akBottom]
+    AutoSize = False
+    Caption = 'The hotkey to open CPU-View is changed in Tools->Options->Key Mappings'
+    WordWrap = True
+  end
+  object alButtons: TActionList[3]
+    Left = 48
+    Top = 72
+    object acEditFirst: TAction
+      Caption = 'Edit First'
+      OnExecute = acEditFirstExecute
+      OnUpdate = acEditFirstUpdate
+    end
+    object acClearFirst: TAction
+      Tag = 1
+      Caption = 'Clear First'
+      OnExecute = acEditFirstExecute
+      OnUpdate = acEditFirstUpdate
+    end
+    object acEditSecond: TAction
+      Tag = 2
+      Caption = 'Edit Second'
+      OnExecute = acEditFirstExecute
+      OnUpdate = acEditFirstUpdate
+    end
+    object acClearSecond: TAction
+      Tag = 3
+      Caption = 'Clear Second'
+      OnExecute = acEditFirstExecute
+      OnUpdate = acEditFirstUpdate
+    end
   end
 end

@@ -22,7 +22,7 @@ unit frmCpuViewShortCuts;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ButtonPanel,
+  Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ButtonPanel, ActnList,
   IDEOptEditorIntf, IdeInspectKeyGrapper, IDEImagesIntf,
   frmCpuViewBaseOptions;
 
@@ -31,6 +31,11 @@ type
   { TCpuViewShortCutsFrame }
 
   TCpuViewShortCutsFrame = class(TCpuViewBaseOptionsFrame)
+    acEditFirst: TAction;
+    acClearFirst: TAction;
+    acEditSecond: TAction;
+    acClearSecond: TAction;
+    alButtons: TActionList;
     btnReset: TButton;
     btnEditFirst: TButton;
     btnEditSecond: TButton;
@@ -38,8 +43,11 @@ type
     btnClearSecond: TButton;
     cbShortCutMode: TComboBox;
     gbShortCuts: TGroupBox;
+    lblInfo: TLabel;
     lblShortCutMode: TLabel;
     tvShortCuts: TTreeView;
+    procedure acEditFirstExecute(Sender: TObject);
+    procedure acEditFirstUpdate(Sender: TObject);
     procedure btnResetClick(Sender: TObject);
     procedure cbShortCutModeChange(Sender: TObject);
   private
@@ -63,11 +71,10 @@ uses
 
 const
   ShortCutTypeString: array [TShortCutType] of string = (
-    'Open CpuView dialog',
     'Close CpuView dialog',
     'Go to address', 'Go back',
     'Step In', 'Step Out', 'Step Over', 'Toggle BreakPoint', 'Run To Cursor', 'Run To User Code',
-    'Set New IP', 'Return To Current'
+    'Show Current Origin', 'Set New Origin'
   );
 
 { TCpuViewShortCutsFrame }
@@ -81,6 +88,64 @@ end;
 procedure TCpuViewShortCutsFrame.btnResetClick(Sender: TObject);
 begin
   Settings.Reset(spShortCuts);
+  UpdateFrameControl;
+end;
+
+procedure TCpuViewShortCutsFrame.acEditFirstUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := tvShortCuts.Selected <> nil;
+end;
+
+procedure TCpuViewShortCutsFrame.acEditFirstExecute(Sender: TObject);
+var
+  Idx: TShortCutType;
+  ShortCut: TCpuViewShortCut;
+  GrabForm: TIdeInspectKeyGrabForm;
+begin
+  Idx := TShortCutType(tvShortCuts.Selected.Index);
+  ShortCut := Settings.ShotCut[Idx];
+  case TAction(Sender).Tag of
+    0:
+    begin
+      GrabForm := TIdeInspectKeyGrabForm.Create(Self);
+      try
+        GrabForm.KeyBox.Key := ShortCut.Key1;
+        GrabForm.KeyBox.ShiftState := ShortCut.Shift1;
+        GrabForm.Position := poScreenCenter;
+        if GrabForm.ShowModal <> mrOK then Exit;
+        ShortCut.Key1 := GrabForm.KeyBox.Key;
+        ShortCut.Shift1 := GrabForm.KeyBox.ShiftState;
+      finally
+        GrabForm.Free;
+      end;
+    end;
+    1:
+    begin
+      ShortCut.Key1 := VK_UNKNOWN;
+      ShortCut.Shift1 := [];
+    end;
+    2:
+    begin
+      GrabForm := TIdeInspectKeyGrabForm.Create(Self);
+      try
+        GrabForm.KeyBox.Key := ShortCut.Key2;
+        GrabForm.KeyBox.ShiftState := ShortCut.Shift2;
+        GrabForm.Position := poScreenCenter;
+        if GrabForm.ShowModal <> mrOK then Exit;
+        ShortCut.Key2 := GrabForm.KeyBox.Key;
+        ShortCut.Shift2 := GrabForm.KeyBox.ShiftState;
+      finally
+        GrabForm.Free;
+      end;
+    end;
+    3:
+    begin
+      ShortCut.Key2 := VK_UNKNOWN;
+      ShortCut.Shift2 := [];
+    end;
+  end;
+  Settings.FillCustomShortCuts;
+  Settings.ShotCut[Idx] := ShortCut;
   UpdateFrameControl;
 end;
 
@@ -135,18 +200,17 @@ begin
   cbShortCutMode.ItemWidth := ADialog.Canvas.TextWidth('"' + cbShortCutMode.Items[1] + '"');
   tvShortCuts.Images := IDEImages.Images_16;
   tvShortCuts.Items.Clear;
-  Add('');
-  Add('');
-  Add('');
-  Add('');
+  Add('menu_exit');
+  Add('address');
+  Add('menu_undo');
   Add('menu_stepinto');
   Add('menu_stepout');
   Add('menu_stepover');
   Add('ActiveBreakPoint');
   Add('menu_run_cursor');
   Add('');
-  Add('');
   Add('debugger_show_execution_point');
+  Add('');
 end;
 
 end.

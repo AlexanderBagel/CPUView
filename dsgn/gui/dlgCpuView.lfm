@@ -113,7 +113,7 @@ object frmCpuView: TfrmCpuView
     object tbStepOut: TToolButton
       Left = 36
       Top = 2
-      Action = acDbgStepOut
+      Action = acDbgStepOver
       ParentShowHint = False
       ShowHint = True
     end
@@ -141,7 +141,7 @@ object frmCpuView: TfrmCpuView
     object tbRunTillRet: TToolButton
       Left = 71
       Top = 2
-      Action = acDbgRunTilReturn
+      Action = acDbgStepOut
       ParentShowHint = False
       ShowHint = True
     end
@@ -485,7 +485,7 @@ object frmCpuView: TfrmCpuView
     end
     object acStackFollowRSP: TAction
       Category = 'StackView Actions'
-      Caption = 'Go to StackPoint'
+      Caption = 'Show Current Frame Origine'
       OnExecute = acStackFollowRSPExecute
       OnUpdate = acStackFollowRSPUpdate
     end
@@ -606,20 +606,20 @@ object frmCpuView: TfrmCpuView
       OnExecute = acDbgStepInExecute
       OnUpdate = DefaultActionUpdate
     end
-    object acDbgStepOut: TAction
+    object acDbgStepOver: TAction
       Category = 'Debugger'
       Caption = 'Step Out'
       Hint = 'Step Over'
       ShortCut = 119
-      OnExecute = acDbgStepOutExecute
+      OnExecute = acDbgStepOverExecute
       OnUpdate = DefaultActionUpdate
     end
-    object acDbgRunTilReturn: TAction
+    object acDbgStepOut: TAction
       Category = 'Debugger'
       Caption = 'Run Till Return'
       Hint = 'Step Out'
       ShortCut = 16502
-      OnExecute = acDbgRunTilReturnExecute
+      OnExecute = acDbgStepOutExecute
       OnUpdate = DefaultActionUpdate
     end
     object acDbgRunTo: TAction
@@ -686,13 +686,13 @@ object frmCpuView: TfrmCpuView
     end
     object acAsmReturnToIP: TAction
       Category = 'AsmView Actions'
-      Caption = 'Return to Current IP'
+      Caption = 'Show Current Origine'
       OnExecute = acAsmReturnToIPExecute
       OnUpdate = acAsmReturnToIPUpdate
     end
     object acAsmSetNewIP: TAction
       Category = 'AsmView Actions'
-      Caption = 'Set New IP'
+      Caption = 'Set New Origine'
       OnExecute = acAsmSetNewIPExecute
       OnUpdate = DefaultActionUpdate
     end
@@ -720,6 +720,12 @@ object frmCpuView: TfrmCpuView
       OnExecute = acDumpsCloseAllToTheRightExecute
       OnUpdate = acDumpsCloseAllToTheRightUpdate
     end
+    object acStackFollowRBP: TAction
+      Category = 'StackView Actions'
+      Caption = 'Show Current Frame Base'
+      OnExecute = acStackFollowRBPExecute
+      OnUpdate = acStackFollowRBPUpdate
+    end
   end
   object pmStack: TPopupMenu
     Left = 1656
@@ -741,6 +747,9 @@ object frmCpuView: TfrmCpuView
     end
     object miStackFollowRsp: TMenuItem
       Action = acStackFollowRSP
+    end
+    object miStackFollowRbp: TMenuItem
+      Action = acStackFollowRBP
     end
     object miStackGoto: TMenuItem
       Action = acViewGoto

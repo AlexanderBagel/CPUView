@@ -35,6 +35,7 @@ uses
   {$IFDEF FPC}
   LCLIntf,
   LCLType,
+  LCLProc,
   DOM,
   XMLRead,
   XMLWrite,
@@ -42,6 +43,7 @@ uses
   Windows,
   XMLIntf, xmldom, XMLDoc,
   {$ENDIF}
+  Menus,
   FWHexView,
   FWHexView.Common,
   FWHexView.MappedView,
@@ -71,6 +73,7 @@ const
   xmlDumpView = 'dumpview';
   xmlRegView = 'regview';
   xmlStackView = 'stackview';
+  xmlShortCuts = 'shortcuts';
   xmlColumns = 'columns';
   xmlLeft = 'left';
   xmlTop = 'top';
@@ -199,10 +202,10 @@ type
   end;
 
   TShortCutType = (
-    sctOpenCpuView, sctCloseCpuView,
+    sctCloseCpuView,
     sctViewerJmpIn, sctViewerStepBack,
     sctStepIn, sctStepOut, sctStepOver, sctToggleBP, sctRunTo, sctRunToUser,
-    sctNewIP, sctReturnToDef);
+    sctReturnToDef, sctNewIP);
 
   TShortCutMode = (scmDefault, scmMSVC, scmCustom);
 
@@ -248,6 +251,7 @@ type
     procedure LoadFromXML_DumpSettings(Root: IXMLNode);
     procedure LoadFromXML_Full(Root: IXMLNode);
     procedure LoadFromXML_RegSettings(Root: IXMLNode);
+    procedure LoadFromXML_ShortCuts(Root: IXMLNode);
     procedure LoadFromXML_StackSettings(Root: IXMLNode);
 
     procedure RestoreViewDefSettings(AView: TFWCustomHexView);
@@ -263,6 +267,7 @@ type
     procedure SaveToXML_DumpSettings(Root: IXMLNode);
     procedure SaveToXML_Full(Root: IXMLNode);
     procedure SaveToXML_RegSettings(Root: IXMLNode);
+    procedure SaveToXML_ShortCuts(Root: IXMLNode);
     procedure SaveToXML_StackSettings(Root: IXMLNode);
   protected
     procedure InitColorMap;
@@ -285,6 +290,7 @@ type
     procedure GetSessionFromRegView(ARegView: TRegView);
     procedure GetSessionFromStackView(AStackView: TStackView);
 
+    procedure FillCustomShortCuts;
     procedure Reset(APart: TSettingPart = spAll);
     procedure Load(const FilePath: string);
     procedure Save(const FilePath: string);
@@ -312,14 +318,22 @@ type
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
   end;
 
+  function KeyShiftToText(Key: Word; Shift: TShiftState): string;
+
 implementation
 
 type
   TViewAccess = class(TFWCustomHexView);
 
 const
+{$IFNDEF FPC}
+  VK_UNKNOWN = 0;
+  VK_C = $43;
+  VK_N = $4E;
+  VK_O = $4F;
+{$ENDIF}
+
   DefaultShortCuts: array [TShortCutType] of TCpuViewShortCut = (
-    (Key1: VK_C; Shift1: [ssAlt, ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_ESCAPE; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_RETURN; Shift1: []; Key2: VK_ADD; Shift2: []),
     (Key1: VK_BACK; Shift1: []; Key2: VK_SUBTRACT; Shift2: []),
@@ -329,9 +343,19 @@ const
     (Key1: VK_F2; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_F4; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_F9; Shift1: [ssAlt]; Key2: VK_UNKNOWN; Shift2: []),
-    (Key1: VK_N; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
-    (Key1: VK_O; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: [])
+    (Key1: VK_O; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_N; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: [])
   );
+
+function KeyShiftToText(Key: Word; Shift: TShiftState): string;
+begin
+  Result := ShortCutToText(ShortCut(Key, Shift));
+end;
+
+procedure TextToKeyShift(const AText: string; var Key: Word; var Shift: TShiftState);
+begin
+  ShortCutToKey(TextToShortCut(AText), Key, Shift);
+end;
 
 { TCpuViewSettins }
 
@@ -408,7 +432,6 @@ end;
 function TCpuViewSettins.GetShotCut(Index: TShortCutType): TCpuViewShortCut;
 const
   MSVCShortCuts: array [TShortCutType] of TCpuViewShortCut = (
-    (Key1: VK_C; Shift1: [ssAlt, ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_ESCAPE; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_RETURN; Shift1: []; Key2: VK_ADD; Shift2: []),
     (Key1: VK_BACK; Shift1: []; Key2: VK_SUBTRACT; Shift2: []),
@@ -418,8 +441,8 @@ const
     (Key1: VK_F9; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_F10; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_UNKNOWN; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
-    (Key1: VK_F10; Shift1: [ssCtrl, ssShift]; Key2: VK_UNKNOWN; Shift2: []),
-    (Key1: VK_MULTIPLY; Shift1: [ssAlt]; Key2: VK_UNKNOWN; Shift2: [])
+    (Key1: VK_MULTIPLY; Shift1: [ssAlt]; Key2: VK_UNKNOWN; Shift2: []),
+    (Key1: VK_F10; Shift1: [ssCtrl, ssShift]; Key2: VK_UNKNOWN; Shift2: [])
   );
 begin
   case ShotCutMode of
@@ -479,6 +502,15 @@ end;
 procedure TCpuViewSettins.GetSessionFromStackView(AStackView: TStackView);
 begin
   FStackFontHeight := DpiToDouble(AStackView.Font.Height, AStackView);
+end;
+
+procedure TCpuViewSettins.FillCustomShortCuts;
+var
+  I: TShortCutType;
+begin
+  for I := Low(TShortCutType) to High(TShortCutType) do
+    FShortCuts[I] := ShotCut[I];
+  FShotCutMode := scmCustom;
 end;
 
 procedure TCpuViewSettins.InitDefaultColors;
@@ -763,12 +795,33 @@ begin
   Node := FindNode(Root, xmlStackView);
   if Node = nil then Exit;
   LoadFromXML_StackSettings(Node);
+  Node := FindNode(Root, xmlShortCuts);
+  if Node = nil then Exit;
+  LoadFromXML_ShortCuts(Node);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_RegSettings(Root: IXMLNode);
 begin
   FRegFontHeight := XMLReadDouble(Root, xmlFontSize);
   FRegSettings.LoadFromXML(Root);
+end;
+
+procedure TCpuViewSettins.LoadFromXML_ShortCuts(Root: IXMLNode);
+var
+  I: TShortCutType;
+  ItemName: string;
+  ShortCut: TCpuViewShortCut;
+begin
+  FShotCutMode := TShortCutMode(
+    GetEnumValue(TypeInfo(TShortCutMode), GetNodeAttr(Root, xmlMode)));
+  for I := Low(TShortCutType) to High(TShortCutType) do
+  begin
+    ItemName := GetEnumName(TypeInfo(TShortCutType), Integer(I));
+    ShortCut := Default(TCpuViewShortCut);
+    TextToKeyShift(GetNodeAttrString(Root, ItemName + '1'), ShortCut.Key1, ShortCut.Shift1);
+    TextToKeyShift(GetNodeAttrString(Root, ItemName + '2'), ShortCut.Key2, ShortCut.Shift2);
+    FShortCuts[I] := ShortCut;
+  end;
 end;
 
 procedure TCpuViewSettins.LoadFromXML_StackSettings(Root: IXMLNode);
@@ -1001,6 +1054,7 @@ begin
   SaveToXML_AsmSettings(NewChild(Root, xmlAsmView));
   SaveToXML_DumpSettings(NewChild(Root, xmlDumpView));
   SaveToXML_RegSettings(NewChild(Root, xmlRegView));
+  SaveToXML_ShortCuts(NewChild(Root, xmlShortCuts));
   SaveToXML_StackSettings(NewChild(Root, xmlStackView));
   {$ELSE}
   SaveToXML_BasicSettings(Root.AddChild(xmlBasic));
@@ -1008,6 +1062,7 @@ begin
   SaveToXML_AsmSettings(Root.AddChild(xmlAsmView));
   SaveToXML_DumpSettings(Root.AddChild(xmlDumpView));
   SaveToXML_RegSettings(Root.AddChild(xmlRegView));
+  SaveToXML_ShortCuts(Root.AddChild(xmlShortCuts));
   SaveToXML_StackSettings(Root.AddChild(xmlStackView));
   {$ENDIF}
 end;
@@ -1016,6 +1071,24 @@ procedure TCpuViewSettins.SaveToXML_RegSettings(Root: IXMLNode);
 begin
   XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
   FRegSettings.SaveToXML(Root);
+end;
+
+procedure TCpuViewSettins.SaveToXML_ShortCuts(Root: IXMLNode);
+var
+  I: TShortCutType;
+  ItemName: string;
+  ShortCut: TCpuViewShortCut;
+begin
+  SetNodeAttr(Root, xmlMode, GetEnumName(TypeInfo(TShortCutMode), Integer(FShotCutMode)));
+  for I := Low(TShortCutType) to High(TShortCutType) do
+  begin
+    ItemName := GetEnumName(TypeInfo(TShortCutType), Integer(I));
+    ShortCut := FShortCuts[I];
+    if ShortCut.Key1 <> VK_UNKNOWN then
+      SetNodeAttr(Root, ItemName + '1', KeyShiftToText(ShortCut.Key1, ShortCut.Shift1));
+    if ShortCut.Key2 <> VK_UNKNOWN then
+      SetNodeAttr(Root, ItemName + '2', KeyShiftToText(ShortCut.Key2, ShortCut.Shift2));
+  end;
 end;
 
 procedure TCpuViewSettins.SaveToXML_StackSettings(Root: IXMLNode);

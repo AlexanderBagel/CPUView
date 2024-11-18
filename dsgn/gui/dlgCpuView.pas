@@ -58,8 +58,8 @@ type
     acTEUtf7: TAction;
     acTEUtf8: TAction;
     acDbgStepIn: TAction;
+    acDbgStepOver: TAction;
     acDbgStepOut: TAction;
-    acDbgRunTilReturn: TAction;
     acDbgRunTo: TAction;
     acDbgToggleBp: TAction;
     acRegModifyInc: TAction;
@@ -73,6 +73,7 @@ type
     acShowInNewDump: TAction;
     acDumpsClosePage: TAction;
     acDumpsCloseAllToTheRight: TAction;
+    acStackFollowRBP: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -119,6 +120,7 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miStackFollowRbp: TMenuItem;
     miProfilerSaveDump: TMenuItem;
     miResetProfiler: TMenuItem;
     miDebugGenException: TMenuItem;
@@ -270,11 +272,11 @@ type
     procedure acAsmSetNewIPExecute(Sender: TObject);
     procedure acAsmShowSourceExecute(Sender: TObject);
     procedure acAsmShowSourceUpdate(Sender: TObject);
-    procedure acDbgRunTilReturnExecute(Sender: TObject);
+    procedure acDbgStepOutExecute(Sender: TObject);
     procedure acDbgRunToExecute(Sender: TObject);
     procedure acDbgRunToUpdate(Sender: TObject);
     procedure acDbgStepInExecute(Sender: TObject);
-    procedure acDbgStepOutExecute(Sender: TObject);
+    procedure acDbgStepOverExecute(Sender: TObject);
     procedure acDbgToggleBpExecute(Sender: TObject);
     procedure acDumpsCloseAllToTheRightExecute(Sender: TObject);
     procedure acDumpsCloseAllToTheRightUpdate(Sender: TObject);
@@ -294,6 +296,8 @@ type
     procedure acShowInNewDumpExecute(Sender: TObject);
     procedure acShowInStackExecute(Sender: TObject);
     procedure acShowInStackUpdate(Sender: TObject);
+    procedure acStackFollowRBPExecute(Sender: TObject);
+    procedure acStackFollowRBPUpdate(Sender: TObject);
     procedure acStackFollowRSPExecute(Sender: TObject);
     procedure acStackFollowRSPUpdate(Sender: TObject);
     procedure acTEAnsiExecute(Sender: TObject);
@@ -336,6 +340,7 @@ type
     FSourceLine: Integer;
     FLastBounds: TRect;
     FCrashDump: TExceptionLogger;
+    FExit1ShortCut, FExit2ShortCut: TShortCut;
     function ActiveViewerSelectedValue: UInt64;
     function CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
     function CheckRegCallback(ANewAddrVA: UInt64): Boolean;
@@ -391,15 +396,22 @@ begin
   FCore.RegView := RegView;
   FCore.DumpViewList.Add(DumpView);
   FCore.StackView := StackView;
+  acDbgToggleBp.ImageIndex := IDEImages.LoadImage('ActiveBreakPoint');
+  acDbgRunTo.ImageIndex := IDEImages.LoadImage('menu_run_cursor');
+  acDbgStepOut.ImageIndex := IDEImages.LoadImage('menu_stepout');
+  acDbgStepIn.ImageIndex := IDEImages.LoadImage('menu_stepinto');
+  acDbgStepOver.ImageIndex := IDEImages.LoadImage('menu_stepover');
+  acAsmReturnToIP.ImageIndex := IDEImages.LoadImage('debugger_show_execution_point');
+  acStackFollowRBP.ImageIndex := IDEImages.LoadImage('callstack_goto');
+  acStackFollowRSP.ImageIndex := IDEImages.LoadImage('evaluate_up');
+  acViewGoto.ImageIndex := IDEImages.LoadImage('address');
+  acDumpsClosePage.ImageIndex := IDEImages.LoadImage('menu_exit');
   ToolBar.Images := IDEImages.Images_16;
-  tbBreakPoint.ImageIndex := IDEImages.LoadImage('ActiveBreakPoint');
-  tbRunTo.ImageIndex := IDEImages.LoadImage('menu_run_cursor');
-  tbRunTillRet.ImageIndex := IDEImages.LoadImage('menu_stepout');
-  tbStepIn.ImageIndex := IDEImages.LoadImage('menu_stepinto');
-  tbStepOut.ImageIndex := IDEImages.LoadImage('menu_stepover');
   pmAsm.Images := IDEImages.Images_16;
-  miAsmRunTo.ImageIndex := tbRunTo.ImageIndex;
-  miAsmCurrentIP.ImageIndex := IDEImages.LoadImage('debugger_show_execution_point');
+  pmDump.Images := IDEImages.Images_16;
+  pmDumps.Images := IDEImages.Images_16;
+  pmRegSelected.Images := IDEImages.Images_16;
+  pmStack.Images := IDEImages.Images_16;
   SetHooks;
   LoadSettings;
   CpuViewDebugLog.Reset;
@@ -566,8 +578,31 @@ begin
 end;
 
 procedure TfrmCpuView.LoadSettings;
+
+  procedure AddActionShortCut(AAction: TAction; const AShortCut: TCpuViewShortCut);
+  begin
+    AAction.ShortCut := ShortCut(AShortCut.Key1, AShortCut.Shift1);
+    AAction.SecondaryShortCuts.Clear;
+    AAction.SecondaryShortCuts.Add(KeyShiftToText(AShortCut.Key2, AShortCut.Shift2));
+  end;
+
+  procedure AddViewerShortCut(AViewer: TCustomMappedHexView;
+    const AShortCut: TCpuViewShortCut; IsJmpIn: Boolean);
+  var
+    ViewerShortCut: TViewShortCut;
+  begin
+    if IsJmpIn then
+      ViewerShortCut := TMappedHexView(AViewer).ShortCuts.JmpTo
+    else
+      ViewerShortCut := TMappedHexView(AViewer).ShortCuts.JmpBack;
+    ViewerShortCut.ShortCut := ShortCut(AShortCut.Key1, AShortCut.Shift1);
+    ViewerShortCut.SecondaryShortCuts.Clear;
+    ViewerShortCut.SecondaryShortCuts.Add(KeyShiftToText(AShortCut.Key2, AShortCut.Shift2));
+  end;
+
 var
   R: TRect;
+  ExitShortCut: TCpuViewShortCut;
 begin
   Settings.Load(ConfigPath);
   Settings.SetSettingsToAsmView(AsmView);
@@ -603,6 +638,22 @@ begin
 
   FCrashDump.Enabled := Settings.UseCrashDump;
   CpuViewDebugLog.Enabled := Settings.UseDebugLog;
+
+  AddActionShortCut(acDbgToggleBp, Settings.ShotCut[sctToggleBP]);
+  AddActionShortCut(acDbgRunTo, Settings.ShotCut[sctRunTo]);
+  AddActionShortCut(acDbgStepOut, Settings.ShotCut[sctStepOut]);
+  AddActionShortCut(acDbgStepIn, Settings.ShotCut[sctStepIn]);
+  AddActionShortCut(acDbgStepOver, Settings.ShotCut[sctStepOver]);
+  AddActionShortCut(acAsmSetNewIP, Settings.ShotCut[sctNewIP]);
+  AddActionShortCut(acAsmReturnToIP, Settings.ShotCut[sctReturnToDef]);
+  AddActionShortCut(acStackFollowRSP, Settings.ShotCut[sctReturnToDef]);
+
+  AddViewerShortCut(AsmView, Settings.ShotCut[sctViewerJmpIn], True);
+  AddViewerShortCut(AsmView, Settings.ShotCut[sctViewerStepBack], False);
+
+  ExitShortCut := Settings.ShotCut[sctCloseCpuView];
+  FExit1ShortCut := ShortCut(ExitShortCut.Key1, ExitShortCut.Shift1);
+  FExit2ShortCut := ShortCut(ExitShortCut.Key2, ExitShortCut.Shift2);
 end;
 
 procedure TfrmCpuView.SaveSettings;
@@ -815,6 +866,19 @@ begin
     Core.AddrInStack(ActiveViewerSelectedValue);
 end;
 
+procedure TfrmCpuView.acStackFollowRBPExecute(Sender: TObject);
+begin
+  Core.ShowStackAtAddr(DbgGate.Context.StackBase);
+  ActiveControl := StackView;
+end;
+
+procedure TfrmCpuView.acStackFollowRBPUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled :=
+    (DbgGate.DebugState = adsPaused) and
+    Core.AddrInStack(DbgGate.Context.StackBase);
+end;
+
 procedure TfrmCpuView.acStackFollowRSPExecute(Sender: TObject);
 begin
   Core.ShowStackAtAddr(DbgGate.Context.StackPoint);
@@ -823,7 +887,9 @@ end;
 
 procedure TfrmCpuView.acStackFollowRSPUpdate(Sender: TObject);
 begin
-  TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
+  TAction(Sender).Enabled :=
+    (DbgGate.DebugState = adsPaused) and
+    Core.AddrInStack(DbgGate.Context.StackPoint);
 end;
 
 procedure TfrmCpuView.acTEAnsiExecute(Sender: TObject);
@@ -926,7 +992,7 @@ begin
     AsmView.HighlightReg := FContextRegName;
 end;
 
-procedure TfrmCpuView.acDbgRunTilReturnExecute(Sender: TObject);
+procedure TfrmCpuView.acDbgStepOutExecute(Sender: TObject);
 begin
   LockZOrder;
   DbgGate.TraceTilReturn;
@@ -979,7 +1045,7 @@ begin
   DbgGate.TraceIn;
 end;
 
-procedure TfrmCpuView.acDbgStepOutExecute(Sender: TObject);
+procedure TfrmCpuView.acDbgStepOverExecute(Sender: TObject);
 begin
   LockZOrder;
   DbgGate.TraceOut;
