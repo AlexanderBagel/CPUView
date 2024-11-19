@@ -37,6 +37,7 @@ interface
 {$message 'View for Call param'}
 {$message 'Highlighting of identical selected values in the dump window'}
 {$message 'Run to user code'}
+{$message 'Display strings in hint'}
 
 uses
   {$IFDEF FPC}
@@ -81,11 +82,14 @@ type
     LastAddrVA: Int64;
   end;
 
+  TCpuViewCore = class;
+
   { TDumpViewList }
 
   TDumpViewList = class
   private
     FAddressMode: TAddressMode;
+    FCore: TCpuViewCore;
     FItemIndex: Integer;
     FItems: TListEx<TDumpViewRec>;
     FOnUpdated: TOnCacheUpdated;
@@ -99,8 +103,10 @@ type
     procedure SetItemIndex(AValue: Integer);
     procedure SetLastAddrVA(AValue: Int64);
     procedure SetOnUpdated(AValue: TOnCacheUpdated);
+  protected
+    procedure OnQueryAddressType(Sender: TObject; AddrVA: UInt64; var AddrType: TDumpAddrType);
   public
-    constructor Create(AUtils: TCommonUtils);
+    constructor Create(ACore: TCpuViewCore; AUtils: TCommonUtils);
     destructor Destroy; override;
     function Add(AValue: TDumpView): Integer;
     function Count: Integer;
@@ -134,6 +140,7 @@ type
     FJmpStack: TList<Int64>;
     FJmpStackIdx: Integer;
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
+    FLastStackLimit: TStackLimit;
     FLockPushToJmpStack: Boolean;
     FLockSelChange: Boolean;
     FLastCachedAddrVA: UInt64;
@@ -209,6 +216,7 @@ type
     // Address on the basis of which the current cache was built.
     // Necessary for proper Undo/Redo operations in the transition cache.
     property LastCachedAddrVA: UInt64 read FLastCachedAddrVA;
+    property LastStackLimit: TStackLimit read FLastStackLimit;
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
     property ShowCallFuncName: Boolean read FShowCallFuncName write FShowCallFuncName;
@@ -246,6 +254,26 @@ begin
     Result := FItems.List[ItemIndex].View
   else
     Result := nil;
+end;
+
+procedure TDumpViewList.OnQueryAddressType(Sender: TObject; AddrVA: UInt64;
+  var AddrType: TDumpAddrType);
+var
+  ARegionData: TRegionData;
+begin
+  if not FUtils.QueryRegion(AddrVA, ARegionData) then Exit;
+  if (raExecute in ARegionData.Access) then
+  begin
+    AddrType := datExecute;
+    Exit;
+  end;
+  if (AddrVA <= FCore.LastStackLimit.Base) and (AddrVA >= FCore.LastStackLimit.Limit) then
+  begin
+    AddrType := datStack;
+    Exit;
+  end;
+  if (raRead in ARegionData.Access) then
+    AddrType := datRead;
 end;
 
 procedure TDumpViewList.SetAddressMode(AValue: TAddressMode);
@@ -289,8 +317,9 @@ begin
     FItems.List[ItemIndex].Stream.Stream.OnUpdated := AValue;
 end;
 
-constructor TDumpViewList.Create(AUtils: TCommonUtils);
+constructor TDumpViewList.Create(ACore: TCpuViewCore; AUtils: TCommonUtils);
 begin
+  FCore := ACore;
   FUtils := AUtils;
   FItems := TListEx<TDumpViewRec>.Create;
 end;
@@ -314,6 +343,7 @@ begin
   Data.Stream := TBufferedROStream.Create(RemoteStream, soOwned);
   Result := FItems.Add(Data);
   AValue.AddressMode := AddressMode;
+  AValue.OnQueryAddressType := OnQueryAddressType;
   AValue.FitColumnsToBestSize;
 end;
 
@@ -447,7 +477,7 @@ begin
   FCacheList := TListEx<TAsmLine>.Create;
   FAddrIndex := TDictionary<Int64, Integer>.Create;
   FUtils := TCommonUtils.Create;
-  FDumpViewList := TDumpViewList.Create(FUtils);
+  FDumpViewList := TDumpViewList.Create(Self, FUtils);
   RemoteStream := TRemoteStream.Create(FUtils);
   FAsmStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FAsmStream.BufferSize := DisasmBuffSize;
@@ -848,8 +878,6 @@ begin
 end;
 
 procedure TCpuViewCore.RefreshView(Forced: Boolean);
-var
-  StackLim: TStackLimit;
 begin
   if (FDebugger = nil) or not FDebugger.IsActive then Exit;
   FLastCtx := FDebugger.Context;
@@ -858,12 +886,13 @@ begin
     FRegView.Context := FLastCtx;
   if Assigned(FStackView) then
   begin
-    StackLim := FDebugger.ThreadStackLimit;
-    FDebugger.FillThreadStackFrames(StackLim, FLastCtx.StackPoint,
+    FLastStackLimit := FDebugger.ThreadStackLimit;
+    FDebugger.FillThreadStackFrames(FLastStackLimit, FLastCtx.StackPoint,
       FLastCtx.StackBase, FStackStream.Stream, FStackView.Frames);
-    FStackStream.SetAddrWindow(StackLim.Limit, StackLim.Base - StackLim.Limit);
+    FStackStream.SetAddrWindow(FLastStackLimit.Limit,
+      FLastStackLimit.Base - FLastStackLimit.Limit);
     FStackView.AddressMode := GetAddrMode;
-    FStackView.SetDataStream(FStackStream, StackLim.Limit);
+    FStackView.SetDataStream(FStackStream, FLastStackLimit.Limit);
     FStackView.FramesUpdated;
     FStackView.FocusOnAddress(FLastCtx.StackPoint, ccmSelectRow);
   end;

@@ -311,19 +311,27 @@ type
   TDumpPainter = class(TRowHexPainter)
   protected
     function ColumnsDrawSupport: TFWHexViewColumnTypes; override;
-    function CpuView: TCustomDumpView;
     procedure DrawHeaderColumn(ACanvas: TCanvas; AColumn: TColumnType;
       var ARect: TRect); override;
+    procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
+    function DumpView: TCustomDumpView;
     function GetHeaderColumnCaption(AColumn: TColumnType): string; override;
   end;
+
+  TDumpAddrType = (datNone, datExecute, datRead, datStack);
+  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: UInt64; var AddrType: TDumpAddrType) of object;
 
   { TCustomDumpView }
 
   TCustomDumpView = class(TFixedColumnView)
+  private
+    FOnQueryAddr: TOnQueryAddrType;
   protected
+    procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TDumpAddrType);
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
     procedure InitDefault; override;
     procedure UpdateView; override;
+    property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
   end;
 
   { TDumpView }
@@ -385,6 +393,7 @@ type
     property OnMouseLeave;
     property OnMouseMove;
     property OnMouseUp;
+    property OnQueryAddressType;
     property OnQueryComment;
     property OnSelectionChange;
     property OnStartDock;
@@ -1455,11 +1464,6 @@ begin
   Result := [ctOpcode, ctDescription];
 end;
 
-function TDumpPainter.CpuView: TCustomDumpView;
-begin
-  Result := TCustomDumpView(Owner);
-end;
-
 procedure TDumpPainter.DrawHeaderColumn(ACanvas: TCanvas;
   AColumn: TColumnType; var ARect: TRect);
 begin
@@ -1472,6 +1476,54 @@ begin
   end;
 end;
 
+procedure TDumpPainter.DrawHexPart(ACanvas: TCanvas; var ARect: TRect);
+var
+  Data: TBytes;
+  AddrVA: UInt64;
+  AddrType: TDumpAddrType;
+  I, L, W, Limit, AByteCount, ASelStart, ASelEnd: Integer;
+begin
+  inherited;
+  if ByteViewMode in [bvmFloat32..bvmText] then Exit;
+  DumpView.GetRawBuff(RowIndex, Data);
+  AddrVA := RawData[RowIndex].Address;
+  AByteCount := IfThen(AddressMode = am32bit, 4, 8);
+  ASelStart := 0;
+  ASelEnd := (AByteCount - 1) shl 1;
+  Limit := Length(Data) - 1;
+  I := 0;
+  while I < Limit do
+  begin
+    if AddressMode = am32bit then
+      AddrVA := PCardinal(@Data[I])^
+    else
+      AddrVA := PUInt64(@Data[I])^;
+    AddrType := datNone;
+    DumpView.DoQueryAddrType(AddrVA, AddrType);
+    L := ARect.Left + TextMetric.CharLength(ctOpcode, 0, ASelStart) - CharWidth;
+    W := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
+    {$message 'Color'}
+    if AddrType <> datNone then
+    begin
+      case AddrType of
+        datExecute: ACanvas.Brush.Color := $CC33FF;
+        datRead: ACanvas.Brush.Color := $CC66;
+        datStack: ACanvas.Brush.Color := $2197FF;
+      end;
+      PatBlt(ACanvas, L, ARect.Bottom - 2, W, 2, PATCOPY);
+    end;
+    Inc(L, W);
+    Inc(ASelStart, AByteCount shl 1);
+    Inc(ASelEnd, AByteCount shl 1);
+    Inc(I, AByteCount);
+  end;
+end;
+
+function TDumpPainter.DumpView: TCustomDumpView;
+begin
+  Result := TCustomDumpView(Owner);
+end;
+
 function TDumpPainter.GetHeaderColumnCaption(AColumn: TColumnType): string;
 begin
   if AColumn = ctDescription then
@@ -1481,6 +1533,13 @@ begin
 end;
 
 { TCustomDumpView }
+
+procedure TCustomDumpView.DoQueryAddrType(AddrVA: UInt64;
+  var AddrType: TDumpAddrType);
+begin
+  if Assigned(FOnQueryAddr) then
+    FOnQueryAddr(Self, AddrVA, AddrType);
+end;
 
 function TCustomDumpView.GetDefaultPainterClass: TPrimaryRowPainterClass;
 begin
