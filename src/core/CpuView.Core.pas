@@ -103,8 +103,6 @@ type
     procedure SetItemIndex(AValue: Integer);
     procedure SetLastAddrVA(AValue: Int64);
     procedure SetOnUpdated(AValue: TOnCacheUpdated);
-  protected
-    procedure OnQueryAddressType(Sender: TObject; AddrVA: UInt64; var AddrType: TDumpAddrType);
   public
     constructor Create(ACore: TCpuViewCore; AUtils: TCommonUtils);
     destructor Destroy; override;
@@ -181,6 +179,7 @@ type
     function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
     procedure LoadFromCache(AIndex: Integer);
+    procedure OnQueryAddressType(Sender: TObject; AddrVA: UInt64; var AddrType: TDumpAddrType);
     procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
     // Forced - означает принудительную перестройку вьювера
@@ -256,26 +255,6 @@ begin
     Result := nil;
 end;
 
-procedure TDumpViewList.OnQueryAddressType(Sender: TObject; AddrVA: UInt64;
-  var AddrType: TDumpAddrType);
-var
-  ARegionData: TRegionData;
-begin
-  if not FUtils.QueryRegion(AddrVA, ARegionData) then Exit;
-  if (raExecute in ARegionData.Access) then
-  begin
-    AddrType := datExecute;
-    Exit;
-  end;
-  if (AddrVA <= FCore.LastStackLimit.Base) and (AddrVA >= FCore.LastStackLimit.Limit) then
-  begin
-    AddrType := datStack;
-    Exit;
-  end;
-  if (raRead in ARegionData.Access) then
-    AddrType := datRead;
-end;
-
 procedure TDumpViewList.SetAddressMode(AValue: TAddressMode);
 var
   I: Integer;
@@ -343,7 +322,7 @@ begin
   Data.Stream := TBufferedROStream.Create(RemoteStream, soOwned);
   Result := FItems.Add(Data);
   AValue.AddressMode := AddressMode;
-  AValue.OnQueryAddressType := OnQueryAddressType;
+  AValue.OnQueryAddressType := FCore.OnQueryAddressType;
   AValue.FitColumnsToBestSize;
 end;
 
@@ -859,6 +838,26 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.OnQueryAddressType(Sender: TObject; AddrVA: UInt64;
+  var AddrType: TDumpAddrType);
+var
+  ARegionData: TRegionData;
+begin
+  if not FUtils.QueryRegion(AddrVA, ARegionData) then Exit;
+  if (raExecute in ARegionData.Access) then
+  begin
+    AddrType := datExecute;
+    Exit;
+  end;
+  if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
+  begin
+    AddrType := datStack;
+    Exit;
+  end;
+  if (raRead in ARegionData.Access) then
+    AddrType := datRead;
+end;
+
 procedure TCpuViewCore.OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
   AColumn: TColumnType; var AComment: string);
 begin
@@ -980,6 +979,7 @@ begin
     if Value = nil then Exit;
     Value.FitColumnsToBestSize;
     FStackView.OnQueryComment := StackViewQueryComment;
+    FStackView.OnQueryAddressType := OnQueryAddressType;
     RefreshView;
   end;
 end;
