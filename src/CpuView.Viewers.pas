@@ -311,9 +311,16 @@ type
     property PopupMenu;
   end;
 
+  TLeftRightBounds = record
+    LeftOffset, Width: Integer;
+  end;
+
   TAddrHightLightPainter = class(TRowHexPainter)
   protected
     procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
+    function GetBounds(AIndex: Integer): TLeftRightBounds;
+    procedure GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
+      XPos, YPos: Int64); override;
     function View: TFixedColumnView;
   end;
 
@@ -649,7 +656,6 @@ type
     function InternalGetRowPainter(ARowIndex: Int64): TAbstractPrimaryRowPainter; override;
     procedure Notification(AComponent: TComponent;
       Operation: TOperation); override;
-    procedure UpdateCursor(const HitTest: TMouseHitInfo); override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure CopySelected(CopyStyle: TCopyStyle); override;
@@ -1475,15 +1481,13 @@ var
   Data: TBytes;
   AddrVA: UInt64;
   AddrType: TDumpAddrType;
-  I, L, W, Limit, AByteCount, ASelStart, ASelEnd: Integer;
+  I, Limit, AByteCount: Integer;
+  Bounds: TLeftRightBounds;
 begin
   inherited;
   if ByteViewMode in [bvmFloat32..bvmText] then Exit;
   GetRawBuff(RowIndex, Data);
-  AddrVA := RawData[RowIndex].Address;
   AByteCount := IfThen(AddressMode = am32bit, 4, 8);
-  ASelStart := 0;
-  ASelEnd := (AByteCount - 1) shl 1;
   Limit := Length(Data) - 1;
   I := 0;
   while I < Limit do
@@ -1494,8 +1498,6 @@ begin
       AddrVA := PUInt64(@Data[I])^;
     AddrType := datNone;
     View.DoQueryAddrType(AddrVA, AddrType);
-    L := ARect.Left + TextMetric.CharLength(ctOpcode, 0, ASelStart) - CharWidth;
-    W := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
     {$message 'Color'}
     if AddrType <> datNone then
     begin
@@ -1504,13 +1506,30 @@ begin
         datRead: ACanvas.Brush.Color := $CC66;
         datStack: ACanvas.Brush.Color := $2197FF;
       end;
-      PatBlt(ACanvas, L, ARect.Bottom - 2, W, 2, PATCOPY);
+      Bounds := GetBounds(I div AByteCount);
+      PatBlt(ACanvas, ARect.Left + Bounds.LeftOffset,
+        ARect.Bottom - 2, Bounds.Width, 2, PATCOPY);
     end;
-    Inc(L, W);
-    Inc(ASelStart, AByteCount shl 1);
-    Inc(ASelEnd, AByteCount shl 1);
     Inc(I, AByteCount);
   end;
+end;
+
+function TAddrHightLightPainter.GetBounds(AIndex: Integer): TLeftRightBounds;
+var
+  AByteCount, ASelStart, ASelEnd: Integer;
+begin
+  AByteCount := IfThen(AddressMode = am32bit, 8, 16);
+  ASelStart := AByteCount * AIndex;
+  ASelEnd := AByteCount * (AIndex + 1) - 2;
+  Result.LeftOffset := TextMetric.CharLength(ctOpcode, 0, ASelStart) - CharWidth;
+  Result.Width := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
+end;
+
+procedure TAddrHightLightPainter.GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
+  XPos, YPos: Int64);
+begin
+  inherited;
+
 end;
 
 function TAddrHightLightPainter.View: TFixedColumnView;
@@ -2102,7 +2121,9 @@ begin
 
   if FContext.EmptyRow(AMouseHitInfo.SelectPoint.RowIndex) or
     (AMouseHitInfo.SelectPoint.ValueOffset < 0) then
-    AMouseHitInfo.SelectPoint.Column := ctNone;
+    AMouseHitInfo.SelectPoint.Column := ctNone
+  else
+    AMouseHitInfo.Cursor := crHandPoint;
 end;
 
 function TRegisterPainter.GetTextMetricClass: TAbstractTextMetricClass;
@@ -2329,7 +2350,7 @@ var
   RegID: Integer;
 begin
   if Context = nil then Exit;
-  HitInfo := GetHitInfo(MousePos.X, MousePos.Y);
+  HitInfo := GetHitInfo(MousePos.X, MousePos.Y, []);
   if (HitInfo.SelectPoint.ValueOffset >= 0) and
     not CheckSelected(HitInfo.SelectPoint) then
     UpdateSelection(HitInfo.SelectPoint, HitInfo.SelectPoint);
@@ -2502,14 +2523,5 @@ begin
   end;
 end;
 
-procedure TCustomRegView.UpdateCursor(const HitTest: TMouseHitInfo);
-begin
-  if HitTest.OnHeader or HitTest.OnSplitter or
-    (HitTest.SelectPoint.Column = ctNone) or
-    (HitTest.SelectPoint.RowIndex < 0) then
-    inherited
-  else
-    Cursor := crHandPoint;
-end;
-
 end.
+

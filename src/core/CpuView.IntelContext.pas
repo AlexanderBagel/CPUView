@@ -441,9 +441,15 @@ begin
     Add(Row, 18);         // SegGs
     Add(Map, 97);         // IF
     Row := Add(Map, 98);  // DF
+    {$IFDEF MSWINDOWS}
     Add(Row, 100);        // LastError
+    Add(Row, 175);        // LastError hint
+    {$ENDIF}
     Row := Add(Map, 99);  // OF
+    {$IFDEF MSWINDOWS}
     Add(Row, 101);        // LastStatus
+    Add(Row, 176);        // LastStatus hint
+    {$ENDIF}
 
     AddSeparator;
 

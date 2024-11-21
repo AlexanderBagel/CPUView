@@ -338,7 +338,12 @@ const
     (Key1: VK_RETURN; Shift1: []; Key2: VK_ADD; Shift2: []),
     (Key1: VK_BACK; Shift1: []; Key2: VK_SUBTRACT; Shift2: []),
     (Key1: VK_F7; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
+    {$IFDEF MSWINDOWS}
     (Key1: VK_F7; Shift1: [ssCtrl]; Key2: VK_UNKNOWN; Shift2: []),
+    {$ENDIF}
+    {$IFDEF LINUX}
+    (Key1: VK_F8; Shift1: [ssShift]; Key2: VK_UNKNOWN; Shift2: []),
+    {$ENDIF}
     (Key1: VK_F8; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_F2; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
     (Key1: VK_F4; Shift1: []; Key2: VK_UNKNOWN; Shift2: []),
