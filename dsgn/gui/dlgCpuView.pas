@@ -542,11 +542,8 @@ end;
 procedure TfrmCpuView.InternalShowInDump(AddrVA: Int64);
 begin
   Core.ShowDumpAtAddr(AddrVA);
-  ActiveDumpView.SelStart := AddrVA;
   if ActiveViewIndex = 0 then
-    ActiveDumpView.SelEnd := AddrVA + AsmView.SelectedRawLength - 1
-  else
-    ActiveDumpView.SelEnd := AddrVA + FDbgGate.PointerSize - 1;
+    ActiveDumpView.SelEnd := AddrVA + AsmView.SelectedRawLength - 1;
   ActiveControl := ActiveDumpView;
 end;
 

@@ -168,6 +168,8 @@ type
     procedure OnContextChange(Sender: TObject);
     procedure OnDebugerChage(Sender: TObject);
     procedure OnDebugerStateChange(Sender: TObject);
+    procedure OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
+      AJmpState: TJmpState; var Handled: Boolean);
     procedure OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
       AColumn: TColumnType; var AComment: string);
     procedure OnRegQueryExternalComment(Sender: TObject;
@@ -181,7 +183,7 @@ type
     function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
     procedure LoadFromCache(AIndex: Integer);
-    procedure OnQueryAddressType(Sender: TObject; AddrVA: UInt64; var AddrType: TDumpAddrType);
+    procedure OnQueryAddressType(Sender: TObject; AddrVA: UInt64; var AddrType: TAddrType);
     procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
     // Forced - означает принудительную перестройку вьювера
@@ -324,6 +326,7 @@ begin
   Data.Stream := TBufferedROStream.Create(RemoteStream, soOwned);
   Result := FItems.Add(Data);
   AValue.AddressMode := AddressMode;
+  AValue.OnJmpTo := FCore.OnJmpTo;
   AValue.OnQueryAddressType := FCore.OnQueryAddressType;
   AValue.FitColumnsToBestSize;
 end;
@@ -377,7 +380,9 @@ begin
   AStream.SetAddrWindow(RegData.BaseAddr, RegData.RegionSize);
   AView.SetDataStream(AStream, RegData.BaseAddr);
   AView.AddressMode := AddressMode;
-  AView.FocusOnAddress(AddrVA, ccmSelectRow);
+  AView.FocusOnAddress(AddrVA, ccmReset);
+  AView.SelStart := AddrVA;
+  AView.SelEnd := AddrVA + FCore.Debugger.PointerSize - 1;
   FItems.List[Index].LastAddrVA := AddrVA;
 end;
 
@@ -840,24 +845,39 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
+  AJmpState: TJmpState; var Handled: Boolean);
+var
+  AddrType: TAddrType;
+begin
+  if AJmpState <> jsPushToUndo then Exit;
+  AddrType := atNone;
+  OnQueryAddressType(Sender, AJmpAddr, AddrType);
+  case AddrType of
+    atExecute: ShowDisasmAtAddr(AJmpAddr);
+    atRead: ShowDumpAtAddr(AJmpAddr);
+    atStack: ShowStackAtAddr(AJmpAddr);
+  end;
+end;
+
 procedure TCpuViewCore.OnQueryAddressType(Sender: TObject; AddrVA: UInt64;
-  var AddrType: TDumpAddrType);
+  var AddrType: TAddrType);
 var
   ARegionData: TRegionData;
 begin
   if not FUtils.QueryRegion(AddrVA, ARegionData) then Exit;
   if (raExecute in ARegionData.Access) then
   begin
-    AddrType := datExecute;
+    AddrType := atExecute;
     Exit;
   end;
   if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
   begin
-    AddrType := datStack;
+    AddrType := atStack;
     Exit;
   end;
   if (raRead in ARegionData.Access) then
-    AddrType := datRead;
+    AddrType := atRead;
 end;
 
 procedure TCpuViewCore.OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
@@ -980,6 +1000,7 @@ begin
     FStackView := Value;
     if Value = nil then Exit;
     Value.FitColumnsToBestSize;
+    FStackView.OnJmpTo := OnJmpTo;
     FStackView.OnQueryComment := StackViewQueryComment;
     FStackView.OnQueryAddressType := OnQueryAddressType;
     RefreshView;

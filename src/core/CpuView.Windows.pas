@@ -838,9 +838,12 @@ begin
       if MBI.Protect and (PAGE_READONLY or PAGE_READWRITE) <> 0 then
         Include(RegionData.Access, raRead);
       if MBI.Protect and (
-        PAGE_READWRITE or PAGE_EXECUTE_READWRITE or
+        PAGE_EXECUTE_READWRITE or
         PAGE_WRITECOPY or PAGE_EXECUTE_WRITECOPY) <> 0 then
+      begin
+        Include(RegionData.Access, raRead);
         Include(RegionData.Access, raWrite);
+      end;
     end;
   end;
 end;

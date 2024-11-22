@@ -292,8 +292,8 @@ type
     property OnVerticalScroll;
   end;
 
-  TDumpAddrType = (datNone, datExecute, datRead, datStack);
-  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: UInt64; var AddrType: TDumpAddrType) of object;
+  TAddrType = (atNone, atExecute, atRead, atStack);
+  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: UInt64; var AddrType: TAddrType) of object;
 
   { TFixedColumnView }
 
@@ -302,7 +302,8 @@ type
     FOnQueryAddr: TOnQueryAddrType;
   protected
     procedure DoChange(ChangeCode: Integer); override;
-    procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TDumpAddrType);
+    function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
+    procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
     procedure InitPainters; override;
     procedure RestoreViewParam; override;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
@@ -316,8 +317,16 @@ type
   end;
 
   TAddrHightLightPainter = class(TRowHexPainter)
+  private
+    FCacheAddrType: TAddrType;
+    FCacheIndex, FCacheAddrIndex: Integer;
+    FCacheData: TBytes;
+    procedure CheckCache;
+    function GetAddrAtIndex(AIndex: Integer): UInt64;
+    function QueryAddrType(AIndex: Integer): TAddrType;
   protected
     procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
+    function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo): UInt64;
     function GetBounds(AIndex: Integer): TLeftRightBounds;
     procedure GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
       XPos, YPos: Int64); override;
@@ -391,6 +400,7 @@ type
     property OnEndDrag;
     property OnEnter;
     property OnExit;
+    property OnJmpTo;
     property OnKeyDown;
     property OnKeyPress;
     property OnKeyUp;
@@ -536,6 +546,7 @@ type
     property OnEndDrag;
     property OnEnter;
     property OnExit;
+    property OnJmpTo;
     property OnKeyDown;
     property OnKeyPress;
     property OnKeyUp;
@@ -1453,8 +1464,26 @@ begin
     FitColumnsToBestSize;
 end;
 
+function TFixedColumnView.DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean;
+var
+  Painter: TAbstractPrimaryRowPainter;
+  AddrVA: UInt64;
+  Handled: Boolean;
+begin
+  if not (ssCtrl in AHitInfo.Shift) then Exit;
+  if AHitInfo.Cursor <> crHandPoint then Exit;
+  Painter := GetRowPainter(MousePressedHitInfo.SelectPoint.RowIndex);
+  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
+  begin
+    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo);
+    Handled := False;
+    DoJmpTo(AddrVA, jsPushToUndo, Handled);
+    Result := True;
+  end;
+end;
+
 procedure TFixedColumnView.DoQueryAddrType(AddrVA: UInt64;
-  var AddrType: TDumpAddrType);
+  var AddrType: TAddrType);
 begin
   if Assigned(FOnQueryAddr) then
     FOnQueryAddr(Self, AddrVA, AddrType);
@@ -1475,42 +1504,67 @@ end;
 
 { TAddrHightLightPainter }
 
+procedure TAddrHightLightPainter.CheckCache;
+begin
+  if RowIndex = FCacheIndex then Exit;
+  GetRawBuff(RowIndex, FCacheData);
+  FCacheIndex := RowIndex;
+  FCacheAddrIndex := -1;
+end;
+
 procedure TAddrHightLightPainter.DrawHexPart(ACanvas: TCanvas;
   var ARect: TRect);
 var
-  Data: TBytes;
-  AddrVA: UInt64;
-  AddrType: TDumpAddrType;
-  I, Limit, AByteCount: Integer;
-  Bounds: TLeftRightBounds;
+  AddrType: TAddrType;
+  I: Integer;
+  ABounds: TLeftRightBounds;
 begin
   inherited;
   if ByteViewMode in [bvmFloat32..bvmText] then Exit;
-  GetRawBuff(RowIndex, Data);
-  AByteCount := IfThen(AddressMode = am32bit, 4, 8);
-  Limit := Length(Data) - 1;
-  I := 0;
-  while I < Limit do
+  CheckCache;
+  for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
   begin
-    if AddressMode = am32bit then
-      AddrVA := PCardinal(@Data[I])^
-    else
-      AddrVA := PUInt64(@Data[I])^;
-    AddrType := datNone;
-    View.DoQueryAddrType(AddrVA, AddrType);
+    AddrType := QueryAddrType(I);
     {$message 'Color'}
-    if AddrType <> datNone then
+    if AddrType <> atNone then
     begin
       case AddrType of
-        datExecute: ACanvas.Brush.Color := $CC33FF;
-        datRead: ACanvas.Brush.Color := $CC66;
-        datStack: ACanvas.Brush.Color := $2197FF;
+        atExecute: ACanvas.Brush.Color := $CC33FF;
+        atRead: ACanvas.Brush.Color := $CC66;
+        atStack: ACanvas.Brush.Color := $2197FF;
       end;
-      Bounds := GetBounds(I div AByteCount);
-      PatBlt(ACanvas, ARect.Left + Bounds.LeftOffset,
-        ARect.Bottom - 2, Bounds.Width, 2, PATCOPY);
+      ABounds := GetBounds(I);
+      PatBlt(ACanvas, ARect.Left + ABounds.LeftOffset,
+        ARect.Bottom - 2, ABounds.Width, 2, PATCOPY);
     end;
-    Inc(I, AByteCount);
+  end;
+end;
+
+function TAddrHightLightPainter.GetAddrAtIndex(AIndex: Integer): UInt64;
+begin
+  CheckCache;
+  if AddressMode = am32bit then
+    Result := PCardinal(@FCacheData[AIndex shl 2])^
+  else
+    Result := PUInt64(@FCacheData[AIndex shl 3])^;
+end;
+
+function TAddrHightLightPainter.GetAddressAtCursor(
+  const AMouseHitInfo: TMouseHitInfo): UInt64;
+var
+  I, L: Integer;
+  ABounds: TLeftRightBounds;
+begin
+  Result := 0;
+  if AMouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  CheckCache;
+  for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
+  begin
+    ABounds := GetBounds(I);
+    L := AMouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+    if L > AMouseHitInfo.XPos then Exit;
+    if L + ABounds.Width > AMouseHitInfo.XPos then
+      Exit(GetAddrAtIndex(I));
   end;
 end;
 
@@ -1527,9 +1581,34 @@ end;
 
 procedure TAddrHightLightPainter.GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
   XPos, YPos: Int64);
+var
+  AddrType: TAddrType;
+  I, L: Integer;
+  ABounds: TLeftRightBounds;
 begin
   inherited;
+  if AMouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  if not (ssCtrl in AMouseHitInfo.Shift) then Exit;
+  CheckCache;
+  for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
+  begin
+    ABounds := GetBounds(I);
+    L := AMouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+    if L > XPos then Exit;
+    if (L + ABounds.Width > XPos) and (QueryAddrType(I) <> atNone) then
+      AMouseHitInfo.Cursor := crHandPoint;
+  end;
+end;
 
+function TAddrHightLightPainter.QueryAddrType(AIndex: Integer): TAddrType;
+begin
+  if FCacheAddrIndex <> AIndex then
+  begin
+    FCacheAddrIndex := AIndex;
+    FCacheAddrType := atNone;
+    View.DoQueryAddrType(GetAddrAtIndex(AIndex), FCacheAddrType);
+  end;
+  Result := FCacheAddrType
 end;
 
 function TAddrHightLightPainter.View: TFixedColumnView;
