@@ -302,6 +302,7 @@ type
     FOnQueryAddr: TOnQueryAddrType;
   protected
     procedure DoChange(ChangeCode: Integer); override;
+    procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
     function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
     procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
     procedure InitPainters; override;
@@ -326,10 +327,10 @@ type
     function QueryAddrType(AIndex: Integer): TAddrType;
   protected
     procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
-    function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo): UInt64;
+    function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo;
+      var AddrIndex: Integer): UInt64;
     function GetBounds(AIndex: Integer): TLeftRightBounds;
-    procedure GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
-      XPos, YPos: Int64); override;
+    procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
     function View: TFixedColumnView;
   end;
 
@@ -400,6 +401,7 @@ type
     property OnEndDrag;
     property OnEnter;
     property OnExit;
+    property OnHint;
     property OnJmpTo;
     property OnKeyDown;
     property OnKeyPress;
@@ -546,6 +548,7 @@ type
     property OnEndDrag;
     property OnEnter;
     property OnExit;
+    property OnHint;
     property OnJmpTo;
     property OnKeyDown;
     property OnKeyPress;
@@ -586,8 +589,7 @@ type
     procedure CopyRowAsString(Builder: TSimplyStringBuilder); override;
     procedure DrawColumn(ACanvas: TCanvas; AColumn: TColumnType;
       var ARect: TRect); override;
-    procedure GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
-      XPos, YPos: Int64); override;
+    procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
     function GetTextMetricClass: TAbstractTextMetricClass; override;
     function Owner: TCustomRegView;
   end;
@@ -1464,18 +1466,44 @@ begin
     FitColumnsToBestSize;
 end;
 
+procedure TFixedColumnView.DoGetHint(var AHintParam: THintParam;
+  var AHint: string);
+var
+  Painter: TAbstractPrimaryRowPainter;
+  AddrIndex: Integer;
+  ABounds: TLeftRightBounds;
+begin
+  if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  Painter := GetRowPainter(MousePressedHitInfo.SelectPoint.RowIndex);
+  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
+  begin
+    AHintParam.AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(
+      AHintParam.HitInfo, AddrIndex);
+    if (AddrIndex >= 0) and (AHintParam.AddrVA <> 0) then
+    begin
+      ABounds := TAddrHightLightPainter(Painter).GetBounds(AddrIndex);
+      AHintParam.CursorRect.Left :=
+        AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+      AHintParam.CursorRect.Width := ABounds.Width;
+      inherited;
+    end;
+  end;
+end;
+
 function TFixedColumnView.DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean;
 var
   Painter: TAbstractPrimaryRowPainter;
   AddrVA: UInt64;
   Handled: Boolean;
+  AddrIndex: Integer;
 begin
   if not (ssCtrl in AHitInfo.Shift) then Exit;
+  if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if AHitInfo.Cursor <> crHandPoint then Exit;
-  Painter := GetRowPainter(MousePressedHitInfo.SelectPoint.RowIndex);
+  Painter := GetRowPainter(AHitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
   begin
-    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo);
+    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex);
     Handled := False;
     DoJmpTo(AddrVA, jsPushToUndo, Handled);
     Result := True;
@@ -1550,21 +1578,25 @@ begin
 end;
 
 function TAddrHightLightPainter.GetAddressAtCursor(
-  const AMouseHitInfo: TMouseHitInfo): UInt64;
+  const AMouseHitInfo: TMouseHitInfo; var AddrIndex: Integer): UInt64;
 var
   I, L: Integer;
   ABounds: TLeftRightBounds;
 begin
   Result := 0;
+  AddrIndex := -1;
   if AMouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   CheckCache;
   for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
   begin
     ABounds := GetBounds(I);
     L := AMouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
-    if L > AMouseHitInfo.XPos then Exit;
-    if L + ABounds.Width > AMouseHitInfo.XPos then
-      Exit(GetAddrAtIndex(I));
+    if L > AMouseHitInfo.ScrolledCursorPos.X then Exit;
+    if L + ABounds.Width > AMouseHitInfo.ScrolledCursorPos.X then
+    begin
+      AddrIndex := I;
+      Exit(GetAddrAtIndex(AddrIndex));
+    end;
   end;
 end;
 
@@ -1579,24 +1611,22 @@ begin
   Result.Width := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
 end;
 
-procedure TAddrHightLightPainter.GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
-  XPos, YPos: Int64);
+procedure TAddrHightLightPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
 var
-  AddrType: TAddrType;
   I, L: Integer;
   ABounds: TLeftRightBounds;
 begin
   inherited;
-  if AMouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
-  if not (ssCtrl in AMouseHitInfo.Shift) then Exit;
+  if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  if not (ssCtrl in AHitInfo.Shift) then Exit;
   CheckCache;
   for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
   begin
     ABounds := GetBounds(I);
-    L := AMouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
-    if L > XPos then Exit;
-    if (L + ABounds.Width > XPos) and (QueryAddrType(I) <> atNone) then
-      AMouseHitInfo.Cursor := crHandPoint;
+    L := AHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+    if L > AHitInfo.ScrolledCursorPos.X then Exit;
+    if (L + ABounds.Width > AHitInfo.ScrolledCursorPos.X) and (QueryAddrType(I) <> atNone) then
+      AHitInfo.Cursor := crHandPoint;
   end;
 end;
 
@@ -2165,12 +2195,11 @@ begin
   end;
 end;
 
-procedure TRegisterPainter.GetHitInfo(var AMouseHitInfo: TMouseHitInfo;
-  XPos, YPos: Int64);
+procedure TRegisterPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
 
   function GlyphLen(Index: Integer): Integer;
   begin
-    Result := TextMetric.SelectionLength(AMouseHitInfo.SelectPoint.Column, 0, Index - 1);
+    Result := TextMetric.SelectionLength(AHitInfo.SelectPoint.Column, 0, Index - 1);
   end;
 
 var
@@ -2180,29 +2209,30 @@ begin
   // контекста может еще не быть, а вот GetHitInfo уже может прийти!
   // The context may not be there yet, but GetHitInfo may already be called!
   if FContext = nil then Exit;
-  LeftOffset := AMouseHitInfo.ColumnStart;
+  LeftOffset := AHitInfo.ColumnStart;
   Inc(LeftOffset, TextMargin);
 
-  AMouseHitInfo.SelectPoint.ValueOffset := -1;
-  RegCount := FContext.RegCount(AMouseHitInfo.SelectPoint.RowIndex);
+  AHitInfo.SelectPoint.ValueOffset := -1;
+  RegCount := FContext.RegCount(AHitInfo.SelectPoint.RowIndex);
   for I := 0 to RegCount - 1 do
   begin
-    Info := FContext.RegInfo(AMouseHitInfo.SelectPoint.RowIndex, I);
+    Info := FContext.RegInfo(AHitInfo.SelectPoint.RowIndex, I);
     FieldLength := GlyphLen(Info.RegNameSize + Info.ValueSize);
-    if (XPos >= LeftOffset) and (XPos < LeftOffset + FieldLength) then
+    if (AHitInfo.ScrolledCursorPos.X >= LeftOffset) and
+      (AHitInfo.ScrolledCursorPos.X < LeftOffset + FieldLength) then
     begin
-      AMouseHitInfo.SelectPoint.ValueOffset := I;
-      AMouseHitInfo.SelectPoint.CharIndex := I;
+      AHitInfo.SelectPoint.ValueOffset := I;
+      AHitInfo.SelectPoint.CharIndex := I;
       Break;
     end;
     Inc(LeftOffset, FieldLength + GlyphLen(Info.ValueSeparatorSize));
   end;
 
-  if FContext.EmptyRow(AMouseHitInfo.SelectPoint.RowIndex) or
-    (AMouseHitInfo.SelectPoint.ValueOffset < 0) then
-    AMouseHitInfo.SelectPoint.Column := ctNone
+  if FContext.EmptyRow(AHitInfo.SelectPoint.RowIndex) or
+    (AHitInfo.SelectPoint.ValueOffset < 0) then
+    AHitInfo.SelectPoint.Column := ctNone
   else
-    AMouseHitInfo.Cursor := crHandPoint;
+    AHitInfo.Cursor := crHandPoint;
 end;
 
 function TRegisterPainter.GetTextMetricClass: TAbstractTextMetricClass;
@@ -2429,7 +2459,7 @@ var
   RegID: Integer;
 begin
   if Context = nil then Exit;
-  HitInfo := GetHitInfo(MousePos.X, MousePos.Y, []);
+  HitInfo := GetHitInfo(MousePos.X, MousePos.Y, SavedShift);
   if (HitInfo.SelectPoint.ValueOffset >= 0) and
     not CheckSelected(HitInfo.SelectPoint) then
     UpdateSelection(HitInfo.SelectPoint, HitInfo.SelectPoint);

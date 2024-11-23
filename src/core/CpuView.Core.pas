@@ -168,6 +168,8 @@ type
     procedure OnContextChange(Sender: TObject);
     procedure OnDebugerChage(Sender: TObject);
     procedure OnDebugerStateChange(Sender: TObject);
+    procedure OnGetHint(Sender: TObject; const Param: THintParam;
+      var Hint: string);
     procedure OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
       AJmpState: TJmpState; var Handled: Boolean);
     procedure OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
@@ -326,6 +328,7 @@ begin
   Data.Stream := TBufferedROStream.Create(RemoteStream, soOwned);
   Result := FItems.Add(Data);
   AValue.AddressMode := AddressMode;
+  AValue.OnHint := FCore.OnGetHint;
   AValue.OnJmpTo := FCore.OnJmpTo;
   AValue.OnQueryAddressType := FCore.OnQueryAddressType;
   AValue.FitColumnsToBestSize;
@@ -845,6 +848,13 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
+  var Hint: string);
+begin
+  if Param.AddrVA <> 0 then
+    Hint := IntToHex(Param.AddrVA);
+end;
+
 procedure TCpuViewCore.OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
   AJmpState: TJmpState; var Handled: Boolean);
 var
@@ -1000,6 +1010,7 @@ begin
     FStackView := Value;
     if Value = nil then Exit;
     Value.FitColumnsToBestSize;
+    FStackView.OnHint := OnGetHint;
     FStackView.OnJmpTo := OnJmpTo;
     FStackView.OnQueryComment := StackViewQueryComment;
     FStackView.OnQueryAddressType := OnQueryAddressType;
