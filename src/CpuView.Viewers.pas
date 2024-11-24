@@ -299,7 +299,9 @@ type
 
   TFixedColumnView = class(TFWCustomHexView)
   private
+    FShowAddInfo: Boolean;
     FOnQueryAddr: TOnQueryAddrType;
+    procedure SetShowAddInfo(const Value: Boolean);
   protected
     procedure DoChange(ChangeCode: Integer); override;
     procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
@@ -307,6 +309,7 @@ type
     procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
     procedure InitPainters; override;
     procedure RestoreViewParam; override;
+    property ShowAddInfo: Boolean read FShowAddInfo write SetShowAddInfo default False;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
   published
     property Font;
@@ -386,6 +389,7 @@ type
     property ParentShowHint;
     property PopupMenu;
     property SeparateGroupByColor;
+    property ShowAddInfo;
     property ShowHint;
     property TabOrder;
     property TabStop;
@@ -533,6 +537,7 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
+    property ShowAddInfo;
     property ShowHint;
     property TabOrder;
     property TabStop;
@@ -1473,6 +1478,7 @@ var
   AddrIndex: Integer;
   ABounds: TLeftRightBounds;
 begin
+  if not ShowAddInfo then Exit;
   if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
   Painter := GetRowPainter(MousePressedHitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
@@ -1497,6 +1503,7 @@ var
   Handled: Boolean;
   AddrIndex: Integer;
 begin
+  if not ShowAddInfo then Exit;
   if not (ssCtrl in AHitInfo.Shift) then Exit;
   if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if AHitInfo.Cursor <> crHandPoint then Exit;
@@ -1530,6 +1537,15 @@ begin
   // columns are recalculated automatically
 end;
 
+procedure TFixedColumnView.SetShowAddInfo(const Value: Boolean);
+begin
+  if ShowAddInfo <> Value then
+  begin
+    FShowAddInfo := Value;
+    Invalidate;
+  end;
+end;
+
 { TAddrHightLightPainter }
 
 procedure TAddrHightLightPainter.CheckCache;
@@ -1548,6 +1564,7 @@ var
   ABounds: TLeftRightBounds;
 begin
   inherited;
+  if not View.ShowAddInfo then Exit;
   if ByteViewMode in [bvmFloat32..bvmText] then Exit;
   CheckCache;
   for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
@@ -1617,6 +1634,7 @@ var
   ABounds: TLeftRightBounds;
 begin
   inherited;
+  if not View.ShowAddInfo then Exit;
   if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if not (ssCtrl in AHitInfo.Shift) then Exit;
   CheckCache;
