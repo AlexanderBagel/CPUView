@@ -33,13 +33,14 @@ interface
 
 {$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
 {$message 'Connect all 10 bookmarks on AsmView'}
-{$message 'Analyze dump with address validation. Underscore the found addresses and add them hint'}
 {$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
 {$message 'The x87/SIMD registers are not editable'}
 {$message 'View for Call param'}
 {$message 'Highlighting of identical selected values in the dump window'}
 {$message 'Run to user code'}
-{$message 'Display strings in hint'}
+{$message 'Display strings in hint with disassembly for executable AddrVA'}
+{$message 'Add TAddrHighlighView as base class for Stack/Dump view'}
+{$message 'Add settings for address validation, colors and hint.'}
 
 uses
   {$IFDEF FPC}
@@ -183,6 +184,7 @@ type
   protected
     procedure BuildAsmWindow(AAddress: Int64);
     function CacheVisibleRows: Integer;
+    function FormatAccessString(const ARegionData: TRegionData): string;
     function GenerateCache(AAddress: Int64): Integer;
     procedure LoadFromCache(AIndex: Integer);
     procedure OnQueryAddressType(Sender: TObject; AddrVA: UInt64; var AddrType: TAddrType);
@@ -204,6 +206,7 @@ type
     function AddrInAsm(AddrVA: Int64): Boolean;
     function AddrInDump(AddrVA: Int64): Boolean;
     function AddrInStack(AddrVA: Int64): Boolean;
+    function QueryAccessStr(AddrVA: UInt64): string;
     function QuerySymbolAtAddr(AddrVA: UInt64): string;
     procedure ShowDisasmAtAddr(AddrVA: Int64);
     procedure ShowDumpAtAddr(AddrVA: Int64);
@@ -331,6 +334,7 @@ begin
   AValue.OnHint := FCore.OnGetHint;
   AValue.OnJmpTo := FCore.OnJmpTo;
   AValue.OnQueryAddressType := FCore.OnQueryAddressType;
+  AValue.ShowHint := True;
   AValue.FitColumnsToBestSize;
 end;
 
@@ -399,6 +403,15 @@ begin
   Result := (AddrVA <= StackLim.Base) and (AddrVA >= StackLim.Limit);
 end;
 
+function TCpuViewCore.QueryAccessStr(AddrVA: UInt64): string;
+var
+  RegionData: TRegionData;
+begin
+  Result := 'No access';
+  if FUtils.QueryRegion(AddrVA, RegionData) then
+    Result := FormatAccessString(RegionData);
+end;
+
 function TCpuViewCore.QuerySymbolAtAddr(AddrVA: UInt64): string;
 begin
   Result := '';
@@ -457,6 +470,22 @@ begin
     Result := AsmView.VisibleRowCount shl 1
   else
     Result := 0;
+end;
+
+function TCpuViewCore.FormatAccessString(const ARegionData: TRegionData
+  ): string;
+begin
+  Result := 'No access';
+  if (ARegionData.Access <> []) and not (raProtect in ARegionData.Access) then
+  begin
+    Result := '...';
+    if raRead in ARegionData.Access then
+      Result[1] := 'R';
+    if raWrite in ARegionData.Access then
+      Result[2] := 'W';
+    if raExecute in ARegionData.Access then
+      Result[3] := 'E';
+  end;
 end;
 
 constructor TCpuViewCore.Create(ADebuggerClass: TAbstractDebuggerClass);
@@ -850,9 +879,16 @@ end;
 
 procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
   var Hint: string);
+var
+  AccessStr, Symbol: string;
 begin
   if Param.AddrVA <> 0 then
-    Hint := IntToHex(Param.AddrVA);
+  begin
+    AccessStr := QueryAccessStr(Param.AddrVA);
+    Symbol := QuerySymbolAtAddr(Param.AddrVA);
+    Hint := Format('Addr:  0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]) +
+      sLineBreak + 'Press Ctrl+Click to jump to an address.';
+  end;
 end;
 
 procedure TCpuViewCore.OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
@@ -875,6 +911,7 @@ procedure TCpuViewCore.OnQueryAddressType(Sender: TObject; AddrVA: UInt64;
 var
   ARegionData: TRegionData;
 begin
+  AddrType := atNone;
   if not FUtils.QueryRegion(AddrVA, ARegionData) then Exit;
   if (raExecute in ARegionData.Access) then
   begin
@@ -1014,6 +1051,7 @@ begin
     FStackView.OnJmpTo := OnJmpTo;
     FStackView.OnQueryComment := StackViewQueryComment;
     FStackView.OnQueryAddressType := OnQueryAddressType;
+    FStackView.ShowHint := True;
     RefreshView;
   end;
 end;

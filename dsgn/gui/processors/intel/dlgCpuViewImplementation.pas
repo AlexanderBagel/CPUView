@@ -202,7 +202,7 @@ begin
         HintParam.MemSize := DbgGate.PointerSize;
       end;
       HintParam.AddrVA := Expression.Value;
-      ValueAccess := QweryAccessStr(HintParam.AddrVA);
+      ValueAccess := Core.QueryAccessStr(HintParam.AddrVA);
       Symbol := Core.QuerySymbolAtAddr(HintParam.AddrVA);
       if Symbol <> '' then
         Symbol := ' ' + Symbol;
@@ -211,7 +211,7 @@ begin
       if Expression.MemSize > 0 then
       begin
         MemSymbol := Core.QuerySymbolAtAddr(Expression.MemValue);
-        MemValueAccess := QweryAccessStr(Expression.MemValue);
+        MemValueAccess := Core.QueryAccessStr(Expression.MemValue);
         ExecuteResult := Format('%s = [%x (%s)%s] -> %x (%s) %s',
           [Expression.Data, Expression.Value, ValueAccess, Symbol,
           Expression.MemValue, MemValueAccess, MemSymbol]);

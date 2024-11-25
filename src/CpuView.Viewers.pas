@@ -309,8 +309,10 @@ type
     procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
     procedure InitPainters; override;
     procedure RestoreViewParam; override;
-    property ShowAddInfo: Boolean read FShowAddInfo write SetShowAddInfo default False;
+    property ShowAddInfo: Boolean read FShowAddInfo write SetShowAddInfo default True;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
+  public
+    constructor Create(AOwner: TComponent); override;
   published
     property Font;
     property PopupMenu;
@@ -1475,18 +1477,21 @@ procedure TFixedColumnView.DoGetHint(var AHintParam: THintParam;
   var AHint: string);
 var
   Painter: TAbstractPrimaryRowPainter;
+  AddrType: TAddrType;
   AddrIndex: Integer;
   ABounds: TLeftRightBounds;
 begin
   if not ShowAddInfo then Exit;
   if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
-  Painter := GetRowPainter(MousePressedHitInfo.SelectPoint.RowIndex);
+  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
   begin
     AHintParam.AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(
-      AHintParam.HitInfo, AddrIndex);
+      AHintParam.HitInfo, AddrIndex{%H-});
     if (AddrIndex >= 0) and (AHintParam.AddrVA <> 0) then
     begin
+      DoQueryAddrType(AHintParam.AddrVA, AddrType{%H-});
+      if AddrType = atNone then Exit;
       ABounds := TAddrHightLightPainter(Painter).GetBounds(AddrIndex);
       AHintParam.CursorRect.Left :=
         AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
@@ -1510,7 +1515,7 @@ begin
   Painter := GetRowPainter(AHitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
   begin
-    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex);
+    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex{%H-});
     Handled := False;
     DoJmpTo(AddrVA, jsPushToUndo, Handled);
     Result := True;
@@ -1535,6 +1540,12 @@ begin
   // колонки пересчитываются автоматически
 
   // columns are recalculated automatically
+end;
+
+constructor TFixedColumnView.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FShowAddInfo := True;
 end;
 
 procedure TFixedColumnView.SetShowAddInfo(const Value: Boolean);

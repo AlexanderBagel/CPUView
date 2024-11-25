@@ -355,7 +355,6 @@ type
     function ToDefaultDpi(Value: Integer): Integer;
     procedure LockZOrder;
     function MeasureCanvas: TBitmap;
-    function QweryAccessStr(AddrVA: UInt64): string;
     procedure UnlockZOrder;
     procedure UpdateStatusBar;
   public
@@ -560,7 +559,7 @@ begin
   StatusBar.Panels[0].Text := Format('Pid: %d, Tid: %d, State: %s',
     [DbgGate.ProcessID, DbgGate.ThreadID, DbgStates[DbgGate.DebugState]]);
   AddrVA := ActiveViewerSelectedValue;
-  AccessStr := QweryAccessStr(AddrVA);
+  AccessStr := FCore.QueryAccessStr(AddrVA);
   Symbol := FCore.QuerySymbolAtAddr(AddrVA);
   StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s) %s', [AddrVA, AccessStr, Symbol]);
   AMeasureCanvas := MeasureCanvas;
@@ -720,26 +719,6 @@ begin
   Result := TBitmap.Create;
   Result.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
   Result.Canvas.Font := Font;
-end;
-
-function TfrmCpuView.QweryAccessStr(AddrVA: UInt64): string;
-var
-  RegionData: TRegionData;
-begin
-  Result := 'No access';
-  if DbgGate.Utils.QueryRegion(AddrVA, RegionData) then
-  begin
-    if (RegionData.Access <> []) and not (raProtect in RegionData.Access) then
-    begin
-      Result := '...';
-      if raRead in RegionData.Access then
-        Result[1] := 'R';
-      if raWrite in RegionData.Access then
-        Result[2] := 'W';
-      if raExecute in RegionData.Access then
-        Result[3] := 'E';
-    end;
-  end;
 end;
 
 procedure TfrmCpuView.UnlockZOrder;
