@@ -298,21 +298,10 @@ type
   { TFixedColumnView }
 
   TFixedColumnView = class(TFWCustomHexView)
-  private
-    FShowAddInfo: Boolean;
-    FOnQueryAddr: TOnQueryAddrType;
-    procedure SetShowAddInfo(const Value: Boolean);
   protected
     procedure DoChange(ChangeCode: Integer); override;
-    procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
-    function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
-    procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
     procedure InitPainters; override;
     procedure RestoreViewParam; override;
-    property ShowAddInfo: Boolean read FShowAddInfo write SetShowAddInfo default True;
-    property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
-  public
-    constructor Create(AOwner: TComponent); override;
   published
     property Font;
     property PopupMenu;
@@ -321,6 +310,10 @@ type
   TLeftRightBounds = record
     LeftOffset, Width: Integer;
   end;
+
+  TAddrHightLightView = class;
+
+  { TAddrHightLightPainter }
 
   TAddrHightLightPainter = class(TRowHexPainter)
   private
@@ -336,7 +329,25 @@ type
       var AddrIndex: Integer): UInt64;
     function GetBounds(AIndex: Integer): TLeftRightBounds;
     procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
-    function View: TFixedColumnView;
+    function View: TAddrHightLightView;
+  end;
+
+  { TAddrHightLightView }
+
+  TAddrHightLightView = class(TFixedColumnView)
+  private
+    FLastInvalidAddrRect: TRect;
+    FValidateAddress: Boolean;
+    FOnQueryAddr: TOnQueryAddrType;
+    procedure SetValidateAddress(AValue: Boolean);
+  protected
+    procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
+    function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
+    procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
+    property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
+    property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
+  public
+    constructor Create(AOwner: TComponent); override;
   end;
 
   { TDumpPainter }
@@ -351,7 +362,7 @@ type
 
   { TCustomDumpView }
 
-  TCustomDumpView = class(TFixedColumnView)
+  TCustomDumpView = class(TAddrHightLightView)
   protected
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
     procedure InitDefault; override;
@@ -391,10 +402,10 @@ type
     property ParentShowHint;
     property PopupMenu;
     property SeparateGroupByColor;
-    property ShowAddInfo;
     property ShowHint;
     property TabOrder;
     property TabStop;
+    property ValidateAddress;
     property Visible;
     property WheelMultiplyer;
     property OnClick;
@@ -484,7 +495,7 @@ type
 
   { TCustomStackView }
 
-  TCustomStackView = class(TFixedColumnView)
+  TCustomStackView = class(TAddrHightLightView)
   strict private
     FFrames: TListEx<TStackFrame>;
     FAddrPCDict: TDictionary<Int64, UInt64>;
@@ -539,10 +550,10 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
-    property ShowAddInfo;
     property ShowHint;
     property TabOrder;
     property TabStop;
+    property ValidateAddress;
     property Visible;
     property WheelMultiplyer;
     property OnClick;
@@ -1473,62 +1484,6 @@ begin
     FitColumnsToBestSize;
 end;
 
-procedure TFixedColumnView.DoGetHint(var AHintParam: THintParam;
-  var AHint: string);
-var
-  Painter: TAbstractPrimaryRowPainter;
-  AddrType: TAddrType;
-  AddrIndex: Integer;
-  ABounds: TLeftRightBounds;
-begin
-  if not ShowAddInfo then Exit;
-  if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
-  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
-  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
-  begin
-    AHintParam.AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(
-      AHintParam.HitInfo, AddrIndex{%H-});
-    if (AddrIndex >= 0) and (AHintParam.AddrVA <> 0) then
-    begin
-      DoQueryAddrType(AHintParam.AddrVA, AddrType{%H-});
-      if AddrType = atNone then Exit;
-      ABounds := TAddrHightLightPainter(Painter).GetBounds(AddrIndex);
-      AHintParam.CursorRect.Left :=
-        AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
-      AHintParam.CursorRect.Width := ABounds.Width;
-      inherited;
-    end;
-  end;
-end;
-
-function TFixedColumnView.DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean;
-var
-  Painter: TAbstractPrimaryRowPainter;
-  AddrVA: UInt64;
-  Handled: Boolean;
-  AddrIndex: Integer;
-begin
-  if not ShowAddInfo then Exit;
-  if not (ssCtrl in AHitInfo.Shift) then Exit;
-  if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
-  if AHitInfo.Cursor <> crHandPoint then Exit;
-  Painter := GetRowPainter(AHitInfo.SelectPoint.RowIndex);
-  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
-  begin
-    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex{%H-});
-    Handled := False;
-    DoJmpTo(AddrVA, jsPushToUndo, Handled);
-    Result := True;
-  end;
-end;
-
-procedure TFixedColumnView.DoQueryAddrType(AddrVA: UInt64;
-  var AddrType: TAddrType);
-begin
-  if Assigned(FOnQueryAddr) then
-    FOnQueryAddr(Self, AddrVA, AddrType);
-end;
-
 procedure TFixedColumnView.InitPainters;
 begin
   DefaultPainter := GetDefaultPainterClass.Create(Self);
@@ -1540,21 +1495,6 @@ begin
   // колонки пересчитываются автоматически
 
   // columns are recalculated automatically
-end;
-
-constructor TFixedColumnView.Create(AOwner: TComponent);
-begin
-  inherited Create(AOwner);
-  FShowAddInfo := True;
-end;
-
-procedure TFixedColumnView.SetShowAddInfo(const Value: Boolean);
-begin
-  if ShowAddInfo <> Value then
-  begin
-    FShowAddInfo := Value;
-    Invalidate;
-  end;
 end;
 
 { TAddrHightLightPainter }
@@ -1575,7 +1515,7 @@ var
   ABounds: TLeftRightBounds;
 begin
   inherited;
-  if not View.ShowAddInfo then Exit;
+  if not View.ValidateAddress then Exit;
   if ByteViewMode in [bvmFloat32..bvmText] then Exit;
   CheckCache;
   for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
@@ -1645,7 +1585,7 @@ var
   ABounds: TLeftRightBounds;
 begin
   inherited;
-  if not View.ShowAddInfo then Exit;
+  if not View.ValidateAddress then Exit;
   if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if not (ssCtrl in AHitInfo.Shift) then Exit;
   CheckCache;
@@ -1670,9 +1610,89 @@ begin
   Result := FCacheAddrType
 end;
 
-function TAddrHightLightPainter.View: TFixedColumnView;
+function TAddrHightLightPainter.View: TAddrHightLightView;
 begin
-  Result := TFixedColumnView(Owner);
+  Result := TAddrHightLightView(Owner);
+end;
+
+{ TAddrHightLightView }
+
+procedure TAddrHightLightView.SetValidateAddress(AValue: Boolean);
+begin
+  if ValidateAddress <> AValue then
+  begin
+    FValidateAddress := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TAddrHightLightView.DoGetHint(var AHintParam: THintParam;
+  var AHint: string);
+var
+  Painter: TAbstractPrimaryRowPainter;
+  AddrType: TAddrType;
+  AddrIndex: Integer;
+  ABounds: TLeftRightBounds;
+begin
+  if not ValidateAddress then Exit;
+  if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  if PtInRect(FLastInvalidAddrRect, AHintParam.HitInfo.CursorPos) then Exit;
+  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
+  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
+  begin
+    AHintParam.AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(
+      AHintParam.HitInfo, AddrIndex{%H-});
+    if (AddrIndex >= 0) and (AHintParam.AddrVA <> 0) then
+    begin
+      ABounds := TAddrHightLightPainter(Painter).GetBounds(AddrIndex);
+      AHintParam.CursorRect.Left :=
+        AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+      AHintParam.CursorRect.Width := ABounds.Width;
+      DoQueryAddrType(AHintParam.AddrVA, AddrType{%H-});
+      if AddrType = atNone then
+      begin
+        FLastInvalidAddrRect := AHintParam.CursorRect;
+        Exit;
+      end;
+      FLastInvalidAddrRect := TRect.Empty;
+      inherited;
+    end;
+  end;
+end;
+
+function TAddrHightLightView.DoLButtonDown(const AHitInfo: TMouseHitInfo
+  ): Boolean;
+var
+  Painter: TAbstractPrimaryRowPainter;
+  AddrVA: UInt64;
+  Handled: Boolean;
+  AddrIndex: Integer;
+begin
+  if not ValidateAddress then Exit;
+  if not (ssCtrl in AHitInfo.Shift) then Exit;
+  if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  if AHitInfo.Cursor <> crHandPoint then Exit;
+  Painter := GetRowPainter(AHitInfo.SelectPoint.RowIndex);
+  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
+  begin
+    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex{%H-});
+    Handled := False;
+    DoJmpTo(AddrVA, jsPushToUndo, Handled);
+    Result := True;
+  end;
+end;
+
+procedure TAddrHightLightView.DoQueryAddrType(AddrVA: UInt64;
+  var AddrType: TAddrType);
+begin
+  if Assigned(FOnQueryAddr) then
+    FOnQueryAddr(Self, AddrVA, AddrType);
+end;
+
+constructor TAddrHightLightView.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FValidateAddress := True;
 end;
 
 { TDumpPainter }

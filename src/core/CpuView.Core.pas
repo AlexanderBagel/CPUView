@@ -39,7 +39,6 @@ interface
 {$message 'Highlighting of identical selected values in the dump window'}
 {$message 'Run to user code'}
 {$message 'Display strings in hint with disassembly for executable AddrVA'}
-{$message 'Add TAddrHighlighView as base class for Stack/Dump view'}
 {$message 'Add settings for address validation, colors and hint.'}
 
 uses
