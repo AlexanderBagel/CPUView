@@ -41,14 +41,17 @@ type
     cbViewers: TCheckBox;
     cbDbgLog: TCheckBox;
     cbDbgCrash: TCheckBox;
+    cbAddrValidation: TCheckBox;
     FontDialog: TFontDialog;
     gbAsmView: TGroupBox;
     gbSessions: TGroupBox;
     lblFont: TLabel;
     procedure btnFontBrowseClick(Sender: TObject);
     procedure btnResetClick(Sender: TObject);
+    procedure cbSymbolsClick(Sender: TObject);
   private
     procedure UpdateCurrentFont(const AFontName: string);
+    procedure UpdateDebugSymbolsIndepended;
     procedure UpdateFrameControl;
   protected
     procedure DoReadSettings; override;
@@ -80,6 +83,11 @@ begin
   UpdateFrameControl;
 end;
 
+procedure TCpuViewMainOptionsFrame.cbSymbolsClick(Sender: TObject);
+begin
+  UpdateDebugSymbolsIndepended;
+end;
+
 procedure TCpuViewMainOptionsFrame.UpdateCurrentFont(const AFontName: string);
 var
   Index: Integer;
@@ -90,6 +98,12 @@ begin
   cbFont.ItemIndex := Index;
 end;
 
+procedure TCpuViewMainOptionsFrame.UpdateDebugSymbolsIndepended;
+begin
+  cbDisplayFuncName.Enabled := cbSymbols.Checked;
+  cbShowSourceLines.Enabled := cbSymbols.Checked;
+end;
+
 procedure TCpuViewMainOptionsFrame.UpdateFrameControl;
 begin
   UpdateCurrentFont(Settings.FontName);
@@ -97,10 +111,12 @@ begin
   cbShowOpcodes.Checked :=  Settings.ShowOpcodes;
   cbShowSourceLines.Checked := Settings.ShowSourceLines;
   cbSymbols.Checked := Settings.UseDebugInfo;
+  cbAddrValidation.Checked := Settings.ValidationAddrVA;
   cbForm.Checked := Settings.SaveFormSession;
   cbViewers.Checked := Settings.SaveViewersSession;
   cbDbgLog.Checked := Settings.UseDebugLog;
   cbDbgCrash.Checked := Settings.UseCrashDump;
+  UpdateDebugSymbolsIndepended;
 end;
 
 procedure TCpuViewMainOptionsFrame.DoReadSettings;
@@ -114,6 +130,7 @@ begin
   Settings.ShowCallFuncName := cbDisplayFuncName.Checked;
   Settings.ShowOpcodes := cbShowOpcodes.Checked;
   Settings.ShowSourceLines := cbShowSourceLines.Checked;
+  Settings.ValidationAddrVA := cbAddrValidation.Checked;
   Settings.UseDebugInfo := cbSymbols.Checked;
   Settings.SaveFormSession := cbForm.Checked;
   Settings.SaveViewersSession := cbViewers.Checked;

@@ -1,7 +1,7 @@
 inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
-  Height = 428
-  ClientHeight = 428
-  Constraints.MinHeight = 428
+  Height = 456
+  ClientHeight = 456
+  Constraints.MinHeight = 456
   DesignLeft = 492
   DesignTop = 232
   object cbFont: TComboBox[0]
@@ -33,18 +33,18 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbAsmView: TGroupBox[3]
     Left = 10
-    Height = 168
+    Height = 200
     Top = 56
     Width = 749
     Anchors = [akTop, akLeft, akRight]
-    Caption = 'Display disassembly line parts:'
-    ClientHeight = 138
+    Caption = 'Display viewer parts:'
+    ClientHeight = 170
     ClientWidth = 745
     TabOrder = 2
     object cbDisplayFuncName: TCheckBox
-      Left = 10
+      Left = 32
       Height = 29
-      Top = 10
+      Top = 104
       Width = 301
       Caption = 'Function name instead call address'
       TabOrder = 0
@@ -52,13 +52,13 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     object cbShowOpcodes: TCheckBox
       Left = 10
       Height = 29
-      Top = 40
+      Top = 8
       Width = 183
       Caption = 'Instruction opcodes'
       TabOrder = 1
     end
     object cbShowSourceLines: TCheckBox
-      Left = 10
+      Left = 32
       Height = 29
       Top = 72
       Width = 119
@@ -68,26 +68,35 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     object cbSymbols: TCheckBox
       Left = 10
       Height = 29
-      Top = 104
+      Top = 40
       Width = 151
       Caption = 'Debug symbols'
       TabOrder = 3
+      OnClick = cbSymbolsClick
+    end
+    object cbAddrValidation: TCheckBox
+      Left = 10
+      Height = 29
+      Top = 136
+      Width = 347
+      Caption = 'Color highlighting of available addresses'
+      TabOrder = 4
     end
   end
   object gbSessions: TGroupBox[4]
     Left = 10
-    Height = 102
-    Top = 240
+    Height = 104
+    Top = 264
     Width = 749
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Session settings:'
-    ClientHeight = 72
+    ClientHeight = 74
     ClientWidth = 745
     TabOrder = 3
     object cbForm: TCheckBox
       Left = 10
       Height = 29
-      Top = 10
+      Top = 8
       Width = 274
       Caption = 'Save form and viewers position'
       TabOrder = 0
@@ -102,25 +111,25 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     end
   end
   object cbDbgLog: TCheckBox[5]
-    Left = 21
+    Left = 10
     Height = 29
-    Top = 351
+    Top = 376
     Width = 213
     Caption = '(DEBUG) Use debug log'
     TabOrder = 4
   end
   object cbDbgCrash: TCheckBox[6]
-    Left = 21
+    Left = 10
     Height = 29
-    Top = 383
+    Top = 408
     Width = 265
     Caption = '(DEBUG) Generate crash dump'
     TabOrder = 5
   end
   object btnReset: TButton[7]
-    Left = 594
+    Left = 592
     Height = 38
-    Top = 351
+    Top = 376
     Width = 164
     Anchors = [akTop, akRight]
     Caption = 'Reset to Default'

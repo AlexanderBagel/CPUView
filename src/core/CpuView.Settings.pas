@@ -159,6 +159,9 @@ const
   xmlEncoder = 'encoder';
   xmlEncoderName = 'name';
   xmlEncoderCP = 'cp';
+  xmlAddrValidateE = 'addrExec';
+  xmlAddrValidateR = 'addrRead';
+  xmlAddrValidateS = 'addrStack';
 
   // not used
   xmlContext = 'ctx';
@@ -232,6 +235,7 @@ type
     FUseDebugInfo: Boolean;
     FUseDebugLog: Boolean;
     FUseCrashDump: Boolean;
+    FValidationAddrVA: Boolean;
     function GetColor(const Index: string): TColor;
     procedure SetColor(const Index: string; Value: TColor);
     function GetShotCut(Index: TShortCutType): TCpuViewShortCut;
@@ -240,6 +244,7 @@ type
     function DpiToDouble(AValue: Integer; AView: TFWCustomHexView): Double;
     function DoubleToDpi(AValue: Double; AView: TFWCustomHexView): Integer;
 
+    procedure LoadFromAddrHightLightColorMap(Value: TAddrHightLightColorMap);
     procedure LoadFromAsmColorMap(Value: TAsmColorMap);
     procedure LoadFromDefaultColorMap(Value: THexViewColorMap);
     procedure LoadFromRegColorMap(Value: TRegistersColorMap);
@@ -256,6 +261,7 @@ type
 
     procedure RestoreViewDefSettings(AView: TFWCustomHexView);
 
+    procedure SaveToAddrHightLightColorMap(Value: TAddrHightLightColorMap);
     procedure SaveToAsmColorMap(Value: TAsmColorMap);
     procedure SaveToDefaultColorMap(Value: THexViewColorMap);
     procedure SaveToRegColorMap(Value: TRegistersColorMap);
@@ -316,6 +322,7 @@ type
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
+    property ValidationAddrVA: Boolean read FValidationAddrVA write FValidationAddrVA;
   end;
 
   function KeyShiftToText(Key: Word; Shift: TShiftState): string;
@@ -434,6 +441,14 @@ begin
   Result := Round(AValue * AView.CurrentPPI / 96);
 end;
 
+procedure TCpuViewSettins.LoadFromAddrHightLightColorMap(
+  Value: TAddrHightLightColorMap);
+begin
+  FColors.Add(xmlAddrValidateE, Value.AddrExecuteColor);
+  FColors.Add(xmlAddrValidateR, Value.AddrReadColor);
+  FColors.Add(xmlAddrValidateS, Value.AddrStackColor);
+end;
+
 function TCpuViewSettins.GetShotCut(Index: TShortCutType): TCpuViewShortCut;
 const
   MSVCShortCuts: array [TShortCutType] of TCpuViewShortCut = (
@@ -544,6 +559,7 @@ begin
   StackColorMap := TStackColorMap.Create(nil);
   try
     LoadFromStackColorMap(StackColorMap);
+    LoadFromAddrHightLightColorMap(StackColorMap);
   finally
     StackColorMap.Free;
   end;
@@ -590,6 +606,7 @@ begin
   FUseDebugInfo := True;
   FUseDebugLog := True;
   FUseCrashDump := True;
+  FValidationAddrVA := True;
 end;
 
 procedure TCpuViewSettins.InitDefaultShortCuts;
@@ -854,6 +871,15 @@ begin
   AView.ResetViewState;
   TViewAccess(AView).Font.Name := FontName;
   SaveToDefaultColorMap(TViewAccess(AView).ColorMap);
+end;
+
+procedure TCpuViewSettins.SaveToAddrHightLightColorMap(
+  Value: TAddrHightLightColorMap);
+begin
+  if ColorMode <> cmCustom then Exit;
+  Value.AddrExecuteColor := Color[xmlAddrValidateE];
+  Value.AddrReadColor := Color[xmlAddrValidateR];
+  Value.AddrStackColor := Color[xmlAddrValidateS];
 end;
 
 procedure TCpuViewSettins.Save(const FilePath: string);
@@ -1184,6 +1210,10 @@ begin
   Add(xmlFrameActiveColor, 'Stack: Active Frame');
   Add(xmlStackPointColor, 'Stack: Stack Point');
   Add(xmlStackPointFontColor, 'Stack: Stack Point Font');
+
+  Add(xmlAddrValidateE, 'Dump/Stack: Address is Executable');
+  Add(xmlAddrValidateR, 'Dump/Stack: Address is Readable');
+  Add(xmlAddrValidateS, 'Dump/Stack: Address is in Stack');
 end;
 
 procedure TCpuViewSettins.SetColor(const Index: string; Value: TColor);
@@ -1213,11 +1243,14 @@ end;
 procedure TCpuViewSettins.SetSettingsToDumpView(ADumpView: TDumpView);
 begin
   RestoreViewDefSettings(ADumpView);
+  SaveToAddrHightLightColorMap(ADumpView.ColorMap);
   ADumpView.Font.Height := DoubleToDpi(FDumpSettings.FontHeight, ADumpView);
   ADumpView.ByteViewMode := FDumpSettings.ByteViewMode;
   ADumpView.Encoder.EncodeType := FDumpSettings.EncodeType;
   ADumpView.Encoder.CodePage := FDumpSettings.CodePage;
   ADumpView.Encoder.EncodingName := FDumpSettings.EncodingName;
+  ADumpView.ShowHint := ValidationAddrVA;
+  ADumpView.ValidateAddress := ValidationAddrVA;
 end;
 
 procedure TCpuViewSettins.SetSettingsToRegView(ARegView: TRegView);
@@ -1231,6 +1264,9 @@ procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);
 begin
   RestoreViewDefSettings(AStackView);
   AStackView.Font.Height := DoubleToDpi(FStackFontHeight, AStackView);
+  AStackView.ShowHint := ValidationAddrVA;
+  AStackView.ValidateAddress := ValidationAddrVA;
+  SaveToAddrHightLightColorMap(AStackView.ColorMap);
   SaveToStackColorMap(AStackView.ColorMap);
 end;
 

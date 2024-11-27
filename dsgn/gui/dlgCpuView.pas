@@ -599,10 +599,13 @@ procedure TfrmCpuView.LoadSettings;
 var
   R: TRect;
   ExitShortCut: TCpuViewShortCut;
+  I: Integer;
 begin
   Settings.Load(ConfigPath);
   Settings.SetSettingsToAsmView(AsmView);
   Settings.SetSettingsToDumpView(DumpView);
+  for I := 1 to pcDumps.PageCount - 1 do
+    Settings.SetSettingsToDumpView(pcDumps.Pages[I].Controls[0] as TDumpView);
   Settings.SetSettingsToRegView(RegView);
   Settings.SetSettingsToContext(DbgGate.Context);
   Settings.SetSettingsToStackView(StackView);

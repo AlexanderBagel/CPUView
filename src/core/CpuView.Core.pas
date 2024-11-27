@@ -333,7 +333,6 @@ begin
   AValue.OnHint := FCore.OnGetHint;
   AValue.OnJmpTo := FCore.OnJmpTo;
   AValue.OnQueryAddressType := FCore.OnQueryAddressType;
-  AValue.ShowHint := True;
   AValue.FitColumnsToBestSize;
 end;
 
@@ -1050,7 +1049,6 @@ begin
     FStackView.OnJmpTo := OnJmpTo;
     FStackView.OnQueryComment := StackViewQueryComment;
     FStackView.OnQueryAddressType := OnQueryAddressType;
-    FStackView.ShowHint := True;
     RefreshView;
   end;
 end;

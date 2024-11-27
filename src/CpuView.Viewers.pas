@@ -292,9 +292,6 @@ type
     property OnVerticalScroll;
   end;
 
-  TAddrType = (atNone, atExecute, atRead, atStack);
-  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: UInt64; var AddrType: TAddrType) of object;
-
   { TFixedColumnView }
 
   TFixedColumnView = class(TFWCustomHexView)
@@ -307,10 +304,31 @@ type
     property PopupMenu;
   end;
 
+  { TAddrHightLightColorMap }
+
+  TAddrHightLightColorMap = class(THexViewColorMap)
+  private
+    FExecuteColor: TColor;
+    FReadColor: TColor;
+    FStackColor: TColor;
+    procedure SetExecuteColor(AValue: TColor);
+    procedure SetReadColor(AValue: TColor);
+    procedure SetStackColor(AValue: TColor);
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure InitLightMode; override;
+    procedure InitDarkMode; override;
+  published
+    property AddrExecuteColor: TColor read FExecuteColor write SetExecuteColor stored IsColorStored;
+    property AddrReadColor: TColor read FReadColor write SetReadColor stored IsColorStored;
+    property AddrStackColor: TColor read FStackColor write SetStackColor stored IsColorStored;
+  end;
+
   TLeftRightBounds = record
     LeftOffset, Width: Integer;
   end;
 
+  TAddrType = (atNone, atExecute, atRead, atStack);
   TAddrHightLightView = class;
 
   { TAddrHightLightPainter }
@@ -332,6 +350,8 @@ type
     function View: TAddrHightLightView;
   end;
 
+  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: UInt64; var AddrType: TAddrType) of object;
+
   { TAddrHightLightView }
 
   TAddrHightLightView = class(TFixedColumnView)
@@ -339,11 +359,16 @@ type
     FLastInvalidAddrRect: TRect;
     FValidateAddress: Boolean;
     FOnQueryAddr: TOnQueryAddrType;
+    function GetColorMap: TAddrHightLightColorMap;
+    procedure SetColorMap(AValue: TAddrHightLightColorMap);
     procedure SetValidateAddress(AValue: Boolean);
   protected
     procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
     function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
     procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
+    function GetColorMapClass: THexViewColorMapClass; override;
+  protected
+    property ColorMap: TAddrHightLightColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
   public
@@ -391,6 +416,7 @@ type
     property BytesInGroup;
     property BytesInRow;
     property ByteViewMode;
+    property ColorMap;
     property Constraints;
     property Enabled;
     property Encoder;
@@ -440,7 +466,7 @@ type
 
   { TStackColorMap }
 
-  TStackColorMap = class(THexViewColorMap)
+  TStackColorMap = class(TAddrHightLightColorMap)
   private
     FAddrPCColor: TColor;
     FAddrPCFontColor: TColor;
@@ -1497,6 +1523,62 @@ begin
   // columns are recalculated automatically
 end;
 
+{ TAddrHightLightColorMap }
+
+procedure TAddrHightLightColorMap.SetExecuteColor(AValue: TColor);
+begin
+  if FExecuteColor <> AValue then
+  begin
+    FExecuteColor := AValue;
+    DoChange;
+  end;
+end;
+
+procedure TAddrHightLightColorMap.SetReadColor(AValue: TColor);
+begin
+  if FReadColor <> AValue then
+  begin
+    FReadColor := AValue;
+    DoChange;
+  end;
+end;
+
+procedure TAddrHightLightColorMap.SetStackColor(AValue: TColor);
+begin
+  if FStackColor <> AValue then
+  begin
+    FStackColor := AValue;
+    DoChange;
+  end;
+end;
+
+procedure TAddrHightLightColorMap.AssignTo(Dest: TPersistent);
+begin
+  inherited;
+  if Dest is TAddrHightLightColorMap then
+  begin
+    TAddrHightLightColorMap(Dest).FExecuteColor := FExecuteColor;
+    TAddrHightLightColorMap(Dest).FReadColor := FReadColor;
+    TAddrHightLightColorMap(Dest).FStackColor := FStackColor;
+  end;
+end;
+
+procedure TAddrHightLightColorMap.InitLightMode;
+begin
+  inherited;
+  FExecuteColor := $CC33FF;
+  FReadColor := $CC66;
+  FStackColor := $2197FF;
+end;
+
+procedure TAddrHightLightColorMap.InitDarkMode;
+begin
+  inherited;
+  FExecuteColor := $CC33FF;
+  FReadColor := $CC66;
+  FStackColor := $2197FF;
+end;
+
 { TAddrHightLightPainter }
 
 procedure TAddrHightLightPainter.CheckCache;
@@ -1521,13 +1603,12 @@ begin
   for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
   begin
     AddrType := QueryAddrType(I);
-    {$message 'Color'}
     if AddrType <> atNone then
     begin
       case AddrType of
-        atExecute: ACanvas.Brush.Color := $CC33FF;
-        atRead: ACanvas.Brush.Color := $CC66;
-        atStack: ACanvas.Brush.Color := $2197FF;
+        atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
+        atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
+        atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
       end;
       ABounds := GetBounds(I);
       PatBlt(ACanvas, ARect.Left + ABounds.LeftOffset,
@@ -1539,6 +1620,7 @@ end;
 function TAddrHightLightPainter.GetAddrAtIndex(AIndex: Integer): UInt64;
 begin
   CheckCache;
+  if FCacheData = nil then Exit(0);
   if AddressMode = am32bit then
     Result := PCardinal(@FCacheData[AIndex shl 2])^
   else
@@ -1626,6 +1708,16 @@ begin
   end;
 end;
 
+function TAddrHightLightView.GetColorMap: TAddrHightLightColorMap;
+begin
+  Result := TAddrHightLightColorMap(inherited ColorMap);
+end;
+
+procedure TAddrHightLightView.SetColorMap(AValue: TAddrHightLightColorMap);
+begin
+  ColorMap.Assign(AValue);
+end;
+
 procedure TAddrHightLightView.DoGetHint(var AHintParam: THintParam;
   var AHint: string);
 var
@@ -1687,6 +1779,11 @@ procedure TAddrHightLightView.DoQueryAddrType(AddrVA: UInt64;
 begin
   if Assigned(FOnQueryAddr) then
     FOnQueryAddr(Self, AddrVA, AddrType);
+end;
+
+function TAddrHightLightView.GetColorMapClass: THexViewColorMapClass;
+begin
+  Result := TAddrHightLightColorMap;
 end;
 
 constructor TAddrHightLightView.Create(AOwner: TComponent);
