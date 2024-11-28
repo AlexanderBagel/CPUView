@@ -140,6 +140,7 @@ type
     FJmpStack: TList<Int64>;
     FJmpStackIdx: Integer;
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
+    FKnownRegionData: TDictionary<Int64, TRegionData>;
     FLastStackLimit: TStackLimit;
     FLockPushToJmpStack: Boolean;
     FLockSelChange: Boolean;
@@ -206,6 +207,8 @@ type
     function AddrInDump(AddrVA: Int64): Boolean;
     function AddrInStack(AddrVA: Int64): Boolean;
     function QueryAccessStr(AddrVA: UInt64): string;
+    function QueryAddressType(AddrVA: UInt64): TAddrType;
+    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean;
     function QuerySymbolAtAddr(AddrVA: UInt64): string;
     procedure ShowDisasmAtAddr(AddrVA: Int64);
     procedure ShowDumpAtAddr(AddrVA: Int64);
@@ -378,7 +381,7 @@ var
   AView: TDumpView;
 begin
   if not CheckIndex(Index) then Exit;
-  if not FUtils.QueryRegion(AddrVA, RegData) then Exit;
+  if not FCore.QueryRegion(AddrVA, RegData) then Exit;
   AView := FItems.List[Index].View;
   AStream := FItems.List[Index].Stream;
   AStream.Stream.OnUpdated := FOnUpdate;
@@ -406,8 +409,35 @@ var
   RegionData: TRegionData;
 begin
   Result := 'No access';
-  if FUtils.QueryRegion(AddrVA, RegionData) then
+  if QueryRegion(AddrVA, RegionData) then
     Result := FormatAccessString(RegionData);
+end;
+
+function TCpuViewCore.QueryAddressType(AddrVA: UInt64): TAddrType;
+var
+  ARegionData: TRegionData;
+begin
+  Result := atNone;
+  if not QueryRegion(AddrVA, ARegionData) then Exit;
+  if (raExecute in ARegionData.Access) then
+    Exit(atExecute);
+  if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
+    Exit(atStack);
+  if (raRead in ARegionData.Access) then
+    Result := atRead;
+end;
+
+function TCpuViewCore.QueryRegion(AddrVA: Int64; out RegionData: TRegionData
+  ): Boolean;
+begin
+  RegionData := Default(TRegionData);
+  Result := FKnownRegionData.TryGetValue(AddrVA, RegionData);
+  if not Result then
+  begin
+    Result := FUtils.QueryRegion(AddrVA, RegionData);
+    if Result then
+      FKnownRegionData.Add(AddrVA, RegionData);
+  end;
 end;
 
 function TCpuViewCore.QuerySymbolAtAddr(AddrVA: UInt64): string;
@@ -512,6 +542,7 @@ begin
   FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
   FStackStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
+  FKnownRegionData := TDictionary<Int64, TRegionData>.Create;
   FShowCallFuncName := True;
   FJmpStack := TList<Int64>.Create;
   FDBase := TCpuViewDBase.Create;
@@ -527,6 +558,7 @@ begin
   FDisassemblyStream.Free;
   FStackStream.Free;
   FKnownFunctionAddrVA.Free;
+  FKnownRegionData.Free;
   FJmpStack.Free;
   FDebugger.Free;
   FUtils.Free;
@@ -541,7 +573,7 @@ begin
     Assigned(Debugger) and
     Assigned(AsmView) and
     Assigned(AsmView.DataStream) and
-    FUtils.QueryRegion(AddrVA, RegionData) and
+    QueryRegion(AddrVA, RegionData) and
     (raExecute in RegionData.Access);
 end;
 
@@ -550,11 +582,11 @@ var
   RegData: TRegionData;
 begin
   if FInvalidReg.RegionSize = 0 then
-    FUtils.QueryRegion(AddrVA, FInvalidReg);
+    QueryRegion(AddrVA, FInvalidReg);
   if AddrVA < FInvalidReg.RegionSize then
     Result := False
   else
-    Result := FUtils.QueryRegion(AddrVA, RegData) and (raRead in RegData.Access);
+    Result := QueryRegion(AddrVA, RegData) and (raRead in RegData.Access);
 end;
 
 function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
@@ -619,7 +651,7 @@ begin
   Result := -1;
   if FDisassemblyStream = nil then Exit;
   ResetCache;
-  if FUtils.QueryRegion(AAddress, RegData) then
+  if QueryRegion(AAddress, RegData) then
     WindowAddr := Max(AAddress - 128, RegData.AllocationBase)
   else
     WindowAddr := AAddress;
@@ -877,15 +909,25 @@ end;
 
 procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
   var Hint: string);
+const
+  PostFix: array [TAddrType] of string = (
+    '',
+    'in Assembly.',
+    'in the Dump.',
+    'on the Stack'
+  );
 var
+  AddressType: TAddrType;
   AccessStr, Symbol: string;
 begin
   if Param.AddrVA <> 0 then
   begin
+    AddressType := QueryAddressType(Param.AddrVA);
+    if AddressType = atNone then Exit;
     AccessStr := QueryAccessStr(Param.AddrVA);
     Symbol := QuerySymbolAtAddr(Param.AddrVA);
     Hint := Format('Addr:  0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]) +
-      sLineBreak + 'Press Ctrl+Click to jump to an address.';
+      sLineBreak + 'Press Ctrl+Click to jump to an address ' + PostFix[AddressType];
   end;
 end;
 
@@ -906,23 +948,8 @@ end;
 
 procedure TCpuViewCore.OnQueryAddressType(Sender: TObject; AddrVA: UInt64;
   var AddrType: TAddrType);
-var
-  ARegionData: TRegionData;
 begin
-  AddrType := atNone;
-  if not FUtils.QueryRegion(AddrVA, ARegionData) then Exit;
-  if (raExecute in ARegionData.Access) then
-  begin
-    AddrType := atExecute;
-    Exit;
-  end;
-  if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
-  begin
-    AddrType := atStack;
-    Exit;
-  end;
-  if (raRead in ARegionData.Access) then
-    AddrType := atRead;
+  AddrType := QueryAddressType(AddrVA);
 end;
 
 procedure TCpuViewCore.OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
@@ -985,6 +1012,7 @@ begin
   FAsmSelEnd := 0;
   FCacheListIndex := 0;
   FKnownFunctionAddrVA.Clear;
+  FKnownRegionData.Clear;
 end;
 
 procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
