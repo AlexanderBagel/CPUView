@@ -2269,7 +2269,7 @@ begin
     for I := 0 to FContext.RegCount(RowIndex) - 1 do
     begin
       Info := FContext.RegInfo(RowIndex, I);
-      RowStr := RowStr + AlignLine(FContext.RegQueryString(Info.RegID, rqstName), Info.RegNameSize);
+      RowStr := RowStr + AlignLine(FContext.RegQueryString(Info.RegID, rqstDisplayName), Info.RegNameSize);
       RowStr := RowStr + AlignLine(FContext.RegQueryString(Info.RegID, rqstValue), Info.ValueSize);
       RowStr := RowStr + AlignLine('', Info.ValueSeparatorSize);
     end;
@@ -2303,7 +2303,7 @@ begin
     else
       ACanvas.Font.Color := TRegistersColorMap(Owner.ColorMap).RegColor;
     ACanvas.Brush.Style := bsClear;
-    DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegQueryString(Info.RegID, rqstName),
+    DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegQueryString(Info.RegID, rqstDisplayName),
       TextMetric.CharPointer(AColumn, 0));
     Inc(DrawR.Left, TextMetric.CharLength(AColumn, 1, Info.RegNameSize));
 

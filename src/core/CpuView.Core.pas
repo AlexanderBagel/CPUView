@@ -29,8 +29,6 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
-{$message warn 'Some of the flags do not change in SimpleMode'}
-
 {$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
@@ -39,7 +37,7 @@ interface
 {$message 'Highlighting of identical selected values in the dump window'}
 {$message 'Run to user code'}
 {$message 'Display strings in hint with disassembly for executable AddrVA'}
-{$message 'Add settings for address validation, colors and hint.'}
+{$message 'Jmp cache for Dump/Stack'}
 
 uses
   {$IFDEF FPC}

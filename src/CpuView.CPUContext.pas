@@ -115,7 +115,7 @@ type
   TContextQueryExternalRegHintEvent = procedure(Sender: TObject;
     const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string) of object;
 
-  TRegQueryStringType = (rqstName, rqstValue);
+  TRegQueryStringType = (rqstName, rqstDisplayName, rqstValue);
 
   TAbstractCPUContext = class;
 
@@ -565,6 +565,18 @@ begin
   FillRegData(ARegID);
   case AType of
     rqstName: Result := LastReg.RegName;
+    rqstDisplayName:
+    begin
+      if LastReg.NameGlyphCount = 0 then
+        Result := ''
+      else
+      begin
+        if LastReg.NameGlyphCount >= Length(LastReg.RegName) then
+          Result := LastReg.RegName
+        else
+          Result := Copy(LastReg.RegName, 1, LastReg.NameGlyphCount);
+      end;
+    end;
     rqstValue: Result := LastReg.Value;
   else
     Result := '';
