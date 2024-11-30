@@ -83,6 +83,7 @@ object frmCpuView: TfrmCpuView
       Width = 710
       Align = alRight
       TabOrder = 1
+      OnDblClick = RegViewDblClick
       OnSelectedContextPopup = RegViewSelectedContextPopup
       OnSelectionChange = RegViewSelectionChange
     end

@@ -317,6 +317,7 @@ type
     procedure miProfilerSaveDumpClick(Sender: TObject);
     procedure miResetProfilerClick(Sender: TObject);
     procedure pcDumpsChange(Sender: TObject);
+    procedure RegViewDblClick(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
       RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
     procedure RegViewSelectionChange(Sender: TObject);
@@ -464,6 +465,26 @@ end;
 procedure TfrmCpuView.pcDumpsChange(Sender: TObject);
 begin
   Core.DumpViewList.ItemIndex := pcDumps.PageIndex;
+end;
+
+procedure TfrmCpuView.RegViewDblClick(Sender: TObject);
+var
+  Handled: Boolean;
+begin
+  if FDbgGate.DebugState <> adsPaused then Exit;
+  FContextRegName := RegView.SelectedRegName;
+  FContextRegister := RegView.SelectedRegister;
+  if FContextRegister.RegID < 0 then Exit;
+  Handled := RegView.Context.RegParam(FContextRegister.RegID, FContextRegisterParam) and
+    (RegView.ReadDataAtSelStart(FContextRegValue, SizeOf(FContextRegValue)) > 0);
+  if not Handled then Exit;
+  if maToggle in FContextRegisterParam.ModifyActions then
+  begin
+    acRegModifyToggle.Execute;
+    Exit;
+  end;
+  if maChange in FContextRegisterParam.ModifyActions then
+    acRegModifyNewValue.Execute;
 end;
 
 procedure TfrmCpuView.RegViewSelectedContextPopup(Sender: TObject;
