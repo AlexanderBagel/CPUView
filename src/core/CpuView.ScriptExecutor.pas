@@ -37,7 +37,7 @@ type
   TExpressionTypes = set of TExpressionType;
   TExpression = record
     Data: string;
-    Value, MemValue: UInt64;
+    Value, MemValue: Int64;
     MemSize: Integer;
     Calculated: Boolean;
     Types: TExpressionTypes;
@@ -49,7 +49,7 @@ type
   private
     FCalculatedList: TExpressionList;
     FContext: TCommonCpuContext;
-    FCurrentRIPOffset: UInt64;
+    FCurrentRIPOffset: Int64;
     FDebugger: TAbstractDebugger;
   protected
     function DoExecute(const Script: string; out ExecuteResult: string): Boolean; virtual; abstract;
@@ -59,7 +59,7 @@ type
     function Execute(const Script: string; out ExecuteResult: string): Boolean;
     property CalculatedList: TExpressionList read FCalculatedList;
     property Context: TCommonCpuContext read FContext write FContext;
-    property CurrentRIPOffset: UInt64 read FCurrentRIPOffset write FCurrentRIPOffset;
+    property CurrentRIPOffset: Int64 read FCurrentRIPOffset write FCurrentRIPOffset;
     property Debugger: TAbstractDebugger read FDebugger write FDebugger;
   end;
 

@@ -95,7 +95,7 @@ type
   TContextChangeType = (cctRemaped, cctContextUpdated, cctDataChange);
   TContextChangeEvent = procedure(Sender: TObject;
     AChangeType: TContextChangeType) of object;
-  TContextQueryRegHintEvent = procedure(Sender: TObject; AddrVA: UInt64;
+  TContextQueryRegHintEvent = procedure(Sender: TObject; AddrVA: Int64;
     AColumnType: TColumnType; var AHint: string) of object;
 
   TRegValue = record
@@ -153,7 +153,7 @@ type
     FUtils: TCommonAbstractUtils;
   protected
     procedure DoChange(AChangeType: TContextChangeType);
-    procedure DoQueryRegHint(AddrVA: UInt64; var AHint: string);
+    procedure DoQueryRegHint(AddrVA: Int64; var AHint: string);
     procedure DoQueryExternalRegHint(const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string);
     function GetViewMode(RegID: TRegID): TRegViewMode; virtual; abstract;
     procedure SetViewMode(RegID: TRegID; const Value: TRegViewMode); virtual; abstract;
@@ -165,7 +165,7 @@ type
     function EmptyRow(ARowIndex: Integer): Boolean; virtual; abstract;
     procedure EndUpdate;
     procedure InitDefault; virtual; abstract;
-    function InstructonPoint: UInt64; virtual; abstract;
+    function InstructonPoint: Int64; virtual; abstract;
     function InstructonPointID: TRegID; virtual; abstract;
     function IsActiveJump(const Value: string): Boolean; virtual; abstract;
     function PointerSize: Integer; virtual; abstract;
@@ -178,13 +178,13 @@ type
     function RegParam(ARegID: TRegID; out AParam: TRegParam): Boolean; virtual; abstract;
     function RegQueryEnumString(ARegID: TRegID; AEnumIndex: Integer): string; virtual; abstract;
     function RegQueryEnumValuesCount(ARegID: TRegID): Integer; virtual; abstract;
-    function RegQueryNamesAtAddr(AAddrVA: UInt64): string; virtual; abstract;
+    function RegQueryNamesAtAddr(AAddrVA: Int64): string; virtual; abstract;
     function RegQueryString(ARegID: TRegID; AType: TRegQueryStringType): string; virtual; abstract;
     function RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
     function RegQueryValue(const ARegName: string; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
     function RegSetValue(ARegID: TRegID; const ANewRegValue: TRegValue): Boolean; virtual; abstract;
     procedure UnRegisterChangeNotification(Value: TContextChangeEvent);
-    function Update(ANewInstructionPoint: UInt64 = 0): Boolean; virtual; abstract;
+    function Update(ANewInstructionPoint: Int64 = 0): Boolean; virtual; abstract;
   public
     property AddressMode: TAddressMode read FAddressMode write FAddressMode;
     property Utils: TCommonAbstractUtils read FUtils write FUtils;
@@ -274,8 +274,8 @@ type
     function RegInfo(ARowIndex, AColIndex: Integer): TRegister; overload; override;
     function RegParam(ARegID: TRegID; out AParam: TRegParam): Boolean; override;
     function RegQueryString(ARegID: TRegID; AType: TRegQueryStringType): string; override;
-    function StackBase: UInt64; virtual; abstract;
-    function StackPoint: UInt64; virtual; abstract;
+    function StackBase: Int64; virtual; abstract;
+    function StackPoint: Int64; virtual; abstract;
     property ThreadID: Cardinal read FThreadID write FThreadID;
   end;
 
@@ -350,7 +350,7 @@ begin
     FChangeList[I](Self, AChangeType);
 end;
 
-procedure TAbstractCPUContext.DoQueryRegHint(AddrVA: UInt64; var AHint: string);
+procedure TAbstractCPUContext.DoQueryRegHint(AddrVA: Int64; var AHint: string);
 begin
   if Assigned(FQueryHint) then
     FQueryHint(Self, AddrVA, ctComment, AHint);

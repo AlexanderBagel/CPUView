@@ -29,7 +29,7 @@ uses
   CpuView.Common;
 
 type
-  TOnCacheUpdated = procedure(pBuff: PByte; AAddrVA: UInt64; ASize: Int64) of object;
+  TOnCacheUpdated = procedure(pBuff: PByte; AAddrVA: Int64; ASize: Int64) of object;
 
   TRemoteStream = class(TStream)
   private

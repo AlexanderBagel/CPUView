@@ -51,11 +51,11 @@ type
   PIntelThreadContext = ^TIntelThreadContext;
   TIntelThreadContext = packed record
     x86Context: Boolean;
-    Rax, Rbx, Rcx, Rdx, Rsp, Rbp, Rsi, Rdi, Rip: UInt64;
-    R: array [8..15] of UInt64; // x64 specific
+    Rax, Rbx, Rcx, Rdx, Rsp, Rbp, Rsi, Rdi, Rip: Int64;
+    R: array [8..15] of Int64; // x64 specific
     EFlags: Cardinal;
     SegGs, SegFs, SegEs, SegDs, SegCs, SegSs: Cardinal;
-    Dr0, Dr1, Dr2, Dr3, Dr6, Dr7: UInt64;
+    Dr0, Dr1, Dr2, Dr3, Dr6, Dr7: Int64;
     LastError, LastStatus: Cardinal;
     ControlWord, StatusWord, TagWord: Word;
     ErrorOffset, ErrorSelector, DataOffset, DataSelector, MxCsr: Cardinal;

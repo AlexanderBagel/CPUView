@@ -339,18 +339,18 @@ type
     FCacheIndex, FCacheAddrIndex: Integer;
     FCacheData: TBytes;
     procedure CheckCache;
-    function GetAddrAtIndex(AIndex: Integer): UInt64;
+    function GetAddrAtIndex(AIndex: Integer): Int64;
     function QueryAddrType(AIndex: Integer): TAddrType;
   protected
     procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
     function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo;
-      var AddrIndex: Integer): UInt64;
+      var AddrIndex: Integer): Int64;
     function GetBounds(AIndex: Integer): TLeftRightBounds;
     procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
     function View: TAddrHightLightView;
   end;
 
-  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: UInt64; var AddrType: TAddrType) of object;
+  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType) of object;
 
   { TAddrHightLightView }
 
@@ -365,7 +365,7 @@ type
   protected
     procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
     function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
-    procedure DoQueryAddrType(AddrVA: UInt64; var AddrType: TAddrType);
+    procedure DoQueryAddrType(AddrVA: Int64; var AddrType: TAddrType);
     function GetColorMapClass: THexViewColorMapClass; override;
   protected
     property ColorMap: TAddrHightLightColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
@@ -428,6 +428,7 @@ type
     property ParentShowHint;
     property PopupMenu;
     property SeparateGroupByColor;
+    property ShortCuts;
     property ShowHint;
     property TabOrder;
     property TabStop;
@@ -524,7 +525,7 @@ type
   TCustomStackView = class(TAddrHightLightView)
   strict private
     FFrames: TListEx<TStackFrame>;
-    FAddrPCDict: TDictionary<Int64, UInt64>;
+    FAddrPCDict: TDictionary<Int64, Int64>;
     function GetColorMap: TStackColorMap;
     procedure SetColorMap(const Value: TStackColorMap);
     procedure UpdateFrameDescriptions;
@@ -542,7 +543,7 @@ type
     procedure CopySelected(CopyStyle: TCopyStyle); override;
     procedure FitColumnToBestSize(Value: TColumnType); override;
     procedure FramesUpdated;
-    function IsAddrPCRow(AIndex: Int64; out AddrVA: UInt64): Boolean;
+    function IsAddrPCRow(AIndex: Int64; out AddrVA: Int64): Boolean;
     property Frames: TListEx<TStackFrame> read FFrames;
   protected
     property ColorMap: TStackColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
@@ -576,6 +577,7 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
+    property ShortCuts;
     property ShowHint;
     property TabOrder;
     property TabStop;
@@ -1617,18 +1619,18 @@ begin
   end;
 end;
 
-function TAddrHightLightPainter.GetAddrAtIndex(AIndex: Integer): UInt64;
+function TAddrHightLightPainter.GetAddrAtIndex(AIndex: Integer): Int64;
 begin
   CheckCache;
   if FCacheData = nil then Exit(0);
   if AddressMode = am32bit then
-    Result := PCardinal(@FCacheData[AIndex shl 2])^
+    Result := PInteger(@FCacheData[AIndex shl 2])^
   else
-    Result := PUInt64(@FCacheData[AIndex shl 3])^;
+    Result := PInt64(@FCacheData[AIndex shl 3])^;
 end;
 
 function TAddrHightLightPainter.GetAddressAtCursor(
-  const AMouseHitInfo: TMouseHitInfo; var AddrIndex: Integer): UInt64;
+  const AMouseHitInfo: TMouseHitInfo; var AddrIndex: Integer): Int64;
 var
   I, L: Integer;
   ABounds: TLeftRightBounds;
@@ -1756,11 +1758,10 @@ function TAddrHightLightView.DoLButtonDown(const AHitInfo: TMouseHitInfo
   ): Boolean;
 var
   Painter: TAbstractPrimaryRowPainter;
-  AddrVA: UInt64;
-  Handled: Boolean;
+  AddrVA: Int64;
   AddrIndex: Integer;
 begin
-  if not ValidateAddress then Exit;
+  if not ValidateAddress then Exit(False);
   if not (ssCtrl in AHitInfo.Shift) then Exit;
   if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if AHitInfo.Cursor <> crHandPoint then Exit;
@@ -1768,13 +1769,11 @@ begin
   if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
   begin
     AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex{%H-});
-    Handled := False;
-    DoJmpTo(AddrVA, jsPushToUndo, Handled);
-    Result := True;
+    Result := JumpToAddress(AddrVA);
   end;
 end;
 
-procedure TAddrHightLightView.DoQueryAddrType(AddrVA: UInt64;
+procedure TAddrHightLightView.DoQueryAddrType(AddrVA: Int64;
   var AddrType: TAddrType);
 begin
   if Assigned(FOnQueryAddr) then
@@ -2027,7 +2026,7 @@ procedure TStackRowPainter.CorrectCanvasFont(ACanvas: TCanvas;
   AColumn: TColumnType);
 var
   TopOfStackIndex: Int64;
-  AddrPcVA: UInt64;
+  AddrPcVA: Int64;
 begin
   if StackView.IsAddrPCRow(RowIndex, AddrPcVA) and (AColumn = ctAddress) then
   begin
@@ -2049,7 +2048,7 @@ procedure TStackRowPainter.DrawAddress(ACanvas: TCanvas; var ARect: TRect);
 var
   TopOfStackIndex: Int64;
   BackR: TRect;
-  AddrPcVA: UInt64;
+  AddrPcVA: Int64;
 begin
   if StackView.IsAddrPCRow(RowIndex, AddrPcVA) then
   begin
@@ -2098,7 +2097,7 @@ end;
 
 procedure TCustomStackView.CopySelected(CopyStyle: TCopyStyle);
 var
-  AValue: UInt64;
+  AValue: Int64;
 begin
   case CopyStyle of
     csAsText, csAddress: inherited;
@@ -2125,7 +2124,7 @@ begin
   inherited;
   ScrollBars := TScrollStyle.ssVertical;
   FFrames := TListEx<TStackFrame>.Create;
-  FAddrPCDict := TDictionary<Int64, UInt64>.Create;
+  FAddrPCDict := TDictionary<Int64, Int64>.Create;
   UpdateFrameDescriptions;
 end;
 
@@ -2146,7 +2145,7 @@ end;
 procedure TCustomStackView.FramesUpdated;
 var
   I: Integer;
-  AddrPC: UInt64;
+  AddrPC: Int64;
 begin
   FAddrPCDict.Clear;
   for I := 0 to Frames.Count - 1 do
@@ -2189,7 +2188,7 @@ begin
   PostPainters.Add(TStackPostPainter.Create(Self));
 end;
 
-function TCustomStackView.IsAddrPCRow(AIndex: Int64; out AddrVA: UInt64): Boolean;
+function TCustomStackView.IsAddrPCRow(AIndex: Int64; out AddrVA: Int64): Boolean;
 begin
   Result := FAddrPCDict.TryGetValue(AIndex, AddrVA);
 end;
@@ -2561,7 +2560,7 @@ function TCustomRegView.CopyCommandEnabled(Value: TCopyStyle): Boolean;
 begin
   case Value of
     csAsText: Result := True;
-    csBytes: Result := (SelStart > 0) and (SelStart = SelEnd) and
+    csBytes: Result := (SelStart >= 0) and (SelStart = SelEnd) and
       (FSelectedRegister.ValueType in [crtValue, crtExtra]);
   else
     Result := False;

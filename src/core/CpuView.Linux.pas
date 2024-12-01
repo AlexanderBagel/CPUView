@@ -47,7 +47,7 @@ uses
 
 type
   TMemoryBasicInformation = record
-    AllocationBase, BaseAddress, RegionSize, OffsetInFile: UInt64;
+    AllocationBase, BaseAddress, RegionSize, OffsetInFile: Int64;
     Read, Write, Execute, Shared: Boolean;
     MappedFile, Hint: string;
   end;
@@ -61,7 +61,7 @@ type
     FMemList: TMemoryBasicInformationList;
     function GetMemList: TMemoryBasicInformationList;
   protected
-    function VirtualQueryMBI(AQueryAddr: UInt64; out
+    function VirtualQueryMBI(AQueryAddr: Int64; out
       MBI: TMemoryBasicInformation): Boolean;
   public
     destructor Destroy; override;
@@ -172,7 +172,7 @@ begin
     Result := nil;
 end;
 
-function ScanDec(const buff: PByte; out Value: UInt64): PByte;
+function ScanDec(const buff: PByte; out Value: Int64): PByte;
 var
   Digit: Byte;
 begin
@@ -192,7 +192,7 @@ begin
   end;
 end;
 
-function ScanHex(const buff: PByte; out Value: UInt64): PByte;
+function ScanHex(const buff: PByte; out Value: Int64): PByte;
 var
   Digit: Byte;
 begin
@@ -258,10 +258,10 @@ var
   MapsPath, Line: string;
   VMData: TStringList;
   M: TMemoryStream;
-  InumDict: TDictionary<UInt64, UInt64>;
+  InumDict: TDictionary<Int64, Int64>;
   FirstMBI, MBI: TMemoryBasicInformation;
   I: Integer;
-  HighIdx, DummyIdx, InumIdx: UInt64;
+  HighIdx, DummyIdx, InumIdx: Int64;
   buff: PByte;
   Delimiter: Char;
 begin
@@ -290,7 +290,7 @@ begin
     end;
 
     MBI := Default(TMemoryBasicInformation);
-    InumDict := TDictionary<UInt64, UInt64>.Create;
+    InumDict := TDictionary<Int64, Int64>.Create;
     try
       for I := 0 to VMData.Count - 1 do
       begin
@@ -805,7 +805,7 @@ begin
   Result := FMemList;
 end;
 
-function TCommonUtils.VirtualQueryMBI(AQueryAddr: UInt64; out
+function TCommonUtils.VirtualQueryMBI(AQueryAddr: Int64; out
   MBI: TMemoryBasicInformation): Boolean;
 var
   List: TMemoryBasicInformationList;
@@ -844,7 +844,7 @@ function TCommonUtils.GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean
 var
   io: iovec;
   Regs: TUserRegs;
-  StackBase: UInt64;
+  StackBase: Int64;
   MBI: TMemoryBasicInformation;
 begin
   Result := Default(TStackLimit);

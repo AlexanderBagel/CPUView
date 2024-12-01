@@ -45,7 +45,6 @@ type
 
   TQuerySymbol = (qsName, qsSourceLine);
 
-  {$message 'Addresses cannot be Int64 - convert to UInt64'}
   TInstruction = record
     AddrVA: Int64;
     AsString, Hint: string;
@@ -55,7 +54,7 @@ type
 
   TBasicBreakPoint = record
     Active: Boolean;
-    AddrVA: UInt64;
+    AddrVA: Int64;
   end;
 
   { TAbstractDebugger }
@@ -82,13 +81,13 @@ type
     constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); reintroduce; virtual;
     destructor Destroy; override;
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; virtual; abstract;
-    function CurrentInstructionPoint: UInt64; virtual; abstract;
+    function CurrentInstructionPoint: Int64; virtual; abstract;
     function DebugState: TAbstractDebugState; virtual; abstract;
     function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer): TList<TInstruction>; virtual; abstract;
     function IsActive: Boolean; virtual; abstract;
     function IsActiveJmp: Boolean; virtual; abstract;
     procedure FillThreadStackFrames(ALimit: TStackLimit;
-      AddrStack, AddrFrame: UInt64; AStream: TRemoteStream;
+      AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
       AFrames: TList<TStackFrame>); virtual;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;
@@ -99,16 +98,16 @@ type
     function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; virtual; abstract;
     procedure Run; virtual; abstract;
     procedure Stop; virtual; abstract;
-    procedure SetNewIP(AddrVA: UInt64); virtual; abstract;
+    procedure SetNewIP(AddrVA: Int64); virtual; abstract;
     function ThreadID: Cardinal; virtual; abstract;
     function ThreadStackLimit: TStackLimit; virtual; abstract;
-    procedure ToggleBreakPoint(AddrVA: UInt64); virtual; abstract;
+    procedure ToggleBreakPoint(AddrVA: Int64); virtual; abstract;
     procedure TraceIn; virtual; abstract;
     procedure TraceOut; virtual; abstract;
     procedure TraceTilReturn; virtual; abstract;
     procedure TraceTo(AddrVA: Int64); virtual; abstract;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean; virtual; abstract;
-    procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: UInt64; ASize: Int64); virtual; abstract;
+    function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean; virtual; abstract;
+    procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); virtual; abstract;
     property BreakPointList: TListEx<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
     property ErrorMessage: string read FErrorMessage;
@@ -181,17 +180,17 @@ begin
 end;
 
 procedure TAbstractDebugger.FillThreadStackFrames(ALimit: TStackLimit;
-  AddrStack, AddrFrame: UInt64; AStream: TRemoteStream;
+  AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
   AFrames: TList<TStackFrame>);
 
-  function InStack(AddrVA: Uint64): Boolean;
+  function InStack(AddrVA: Int64): Boolean;
   begin
     Result := (AddrVA <= ALimit.Base) and (AddrVA >= ALimit.Limit);
   end;
 
 var
   AFrame: TStackFrame;
-  NewAddrFrame: UInt64;
+  NewAddrFrame: Int64;
 begin
   AFrames.Clear;
   Dec(ALimit.Base, PointerSize);
@@ -199,9 +198,9 @@ begin
   AFrame.AddrFrame := AddrFrame;
   {$IFDEF USE_INTEL_CTX}
   repeat
-    AFrame.AddrPC := AFrame.AddrFrame + UInt64(PointerSize);
+    AFrame.AddrPC := AFrame.AddrFrame + Int64(PointerSize);
     AFrames.Add(AFrame);
-    AFrame.AddrStack := AFrame.AddrPC + UInt64(PointerSize);
+    AFrame.AddrStack := AFrame.AddrPC + Int64(PointerSize);
     AStream.Position := AFrame.AddrFrame;
     AStream.ReadBuffer(NewAddrFrame, PointerSize);
     if AFrame.AddrFrame >= NewAddrFrame then

@@ -26,7 +26,7 @@ uses
 
 type
 
-  TQueryAddrCallback = function(ANewAddrVA: UInt64): Boolean of object;
+  TQueryAddrCallback = function(ANewAddrVA: Int64): Boolean of object;
 
   { TfrmInputBox }
 
@@ -42,7 +42,7 @@ type
     FCallback: TQueryAddrCallback;
   end;
 
-  function QueryAddress(const ACaption, APromt: string; var AAddrVA: UInt64;
+  function QueryAddress(const ACaption, APromt: string; var AAddrVA: Int64;
     ACallback: TQueryAddrCallback): Boolean;
   function QuerySetList(const ACaption, APromt: string;
     AList: array of string; var ItemIndex: Integer): Boolean;
@@ -51,11 +51,11 @@ implementation
 
 {$R *.lfm}
 
-function QueryAddress(const ACaption, APromt: string; var AAddrVA: UInt64;
+function QueryAddress(const ACaption, APromt: string; var AAddrVA: Int64;
   ACallback: TQueryAddrCallback): Boolean;
 var
   frmInputBox: TfrmInputBox;
-  ANewAddrVA: UInt64;
+  ANewAddrVA: Int64;
 begin
   frmInputBox := TfrmInputBox.Create(Application);
   try
@@ -64,7 +64,7 @@ begin
     frmInputBox.FCallback := ACallback;
     frmInputBox.edAddress.Text := '0x' + IntToHex(AAddrVA, 1);
     Result := (frmInputBox.ShowModal = mrOK) and
-      TryStrToUInt64(frmInputBox.edAddress.Text, ANewAddrVA);
+      TryStrToInt64(frmInputBox.edAddress.Text, ANewAddrVA);
     if Result then
       AAddrVA := ANewAddrVA;
   finally
@@ -100,11 +100,11 @@ end;
 
 procedure TfrmInputBox.edAddressChange(Sender: TObject);
 var
-  ANewAddrVA: UInt64;
+  ANewAddrVA: Int64;
 begin
   if edAddress.Visible then
   begin
-    if not TryStrToUInt64(edAddress.Text, ANewAddrVA) then
+    if not TryStrToInt64(edAddress.Text, ANewAddrVA) then
       btnOk.Enabled := False
     else
       btnOk.Enabled := FCallback(ANewAddrVA);

@@ -332,7 +332,7 @@ type
     FAsmViewSelectedAddr,
     FContextRegValue,
     FDumpSelectedValue,
-    FStackSelectedValue: UInt64;
+    FStackSelectedValue: Int64;
     FDumpNameIdx: Integer;
     FContextRegName, FSourcePath: string;
     FContextRegister: TRegister;
@@ -342,9 +342,9 @@ type
     FLastBounds: TRect;
     FCrashDump: TExceptionLogger;
     FExit1ShortCut, FExit2ShortCut: TShortCut;
-    function ActiveViewerSelectedValue: UInt64;
-    function CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
-    function CheckRegCallback(ANewAddrVA: UInt64): Boolean;
+    function ActiveViewerSelectedValue: Int64;
+    function CheckAddressCallback(ANewAddrVA: Int64): Boolean;
+    function CheckRegCallback(ANewAddrVA: Int64): Boolean;
     procedure InternalShowInDump(AddrVA: Int64);
   protected
     function ActiveDumpView: TDumpView;
@@ -530,7 +530,7 @@ begin
   TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
 end;
 
-function TfrmCpuView.ActiveViewerSelectedValue: UInt64;
+function TfrmCpuView.ActiveViewerSelectedValue: Int64;
 begin
   Result := 0;
   if AsmView.Focused then
@@ -543,7 +543,7 @@ begin
     Result := FStackSelectedValue;
 end;
 
-function TfrmCpuView.CheckAddressCallback(ANewAddrVA: UInt64): Boolean;
+function TfrmCpuView.CheckAddressCallback(ANewAddrVA: Int64): Boolean;
 begin
   case FQweryAddrViewerIndex of
     0: Result := FCore.AddrInAsm(ANewAddrVA);
@@ -554,7 +554,7 @@ begin
   end
 end;
 
-function TfrmCpuView.CheckRegCallback(ANewAddrVA: UInt64): Boolean;
+function TfrmCpuView.CheckRegCallback(ANewAddrVA: Int64): Boolean;
 begin
   Result := True;
 end;
@@ -573,7 +573,7 @@ const
     'Error', 'Stoped', 'Start', 'Paused', 'Running', 'Finished'
   );
 var
-  AddrVA: UInt64;
+  AddrVA: Int64;
   AccessStr, Symbol: string;
   AMeasureCanvas: TBitmap;
 begin
@@ -771,23 +771,15 @@ end;
 
 procedure TfrmCpuView.acViewGotoExecute(Sender: TObject);
 var
-  NewAddress: UInt64;
+  NewAddress: Int64;
 begin
   FQweryAddrViewerIndex := ActiveViewIndex;
   if (FQweryAddrViewerIndex < 0) or (FQweryAddrViewerIndex = 1) then Exit;
   NewAddress := 0;
   if QueryAddress('Go to Address', 'Address:', NewAddress, CheckAddressCallback) then
     case FQweryAddrViewerIndex of
-      0:
-      begin
-        FCore.ShowDisasmAtAddr(NewAddress);
-        AsmView.FocusOnAddress(NewAddress, ccmSelectRow);
-      end;
-      2:
-      begin
-        FCore.ShowStackAtAddr(NewAddress);
-        StackView.FocusOnAddress(NewAddress, ccmSelectRow);
-      end;
+      0: FCore.ShowDisasmAtAddr(NewAddress, True);
+      2: FCore.ShowStackAtAddr(NewAddress);
       3:
       begin
         FCore.ShowDumpAtAddr(NewAddress);
@@ -924,7 +916,7 @@ end;
 
 procedure TfrmCpuView.acShowInAsmExecute(Sender: TObject);
 begin
-  Core.ShowDisasmAtAddr(ActiveViewerSelectedValue);
+  Core.ShowDisasmAtAddr(ActiveViewerSelectedValue, True);
   ActiveControl := AsmView;
 end;
 
@@ -965,7 +957,7 @@ begin
       I := Integer(FContextRegValue);
       if QuerySetList('Edit ' + FContextRegName, 'New value:', SetValues, I) then
       begin
-        FContextRegValue := UInt64(I);
+        FContextRegValue := Int64(I);
         FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
       end;
     end;
@@ -1013,7 +1005,7 @@ end;
 
 procedure TfrmCpuView.acAsmReturnToIPExecute(Sender: TObject);
 begin
-  Core.ShowDisasmAtAddr(DbgGate.CurrentInstructionPoint);
+  Core.ShowDisasmAtAddr(DbgGate.CurrentInstructionPoint, True);
 end;
 
 procedure TfrmCpuView.acAsmReturnToIPUpdate(Sender: TObject);

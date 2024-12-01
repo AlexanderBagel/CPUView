@@ -52,7 +52,7 @@ type
   TWaitState = (wsInstruction, wsSizePfx, wsMem, wsRegImm, wsOperand);
   TWaitStates = set of TWaitState;
   TToken = record
-    Value: UInt64;
+    Value: Int64;
     Decrement: Boolean;
   end;
 
@@ -191,7 +191,7 @@ begin
           AExpression.Data := AExpression.Data + TokenStr;
           if wsRegImm in WaitState then
           begin
-            if not TryStrToUInt64(TokenStr, Token.Value) then
+            if not TryStrToInt64(TokenStr, Token.Value) then
               Exit;
             Token.Decrement := Sign;
             Include(AExpression.Types, etImm);

@@ -94,13 +94,13 @@ type
   TThreadWorkerMaskBreakpoints = class(TFpDbgDebggerThreadWorkerItem)
   private
     FBuff: PByte;
-    FAddrVA: UInt64;
+    FAddrVA: Int64;
     FSize: Int64;
   protected
     procedure DoExecute; override;
   public
     constructor Create(ADebugger: TFpDebugDebuggerBase; pBuff: PByte;
-      AAddrVA: UInt64; ASize: Int64);
+      AAddrVA: Int64; ASize: Int64);
   end;
 
   { TThreadWorkerChangeThreadContext }
@@ -133,7 +133,7 @@ type
     FPreviosSrcFuncName, FPreviosSrcFileName: string;
     FLockTimeOut: Int64;
     FSnapshotManager:  TSnapshotManager;
-    FTemporaryIP: TDictionary<Integer, UInt64>;
+    FTemporaryIP: TDictionary<Integer, Int64>;
     FThreadsMonitor: TIdeThreadsMonitor;
     FThreadsNotification: TThreadsNotification;
     FUpdateWaiting: TUpdateWaitingStates;
@@ -156,7 +156,7 @@ type
     constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); override;
     destructor Destroy; override;
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; override;
-    function CurrentInstructionPoint: UInt64; override;
+    function CurrentInstructionPoint: Int64; override;
     function DebugState: TAbstractDebugState; override;
     function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer): TListEx<TInstruction>; override;
     function IsActive: Boolean; override;
@@ -170,16 +170,16 @@ type
     function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; override;
     procedure Run; override;
     procedure Stop; override;
-    procedure SetNewIP(AddrVA: UInt64); override;
-    procedure ToggleBreakPoint(AddrVA: UInt64); override;
+    procedure SetNewIP(AddrVA: Int64); override;
+    procedure ToggleBreakPoint(AddrVA: Int64); override;
     function ThreadStackLimit: TStackLimit; override;
     function ThreadID: Cardinal; override;
     procedure TraceIn; override;
     procedure TraceOut; override;
     procedure TraceTilReturn; override;
     procedure TraceTo(AddrVA: Int64); override;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean; override;
-    procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: UInt64; ASize: Int64); override;
+    function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean; override;
+    procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); override;
     property Debugger: TDebuggerIntf read FDebugger;
     property DbgController: TDbgController read FDbgController;
   end;
@@ -199,7 +199,7 @@ begin
 end;
 
 constructor TThreadWorkerMaskBreakpoints.Create(ADebugger: TFpDebugDebuggerBase;
-  pBuff: PByte; AAddrVA: UInt64; ASize: Int64);
+  pBuff: PByte; AAddrVA: Int64; ASize: Int64);
 begin
   inherited Create(ADebugger, twpContinue);
   FAddrVA := AAddrVA;
@@ -241,7 +241,7 @@ var
   BP: TIDEBreakPoint;
   BPList: TDBGPtrArray;
   BBP: TBasicBreakPoint;
-  DuplicateController: TDictionary<UInt64, Boolean>;
+  DuplicateController: TDictionary<Int64, Boolean>;
   LineAddressesPresent: Boolean;
 begin
   CpuViewDebugLog.Log('DebugGate: BreakPointChanged start', True);
@@ -256,7 +256,7 @@ begin
   BreakPointList.Clear;
   if FBreakPoints = nil then Exit;
   if FProcess = nil then Exit;
-  DuplicateController := TDictionary<UInt64, Boolean>.Create;
+  DuplicateController := TDictionary<Int64, Boolean>.Create;
   try
     for I := 0 to FBreakPoints.Count - 1 do
     begin
@@ -631,7 +631,7 @@ constructor TCpuViewDebugGate.Create(AOwner: TComponent;
   AUtils: TCommonAbstractUtils);
 begin
   inherited;
-  FTemporaryIP := TDictionary<Integer, UInt64>.Create;
+  FTemporaryIP := TDictionary<Integer, Int64>.Create;
   FSupportStream := TRemoteStream.Create(Utils);
   FSupportStream.OnUpdated := UpdateRemoteStream;
   FBreakpointsNotification := TIDEBreakPointsNotification.Create;
@@ -686,7 +686,7 @@ begin
   Result := RemapCmd[ACommand] in AvailableCommands;
 end;
 
-function TCpuViewDebugGate.CurrentInstructionPoint: UInt64;
+function TCpuViewDebugGate.CurrentInstructionPoint: Int64;
 var
   AEntry: TThreadEntry;
 begin
@@ -972,7 +972,7 @@ begin
   CpuViewDebugLog.Log('DebugGate: Stop end', False);
 end;
 
-procedure TCpuViewDebugGate.SetNewIP(AddrVA: UInt64);
+procedure TCpuViewDebugGate.SetNewIP(AddrVA: Int64);
 begin
   CpuViewDebugLog.Log(Format('DebugGate: SetNewIP(0x%x)', [AddrVA]), True);
 
@@ -981,7 +981,7 @@ begin
   CpuViewDebugLog.Log('DebugGate: SetNewIP end', False);
 end;
 
-procedure TCpuViewDebugGate.ToggleBreakPoint(AddrVA: UInt64);
+procedure TCpuViewDebugGate.ToggleBreakPoint(AddrVA: Int64);
 var
   Sym: TFpSymbol;
   Bp: TIDEBreakPoint;
@@ -1114,7 +1114,7 @@ begin
   CpuViewDebugLog.Log('DebugGate: TraceTo end', False);
 end;
 
-function TCpuViewDebugGate.UpdateRegValue(RegID: Integer; ANewRegValue: UInt64
+function TCpuViewDebugGate.UpdateRegValue(RegID: Integer; ANewRegValue: Int64
   ): Boolean;
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
@@ -1153,12 +1153,12 @@ begin
   CpuViewDebugLog.Log('DebugGate: UpdateRegValue end', False);
 end;
 
-procedure TCpuViewDebugGate.UpdateRemoteStream(pBuff: PByte; AAddrVA: UInt64;
+procedure TCpuViewDebugGate.UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64;
   ASize: Int64);
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerMaskBreakpoints;
-  AddrVA, Limit: UInt64;
+  AddrVA, Limit: Int64;
   NeedUpdate: Boolean;
   I: Integer;
 begin

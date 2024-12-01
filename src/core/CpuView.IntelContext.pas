@@ -138,20 +138,20 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure InitDefault; override;
-    function InstructonPoint: UInt64; override;
+    function InstructonPoint: Int64; override;
     function InstructonPointID: TRegID; override;
     function IsActiveJump(const Value: string): Boolean; override;
     function PointerSize: Integer; override;
     function RegDescriptor(const ARegName: string; out ADescriptor: TRegDescriptor): Boolean; overload; override;
     function RegQueryEnumString(ARegID: TRegID; AEnumIndex: Integer): string; override;
     function RegQueryEnumValuesCount(ARegID: TRegID): Integer; override;
-    function RegQueryNamesAtAddr(AAddrVA: UInt64): string; override;
+    function RegQueryNamesAtAddr(AAddrVA: Int64): string; override;
     function RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean; overload; override;
     function RegQueryValue(const ARegName: string; out ARegValue: TRegValue): Boolean; overload; override;
     function RegSetValue(ARegID: TRegID; const ANewRegValue: TRegValue): Boolean; override;
-    function StackBase: UInt64; override;
-    function StackPoint: UInt64; override;
-    function Update(ANewInstructionPoint: UInt64 = 0): Boolean; override;
+    function StackBase: Int64; override;
+    function StackPoint: Int64; override;
+    function Update(ANewInstructionPoint: Int64 = 0): Boolean; override;
     property Context: TIntelThreadContext read FContext write SetContext;
     property FPUMode: TFPUMode read FFPUMode write SetFPUMode;
     property MapMode: TIntelCpuMapMode read FMapMode write SetMapMode;
@@ -1045,7 +1045,7 @@ begin
   Add(crtSelectableHint, vmDefOnly);   // 176 - LastStatus hint
 end;
 
-function TIntelCpuContext.InstructonPoint: UInt64;
+function TIntelCpuContext.InstructonPoint: Int64;
 begin
   Result := FContext.Rip;
 end;
@@ -1218,7 +1218,7 @@ begin
   end;
 end;
 
-function TIntelCpuContext.RegQueryNamesAtAddr(AAddrVA: UInt64): string;
+function TIntelCpuContext.RegQueryNamesAtAddr(AAddrVA: Int64): string;
 begin
   if not FQueryRegAtAddr.TryGetValue(AAddrVA, Result) then
     Result := '';
@@ -1280,7 +1280,7 @@ var
   ReloadTagWord: Boolean;
   TagWordCtx: TIntelThreadContext;
   ExtendedData: TThreadExtendedData;
-  OriginalRIP: UInt64;
+  OriginalRIP: Int64;
 begin
   if ARegID in [100, 101] then
   begin
@@ -1711,12 +1711,12 @@ begin
   FContext.TagWord := (FContext.TagWord and Mask) or NewTagWord;
 end;
 
-function TIntelCpuContext.StackBase: UInt64;
+function TIntelCpuContext.StackBase: Int64;
 begin
   Result := FContext.Rbp;
 end;
 
-function TIntelCpuContext.StackPoint: UInt64;
+function TIntelCpuContext.StackPoint: Int64;
 begin
   Result := FContext.Rsp;
 end;
@@ -1728,7 +1728,7 @@ begin
     Dec(Result, 8);
 end;
 
-function TIntelCpuContext.Update(ANewInstructionPoint: UInt64): Boolean;
+function TIntelCpuContext.Update(ANewInstructionPoint: Int64): Boolean;
 var
   ACtx: TIntelThreadContext;
   ExtendedData: TThreadExtendedData;
@@ -2004,7 +2004,7 @@ end;
 
 procedure TIntelCpuContext.UpdateModifyed(const Value: TIntelThreadContext);
 
-  function CheckReg(A, B: UInt64; RegID: Integer): Boolean;
+  function CheckReg(A, B: Int64; RegID: Integer): Boolean;
   begin
     Result := A <> B;
     KnownRegs.List[RegID].Modifyed := Result;

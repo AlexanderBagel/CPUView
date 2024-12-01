@@ -109,6 +109,7 @@ type
     function Add(AValue: TDumpView): Integer;
     function Count: Integer;
     procedure Delete(Index: Integer);
+    procedure JumpClear;
     procedure Reset;
     procedure Restore(DefAddrVA: Int64);
     procedure Update(Index: Integer; AddrVA: Int64);
@@ -125,6 +126,7 @@ type
   TCpuViewCore = class
   private
     FAddrIndex: TDictionary<Int64, Integer>;
+    FAsmJmpStack: TJumpStack;
     FAsmView: TAsmView;
     FAsmSelStart, FAsmSelEnd: Int64;
     FAsmStream: TBufferedROStream;
@@ -135,14 +137,11 @@ type
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
     FInvalidReg: TRegionData;
-    FJmpStack: TList<Int64>;
-    FJmpStackIdx: Integer;
     FKnownFunctionAddrVA: TDictionary<Int64, string>;
     FKnownRegionData: TDictionary<Int64, TRegionData>;
     FLastStackLimit: TStackLimit;
-    FLockPushToJmpStack: Boolean;
     FLockSelChange: Boolean;
-    FLastCachedAddrVA: UInt64;
+    FLastCachedAddrVA: Int64;
     FLastCtx: TCommonCpuContext;
     FRegView: TRegView;
     FShowCallFuncName: Boolean;
@@ -159,7 +158,7 @@ type
     procedure OnAsmCacheEnd(Sender: TObject);
     procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
       AJmpState: TJmpState; var Handled: Boolean);
-    procedure OnAsmQueryComment(Sender: TObject; AddrVA: UInt64;
+    procedure OnAsmQueryComment(Sender: TObject; AddrVA: Int64;
       AColumn: TColumnType; var AComment: string);
     procedure OnAsmScroll(Sender: TObject; AStep: TScrollStepDirection);
     procedure OnAsmSelectionChange(Sender: TObject);
@@ -171,7 +170,7 @@ type
       var Hint: string);
     procedure OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
       AJmpState: TJmpState; var Handled: Boolean);
-    procedure OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
+    procedure OnRegQueryComment(Sender: TObject; AddrVA: Int64;
       AColumn: TColumnType; var AComment: string);
     procedure OnRegQueryExternalComment(Sender: TObject;
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
@@ -185,7 +184,7 @@ type
     function FormatAccessString(const ARegionData: TRegionData): string;
     function GenerateCache(AAddress: Int64): Integer;
     procedure LoadFromCache(AIndex: Integer);
-    procedure OnQueryAddressType(Sender: TObject; AddrVA: UInt64; var AddrType: TAddrType);
+    procedure OnQueryAddressType(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType);
     procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
     // Forced - означает принудительную перестройку вьювера
@@ -195,7 +194,7 @@ type
     // Necessary when changing Viewer settings
     procedure RefreshAsmView(Forced: Boolean);
     procedure ResetCache;
-    procedure StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
+    procedure StackViewQueryComment(Sender: TObject; AddrVA: Int64;
       AColumn: TColumnType; var AComment: string);
     procedure UpdateStreamsProcessID;
   public
@@ -204,15 +203,15 @@ type
     function AddrInAsm(AddrVA: Int64): Boolean;
     function AddrInDump(AddrVA: Int64): Boolean;
     function AddrInStack(AddrVA: Int64): Boolean;
-    function QueryAccessStr(AddrVA: UInt64): string;
-    function QueryAddressType(AddrVA: UInt64): TAddrType;
+    function QueryAccessStr(AddrVA: Int64): string;
+    function QueryAddressType(AddrVA: Int64): TAddrType;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean;
-    function QuerySymbolAtAddr(AddrVA: UInt64): string;
-    procedure ShowDisasmAtAddr(AddrVA: Int64);
+    function QuerySymbolAtAddr(AddrVA: Int64): string;
+    procedure ShowDisasmAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = False);
     procedure ShowDumpAtAddr(AddrVA: Int64);
     procedure ShowStackAtAddr(AddrVA: Int64);
     procedure UpdateAfterSettingsChange;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: UInt64): Boolean;
+    function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean;
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
     property DBase: TCpuViewDBase read FDBase;
@@ -223,7 +222,7 @@ type
     // -------------------------------------------------------------------------
     // Address on the basis of which the current cache was built.
     // Necessary for proper Undo/Redo operations in the transition cache.
-    property LastCachedAddrVA: UInt64 read FLastCachedAddrVA;
+    property LastCachedAddrVA: Int64 read FLastCachedAddrVA;
     property LastStackLimit: TStackLimit read FLastStackLimit;
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
@@ -352,6 +351,14 @@ begin
     Dec(FItemIndex);
 end;
 
+procedure TDumpViewList.JumpClear;
+var
+  I: Integer;
+begin
+  for I := 0 to Count - 1 do
+    FItems.List[I].View.JumpClear;
+end;
+
 procedure TDumpViewList.Reset;
 var
   I: Integer;
@@ -402,7 +409,7 @@ begin
   Result := (AddrVA <= StackLim.Base) and (AddrVA >= StackLim.Limit);
 end;
 
-function TCpuViewCore.QueryAccessStr(AddrVA: UInt64): string;
+function TCpuViewCore.QueryAccessStr(AddrVA: Int64): string;
 var
   RegionData: TRegionData;
 begin
@@ -411,7 +418,7 @@ begin
     Result := FormatAccessString(RegionData);
 end;
 
-function TCpuViewCore.QueryAddressType(AddrVA: UInt64): TAddrType;
+function TCpuViewCore.QueryAddressType(AddrVA: Int64): TAddrType;
 var
   ARegionData: TRegionData;
 begin
@@ -438,7 +445,7 @@ begin
   end;
 end;
 
-function TCpuViewCore.QuerySymbolAtAddr(AddrVA: UInt64): string;
+function TCpuViewCore.QuerySymbolAtAddr(AddrVA: Int64): string;
 begin
   Result := '';
   if not FKnownFunctionAddrVA.TryGetValue(AddrVA, Result) then
@@ -542,7 +549,7 @@ begin
   FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
   FKnownRegionData := TDictionary<Int64, TRegionData>.Create;
   FShowCallFuncName := True;
-  FJmpStack := TList<Int64>.Create;
+  FAsmJmpStack := TJumpStack.Create;
   FDBase := TCpuViewDBase.Create;
 end;
 
@@ -557,7 +564,7 @@ begin
   FStackStream.Free;
   FKnownFunctionAddrVA.Free;
   FKnownRegionData.Free;
-  FJmpStack.Free;
+  FAsmJmpStack.Free;
   FDebugger.Free;
   FUtils.Free;
   inherited;
@@ -751,46 +758,12 @@ end;
 
 procedure TCpuViewCore.OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
   AJmpState: TJmpState; var Handled: Boolean);
-var
-  NewJmpAddr: Int64;
 begin
-  case AJmpState of
-    jsPushToUndo:
-    begin
-      Handled := AddrInAsm(AJmpAddr);
-      if not Handled then Exit;
-      ShowDisasmAtAddr(AJmpAddr);
-    end;
-    jsPopFromUndo:
-    begin
-      Handled := True;
-      if FJmpStackIdx = 0 then Exit;
-      NewJmpAddr := FJmpStack[FJmpStackIdx - 2];
-      FLockPushToJmpStack := True;
-      try
-        ShowDisasmAtAddr(NewJmpAddr);
-      finally
-        FLockPushToJmpStack := False;
-      end;
-      NewJmpAddr := FJmpStack[FJmpStackIdx - 3];
-      Dec(FJmpStackIdx, 3);
-      AsmView.FocusOnAddress(NewJmpAddr, ccmSelectRow);
-    end;
-    jsRestorePopFromUndo:
-    begin
-      if FJmpStackIdx >= FJmpStack.Count then Exit;
-      Inc(FJmpStackIdx, 3);
-      FLockPushToJmpStack := True;
-      try
-        ShowDisasmAtAddr(FJmpStack[FJmpStackIdx - 1]);
-      finally
-        FLockPushToJmpStack := False;
-      end;
-    end;
-  end;
+  if (AJmpState in [jsJmpPushToStack..jsJmpRedo]) and AddrInAsm(AJmpAddr) then
+    ShowDisasmAtAddr(AJmpAddr);
 end;
 
-procedure TCpuViewCore.OnAsmQueryComment(Sender: TObject; AddrVA: UInt64;
+procedure TCpuViewCore.OnAsmQueryComment(Sender: TObject; AddrVA: Int64;
   AColumn: TColumnType; var AComment: string);
 begin
   case AColumn of
@@ -880,12 +853,15 @@ begin
         FAsmView.InstructionPoint := 0;
         FAsmView.CurrentIPIsActiveJmp := False;
         FAsmView.Invalidate;
+        FAsmView.JumpClear;
       end;
       if Assigned(FStackView) then
       begin
         FStackView.Frames.Clear;
         FStackView.Invalidate;
+        FStackView.JumpClear;
       end;
+      FDumpViewList.JumpClear;
       DoReset;
     end;
     adsFinished:
@@ -897,8 +873,7 @@ begin
       if Assigned(FStackView) then
         FStackView.SetDataStream(nil, 0);
       FDumpViewList.Reset;
-      FJmpStack.Clear;
-      FJmpStackIdx := 0;
+      FAsmJmpStack.Clear;
       UpdateStreamsProcessID;
       DoReset;
     end;
@@ -934,23 +909,23 @@ procedure TCpuViewCore.OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
 var
   AddrType: TAddrType;
 begin
-  if AJmpState <> jsPushToUndo then Exit;
+  if AJmpState <> jsJmpPushToStack then Exit;
   AddrType := atNone;
   OnQueryAddressType(Sender, AJmpAddr, AddrType);
   case AddrType of
-    atExecute: ShowDisasmAtAddr(AJmpAddr);
+    atExecute: ShowDisasmAtAddr(AJmpAddr, True);
     atRead: ShowDumpAtAddr(AJmpAddr);
     atStack: ShowStackAtAddr(AJmpAddr);
   end;
 end;
 
-procedure TCpuViewCore.OnQueryAddressType(Sender: TObject; AddrVA: UInt64;
+procedure TCpuViewCore.OnQueryAddressType(Sender: TObject; AddrVA: Int64;
   var AddrType: TAddrType);
 begin
   AddrType := QueryAddressType(AddrVA);
 end;
 
-procedure TCpuViewCore.OnRegQueryComment(Sender: TObject; AddrVA: UInt64;
+procedure TCpuViewCore.OnRegQueryComment(Sender: TObject; AddrVA: Int64;
   AColumn: TColumnType; var AComment: string);
 begin
   AComment := QuerySymbolAtAddr(AddrVA);
@@ -1013,7 +988,7 @@ begin
   FKnownRegionData.Clear;
 end;
 
-procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: UInt64;
+procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: Int64;
   AColumn: TColumnType; var AComment: string);
 var
   AStackValue: Int64;
@@ -1092,24 +1067,20 @@ begin
     FStackView.Invalidate;
 end;
 
-procedure TCpuViewCore.ShowDisasmAtAddr(AddrVA: Int64);
+procedure TCpuViewCore.ShowDisasmAtAddr(AddrVA: Int64; PushToJmpStack: Boolean);
 begin
   if Assigned(FAsmView) then
   begin
+    if PushToJmpStack then
+    begin
+      FAsmView.JumpToAddress(AddrVA);
+      Exit;
+    end;
     try
-      if not FLockPushToJmpStack then
-      begin
-        FJmpStack.Count := FJmpStackIdx;
-        FJmpStack.Add(FAsmView.SelectedInstructionAddr);
-        FJmpStack.Add(FAsmView.RowToAddress(FAsmView.CurrentVisibleRow, 0));
-        FJmpStack.Add(AddrVA);
-        Inc(FJmpStackIdx, 3);
-      end;
       FAsmSelStart := 0;
       FAsmSelEnd := 0;
       if not FAsmView.IsAddrVisible(AddrVA) then
         BuildAsmWindow(AddrVA);
-      FAsmView.FocusOnAddress(AddrVA, ccmSelectRow);
     except
       RefreshView;
       raise;
@@ -1138,7 +1109,7 @@ begin
 end;
 
 function TCpuViewCore.UpdateRegValue(RegID: Integer;
-  ANewRegValue: UInt64): Boolean;
+  ANewRegValue: Int64): Boolean;
 begin
   Result := False;
   if CanWork then

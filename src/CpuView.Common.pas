@@ -33,13 +33,13 @@ type
   TRegViewModes = set of TRegViewMode;
 
   TStackLimit = record
-    Base, Limit: UInt64;
+    Base, Limit: Int64;
   end;
 
   TStackFrame = record
     AddrStack,
     AddrFrame,
-    AddrPC: UInt64;
+    AddrPC: Int64;
   end;
 
   TRegionAccess = (raRead, raWrite, raExecute, raProtect);
