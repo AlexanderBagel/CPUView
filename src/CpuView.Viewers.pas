@@ -1761,7 +1761,8 @@ var
   AddrVA: Int64;
   AddrIndex: Integer;
 begin
-  if not ValidateAddress then Exit(False);
+  Result := False;
+  if not ValidateAddress then Exit;
   if not (ssCtrl in AHitInfo.Shift) then Exit;
   if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if AHitInfo.Cursor <> crHandPoint then Exit;
@@ -1769,7 +1770,7 @@ begin
   if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
   begin
     AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex{%H-});
-    Result := JumpToAddress(AddrVA);
+    DoJmpTo(AddrVA, jsQueryJump, Result);
   end;
 end;
 

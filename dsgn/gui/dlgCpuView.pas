@@ -562,8 +562,11 @@ end;
 procedure TfrmCpuView.InternalShowInDump(AddrVA: Int64);
 begin
   Core.ShowDumpAtAddr(AddrVA);
+  ActiveDumpView.FocusOnAddress(AddrVA, ccmSetNewSelection);
   if ActiveViewIndex = 0 then
-    ActiveDumpView.SelEnd := AddrVA + AsmView.SelectedRawLength - 1;
+    ActiveDumpView.SelEnd := AddrVA + AsmView.SelectedRawLength - 1
+  else
+    ActiveDumpView.SelEnd := AddrVA + DbgGate.PointerSize - 1;
   ActiveControl := ActiveDumpView;
 end;
 
@@ -778,13 +781,9 @@ begin
   NewAddress := 0;
   if QueryAddress('Go to Address', 'Address:', NewAddress, CheckAddressCallback) then
     case FQweryAddrViewerIndex of
-      0: FCore.ShowDisasmAtAddr(NewAddress, True);
+      0: FCore.ShowDisasmAtAddr(NewAddress);
       2: FCore.ShowStackAtAddr(NewAddress);
-      3:
-      begin
-        FCore.ShowDumpAtAddr(NewAddress);
-        ActiveDumpView.FocusOnAddress(NewAddress, ccmSetNewSelection);
-      end;
+      3: InternalShowInDump(NewAddress);
     end;
 end;
 
@@ -916,7 +915,7 @@ end;
 
 procedure TfrmCpuView.acShowInAsmExecute(Sender: TObject);
 begin
-  Core.ShowDisasmAtAddr(ActiveViewerSelectedValue, True);
+  Core.ShowDisasmAtAddr(ActiveViewerSelectedValue);
   ActiveControl := AsmView;
 end;
 
@@ -1005,7 +1004,7 @@ end;
 
 procedure TfrmCpuView.acAsmReturnToIPExecute(Sender: TObject);
 begin
-  Core.ShowDisasmAtAddr(DbgGate.CurrentInstructionPoint, True);
+  Core.ShowDisasmAtAddr(DbgGate.CurrentInstructionPoint);
 end;
 
 procedure TfrmCpuView.acAsmReturnToIPUpdate(Sender: TObject);
