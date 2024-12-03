@@ -292,21 +292,9 @@ type
     property OnVerticalScroll;
   end;
 
-  { TFixedColumnView }
+  { TAddressViewColorMap }
 
-  TFixedColumnView = class(TFWCustomHexView)
-  protected
-    procedure DoChange(ChangeCode: Integer); override;
-    procedure InitPainters; override;
-    procedure RestoreViewParam; override;
-  published
-    property Font;
-    property PopupMenu;
-  end;
-
-  { TAddrHightLightColorMap }
-
-  TAddrHightLightColorMap = class(THexViewColorMap)
+  TAddressViewColorMap = class(THexViewColorMap)
   private
     FExecuteColor: TColor;
     FReadColor: TColor;
@@ -324,16 +312,43 @@ type
     property AddrStackColor: TColor read FStackColor write SetStackColor stored IsColorStored;
   end;
 
+  { TCustomAddressView }
+
+  TAddrType = (atNone, atExecute, atRead, atStack);
+  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType) of object;
+
+  TCustomAddressView = class(TFWCustomHexView)
+  private
+    FLastInvalidAddrRect: TRect;
+    FOnQueryAddr: TOnQueryAddrType;
+    FValidateAddress: Boolean;
+    function GetColorMap: TAddressViewColorMap;
+    procedure SetColorMap(AValue: TAddressViewColorMap);
+    procedure SetValidateAddress(AValue: Boolean);
+  protected
+    procedure DoChange(ChangeCode: Integer); override;
+    procedure DoQueryAddrType(AddrVA: Int64; var AddrType: TAddrType);
+    procedure InitPainters; override;
+    function GetColorMapClass: THexViewColorMapClass; override;
+    procedure RestoreViewParam; override;
+  protected
+    property ColorMap: TAddressViewColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
+    property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
+    property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
+  public
+    constructor Create(AOwner: TComponent); override;
+  published
+    property Font;
+    property PopupMenu;
+  end;
+
   TLeftRightBounds = record
     LeftOffset, Width: Integer;
   end;
 
-  TAddrType = (atNone, atExecute, atRead, atStack);
-  TAddrHightLightView = class;
+  { TAddressViewPainter }
 
-  { TAddrHightLightPainter }
-
-  TAddrHightLightPainter = class(TRowHexPainter)
+  TAddressViewPainter = class(TRowHexPainter)
   private
     FCacheAddrType: TAddrType;
     FCacheIndex, FCacheAddrIndex: Integer;
@@ -342,53 +357,30 @@ type
     function GetAddrAtIndex(AIndex: Integer): Int64;
     function QueryAddrType(AIndex: Integer): TAddrType;
   protected
-    procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
     function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo;
       var AddrIndex: Integer): Int64;
     function GetBounds(AIndex: Integer): TLeftRightBounds;
-    procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
-    function View: TAddrHightLightView;
-  end;
-
-  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType) of object;
-
-  { TAddrHightLightView }
-
-  TAddrHightLightView = class(TFixedColumnView)
-  private
-    FLastInvalidAddrRect: TRect;
-    FValidateAddress: Boolean;
-    FOnQueryAddr: TOnQueryAddrType;
-    function GetColorMap: TAddrHightLightColorMap;
-    procedure SetColorMap(AValue: TAddrHightLightColorMap);
-    procedure SetValidateAddress(AValue: Boolean);
-  protected
-    procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
-    function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
-    procedure DoQueryAddrType(AddrVA: Int64; var AddrType: TAddrType);
-    function GetColorMapClass: THexViewColorMapClass; override;
-  protected
-    property ColorMap: TAddrHightLightColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
-    property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
-    property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
-  public
-    constructor Create(AOwner: TComponent); override;
+    function View: TCustomAddressView;
   end;
 
   { TDumpPainter }
 
-  TDumpPainter = class(TAddrHightLightPainter)
+  TDumpPainter = class(TAddressViewPainter)
   protected
     function ColumnsDrawSupport: TFWHexViewColumnTypes; override;
     procedure DrawHeaderColumn(ACanvas: TCanvas; AColumn: TColumnType;
       var ARect: TRect); override;
+    procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
     function GetHeaderColumnCaption(AColumn: TColumnType): string; override;
+    procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
   end;
 
   { TCustomDumpView }
 
-  TCustomDumpView = class(TAddrHightLightView)
+  TCustomDumpView = class(TCustomAddressView)
   protected
+    procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
+    function DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean; override;
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
     procedure InitDefault; override;
     procedure UpdateView; override;
@@ -467,7 +459,7 @@ type
 
   { TStackColorMap }
 
-  TStackColorMap = class(TAddrHightLightColorMap)
+  TStackColorMap = class(TAddressViewColorMap)
   private
     FAddrPCColor: TColor;
     FAddrPCFontColor: TColor;
@@ -511,18 +503,19 @@ type
 
   { TStackRowPainter }
 
-  TStackRowPainter = class(TAddrHightLightPainter)
+  TStackRowPainter = class(TAddressViewPainter)
   strict private
     function StackView: TCustomStackView;
     function GetTopOfStackRowIndex(out AIndex: Int64): Boolean;
   protected
     procedure CorrectCanvasFont(ACanvas: TCanvas; AColumn: TColumnType); override;
     procedure DrawAddress(ACanvas: TCanvas; var ARect: TRect); override;
+    procedure DrawWorkSpace(ACanvas: TCanvas; var ARect: TRect); override;
   end;
 
   { TCustomStackView }
 
-  TCustomStackView = class(TAddrHightLightView)
+  TCustomStackView = class(TCustomAddressView)
   strict private
     FFrames: TListEx<TStackFrame>;
     FAddrPCDict: TDictionary<Int64, Int64>;
@@ -533,6 +526,7 @@ type
     function ByteViewModeCommandEnabled(Value: TByteViewMode; var AChecked: Boolean): Boolean; override;
     function CopyCommandEnabled(Value: TCopyStyle): Boolean; override;
     procedure DoChange(ChangeCode: Integer); override;
+    procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
     procedure InitDefault; override;
     procedure InitPainters; override;
@@ -684,7 +678,7 @@ type
 
   { TCustomRegView }
 
-  TCustomRegView = class(TFixedColumnView, ICpuContextViewModeAction)
+  TCustomRegView = class(TCustomAddressView, ICpuContextViewModeAction)
   private
     FContext: TAbstractCPUContext;
     FActiveRegParam: TRegParam;
@@ -1503,31 +1497,9 @@ begin
   end;
 end;
 
-{ TFixedColumnView }
+{ TAddressViewColorMap }
 
-procedure TFixedColumnView.DoChange(ChangeCode: Integer);
-begin
-  inherited;
-  if ChangeCode in [cmFont, cmData] then
-    FitColumnsToBestSize;
-end;
-
-procedure TFixedColumnView.InitPainters;
-begin
-  DefaultPainter := GetDefaultPainterClass.Create(Self);
-  Painters.Add(DefaultPainter);
-end;
-
-procedure TFixedColumnView.RestoreViewParam;
-begin
-  // колонки пересчитываются автоматически
-
-  // columns are recalculated automatically
-end;
-
-{ TAddrHightLightColorMap }
-
-procedure TAddrHightLightColorMap.SetExecuteColor(AValue: TColor);
+procedure TAddressViewColorMap.SetExecuteColor(AValue: TColor);
 begin
   if FExecuteColor <> AValue then
   begin
@@ -1536,7 +1508,7 @@ begin
   end;
 end;
 
-procedure TAddrHightLightColorMap.SetReadColor(AValue: TColor);
+procedure TAddressViewColorMap.SetReadColor(AValue: TColor);
 begin
   if FReadColor <> AValue then
   begin
@@ -1545,7 +1517,7 @@ begin
   end;
 end;
 
-procedure TAddrHightLightColorMap.SetStackColor(AValue: TColor);
+procedure TAddressViewColorMap.SetStackColor(AValue: TColor);
 begin
   if FStackColor <> AValue then
   begin
@@ -1554,18 +1526,18 @@ begin
   end;
 end;
 
-procedure TAddrHightLightColorMap.AssignTo(Dest: TPersistent);
+procedure TAddressViewColorMap.AssignTo(Dest: TPersistent);
 begin
   inherited;
-  if Dest is TAddrHightLightColorMap then
+  if Dest is TAddressViewColorMap then
   begin
-    TAddrHightLightColorMap(Dest).FExecuteColor := FExecuteColor;
-    TAddrHightLightColorMap(Dest).FReadColor := FReadColor;
-    TAddrHightLightColorMap(Dest).FStackColor := FStackColor;
+    TAddressViewColorMap(Dest).FExecuteColor := FExecuteColor;
+    TAddressViewColorMap(Dest).FReadColor := FReadColor;
+    TAddressViewColorMap(Dest).FStackColor := FStackColor;
   end;
 end;
 
-procedure TAddrHightLightColorMap.InitLightMode;
+procedure TAddressViewColorMap.InitLightMode;
 begin
   inherited;
   FExecuteColor := $CC33FF;
@@ -1573,7 +1545,7 @@ begin
   FStackColor := $2197FF;
 end;
 
-procedure TAddrHightLightColorMap.InitDarkMode;
+procedure TAddressViewColorMap.InitDarkMode;
 begin
   inherited;
   FExecuteColor := $CC33FF;
@@ -1581,9 +1553,68 @@ begin
   FStackColor := $2197FF;
 end;
 
-{ TAddrHightLightPainter }
+{ TCustomAddressView }
 
-procedure TAddrHightLightPainter.CheckCache;
+procedure TCustomAddressView.SetValidateAddress(AValue: Boolean);
+begin
+  if ValidateAddress <> AValue then
+  begin
+    FValidateAddress := AValue;
+    Invalidate;
+  end;
+end;
+
+function TCustomAddressView.GetColorMap: TAddressViewColorMap;
+begin
+  Result := TAddressViewColorMap(inherited ColorMap);
+end;
+
+procedure TCustomAddressView.SetColorMap(AValue: TAddressViewColorMap);
+begin
+  ColorMap.Assign(AValue);
+end;
+
+procedure TCustomAddressView.DoChange(ChangeCode: Integer);
+begin
+  inherited;
+  if ChangeCode in [cmFont, cmData] then
+    FitColumnsToBestSize;
+end;
+
+procedure TCustomAddressView.DoQueryAddrType(AddrVA: Int64;
+  var AddrType: TAddrType);
+begin
+  if Assigned(FOnQueryAddr) then
+    FOnQueryAddr(Self, AddrVA, AddrType);
+end;
+
+procedure TCustomAddressView.InitPainters;
+begin
+  DefaultPainter := GetDefaultPainterClass.Create(Self);
+  Painters.Add(DefaultPainter);
+end;
+
+function TCustomAddressView.GetColorMapClass: THexViewColorMapClass;
+begin
+  Result := TAddressViewColorMap;
+end;
+
+procedure TCustomAddressView.RestoreViewParam;
+begin
+  // колонки пересчитываются автоматически
+
+  // columns are recalculated automatically
+end;
+
+constructor TCustomAddressView.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FValidateAddress := True;
+end;
+
+{ TAddressViewPainter }
+
+procedure TAddressViewPainter.CheckCache;
 begin
   if RowIndex = FCacheIndex then Exit;
   GetRawBuff(RowIndex, FCacheData);
@@ -1591,8 +1622,86 @@ begin
   FCacheAddrIndex := -1;
 end;
 
-procedure TAddrHightLightPainter.DrawHexPart(ACanvas: TCanvas;
-  var ARect: TRect);
+function TAddressViewPainter.GetAddrAtIndex(AIndex: Integer): Int64;
+begin
+  CheckCache;
+  if FCacheData = nil then Exit(0);
+  if AddressMode = am32bit then
+    Result := PInteger(@FCacheData[AIndex shl 2])^
+  else
+    Result := PInt64(@FCacheData[AIndex shl 3])^;
+end;
+
+function TAddressViewPainter.GetAddressAtCursor(
+  const AMouseHitInfo: TMouseHitInfo; var AddrIndex: Integer): Int64;
+var
+  I, L: Integer;
+  ABounds: TLeftRightBounds;
+begin
+  Result := 0;
+  AddrIndex := -1;
+  if AMouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  CheckCache;
+  for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
+  begin
+    ABounds := GetBounds(I);
+    L := AMouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+    if L > AMouseHitInfo.ScrolledCursorPos.X then Exit;
+    if L + ABounds.Width > AMouseHitInfo.ScrolledCursorPos.X then
+    begin
+      AddrIndex := I;
+      Exit(GetAddrAtIndex(AddrIndex));
+    end;
+  end;
+end;
+
+function TAddressViewPainter.GetBounds(AIndex: Integer): TLeftRightBounds;
+var
+  AByteCount, ASelStart, ASelEnd: Integer;
+begin
+  AByteCount := IfThen(AddressMode = am32bit, 8, 16);
+  ASelStart := AByteCount * AIndex;
+  ASelEnd := AByteCount * (AIndex + 1) - 2;
+  Result.LeftOffset := TextMetric.CharLength(ctOpcode, 0, ASelStart) - CharWidth;
+  Result.Width := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
+end;
+
+function TAddressViewPainter.QueryAddrType(AIndex: Integer): TAddrType;
+begin
+  if FCacheAddrIndex <> AIndex then
+  begin
+    FCacheAddrIndex := AIndex;
+    FCacheAddrType := atNone;
+    View.DoQueryAddrType(GetAddrAtIndex(AIndex), FCacheAddrType);
+  end;
+  Result := FCacheAddrType
+end;
+
+function TAddressViewPainter.View: TCustomAddressView;
+begin
+  Result := TCustomAddressView(Owner);
+end;
+
+{ TDumpPainter }
+
+function TDumpPainter.ColumnsDrawSupport: TFWHexViewColumnTypes;
+begin
+  Result := [ctOpcode, ctDescription];
+end;
+
+procedure TDumpPainter.DrawHeaderColumn(ACanvas: TCanvas;
+  AColumn: TColumnType; var ARect: TRect);
+begin
+  case AColumn of
+    ctDescription:
+      DefaultDrawHeaderColumn(ACanvas, ARect,
+        GetHeaderColumnCaption(AColumn), 0);
+  else
+    inherited;
+  end;
+end;
+
+procedure TDumpPainter.DrawHexPart(ACanvas: TCanvas; var ARect: TRect);
 var
   AddrType: TAddrType;
   I: Integer;
@@ -1619,51 +1728,15 @@ begin
   end;
 end;
 
-function TAddrHightLightPainter.GetAddrAtIndex(AIndex: Integer): Int64;
+function TDumpPainter.GetHeaderColumnCaption(AColumn: TColumnType): string;
 begin
-  CheckCache;
-  if FCacheData = nil then Exit(0);
-  if AddressMode = am32bit then
-    Result := PInteger(@FCacheData[AIndex shl 2])^
+  if AColumn = ctDescription then
+    Result := Encoder.DisplayName
   else
-    Result := PInt64(@FCacheData[AIndex shl 3])^;
+    Result := inherited;
 end;
 
-function TAddrHightLightPainter.GetAddressAtCursor(
-  const AMouseHitInfo: TMouseHitInfo; var AddrIndex: Integer): Int64;
-var
-  I, L: Integer;
-  ABounds: TLeftRightBounds;
-begin
-  Result := 0;
-  AddrIndex := -1;
-  if AMouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
-  CheckCache;
-  for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
-  begin
-    ABounds := GetBounds(I);
-    L := AMouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
-    if L > AMouseHitInfo.ScrolledCursorPos.X then Exit;
-    if L + ABounds.Width > AMouseHitInfo.ScrolledCursorPos.X then
-    begin
-      AddrIndex := I;
-      Exit(GetAddrAtIndex(AddrIndex));
-    end;
-  end;
-end;
-
-function TAddrHightLightPainter.GetBounds(AIndex: Integer): TLeftRightBounds;
-var
-  AByteCount, ASelStart, ASelEnd: Integer;
-begin
-  AByteCount := IfThen(AddressMode = am32bit, 8, 16);
-  ASelStart := AByteCount * AIndex;
-  ASelEnd := AByteCount * (AIndex + 1) - 2;
-  Result.LeftOffset := TextMetric.CharLength(ctOpcode, 0, ASelStart) - CharWidth;
-  Result.Width := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
-end;
-
-procedure TAddrHightLightPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
+procedure TDumpPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
 var
   I, L: Integer;
   ABounds: TLeftRightBounds;
@@ -1683,45 +1756,17 @@ begin
   end;
 end;
 
-function TAddrHightLightPainter.QueryAddrType(AIndex: Integer): TAddrType;
-begin
-  if FCacheAddrIndex <> AIndex then
-  begin
-    FCacheAddrIndex := AIndex;
-    FCacheAddrType := atNone;
-    View.DoQueryAddrType(GetAddrAtIndex(AIndex), FCacheAddrType);
-  end;
-  Result := FCacheAddrType
-end;
+{ TCustomDumpView }
 
-function TAddrHightLightPainter.View: TAddrHightLightView;
-begin
-  Result := TAddrHightLightView(Owner);
-end;
-
-{ TAddrHightLightView }
-
-procedure TAddrHightLightView.SetValidateAddress(AValue: Boolean);
-begin
-  if ValidateAddress <> AValue then
-  begin
-    FValidateAddress := AValue;
-    Invalidate;
-  end;
-end;
-
-function TAddrHightLightView.GetColorMap: TAddrHightLightColorMap;
-begin
-  Result := TAddrHightLightColorMap(inherited ColorMap);
-end;
-
-procedure TAddrHightLightView.SetColorMap(AValue: TAddrHightLightColorMap);
-begin
-  ColorMap.Assign(AValue);
-end;
-
-procedure TAddrHightLightView.DoGetHint(var AHintParam: THintParam;
+procedure TCustomDumpView.DoGetHint(var AHintParam: THintParam;
   var AHint: string);
+const
+  PostFix: array [TAddrType] of string = (
+    '',
+    'in Assembly.',
+    'in the Dump.',
+    'on the Stack'
+  );
 var
   Painter: TAbstractPrimaryRowPainter;
   AddrType: TAddrType;
@@ -1729,16 +1774,17 @@ var
   ABounds: TLeftRightBounds;
 begin
   if not ValidateAddress then Exit;
+  if ByteViewMode in [bvmFloat32..bvmText] then Exit;
   if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if PtInRect(FLastInvalidAddrRect, AHintParam.HitInfo.CursorPos) then Exit;
   Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
-  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
+  if Assigned(Painter) then
   begin
-    AHintParam.AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(
+    AHintParam.AddrVA := TAddressViewPainter(Painter).GetAddressAtCursor(
       AHintParam.HitInfo, AddrIndex{%H-});
     if (AddrIndex >= 0) and (AHintParam.AddrVA <> 0) then
     begin
-      ABounds := TAddrHightLightPainter(Painter).GetBounds(AddrIndex);
+      ABounds := TAddressViewPainter(Painter).GetBounds(AddrIndex);
       AHintParam.CursorRect.Left :=
         AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
       AHintParam.CursorRect.Width := ABounds.Width;
@@ -1750,12 +1796,13 @@ begin
       end;
       FLastInvalidAddrRect := TRect.Empty;
       inherited;
+      AHint := AHint + sLineBreak +
+        'Press Ctrl+Click to jump to an address ' + PostFix[AddrType];
     end;
   end;
 end;
 
-function TAddrHightLightView.DoLButtonDown(const AHitInfo: TMouseHitInfo
-  ): Boolean;
+function TCustomDumpView.DoLButtonDown(const AHitInfo: TMouseHitInfo): Boolean;
 var
   Painter: TAbstractPrimaryRowPainter;
   AddrVA: Int64;
@@ -1767,59 +1814,12 @@ begin
   if AHitInfo.SelectPoint.Column <> ctOpcode then Exit;
   if AHitInfo.Cursor <> crHandPoint then Exit;
   Painter := GetRowPainter(AHitInfo.SelectPoint.RowIndex);
-  if Assigned(Painter) and (Painter is TAddrHightLightPainter) then
+  if Assigned(Painter) then
   begin
-    AddrVA := TAddrHightLightPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex{%H-});
+    AddrVA := TDumpPainter(Painter).GetAddressAtCursor(AHitInfo, AddrIndex{%H-});
     DoJmpTo(AddrVA, jsQueryJump, Result);
   end;
 end;
-
-procedure TAddrHightLightView.DoQueryAddrType(AddrVA: Int64;
-  var AddrType: TAddrType);
-begin
-  if Assigned(FOnQueryAddr) then
-    FOnQueryAddr(Self, AddrVA, AddrType);
-end;
-
-function TAddrHightLightView.GetColorMapClass: THexViewColorMapClass;
-begin
-  Result := TAddrHightLightColorMap;
-end;
-
-constructor TAddrHightLightView.Create(AOwner: TComponent);
-begin
-  inherited Create(AOwner);
-  FValidateAddress := True;
-end;
-
-{ TDumpPainter }
-
-function TDumpPainter.ColumnsDrawSupport: TFWHexViewColumnTypes;
-begin
-  Result := [ctOpcode, ctDescription];
-end;
-
-procedure TDumpPainter.DrawHeaderColumn(ACanvas: TCanvas;
-  AColumn: TColumnType; var ARect: TRect);
-begin
-  case AColumn of
-    ctDescription:
-      DefaultDrawHeaderColumn(ACanvas, ARect,
-        GetHeaderColumnCaption(AColumn), 0);
-  else
-    inherited;
-  end;
-end;
-
-function TDumpPainter.GetHeaderColumnCaption(AColumn: TColumnType): string;
-begin
-  if AColumn = ctDescription then
-    Result := Encoder.DisplayName
-  else
-    Result := inherited;
-end;
-
-{ TCustomDumpView }
 
 function TCustomDumpView.GetDefaultPainterClass: TPrimaryRowPainterClass;
 begin
@@ -2069,6 +2069,33 @@ begin
   inherited;
 end;
 
+procedure TStackRowPainter.DrawWorkSpace(ACanvas: TCanvas; var ARect: TRect);
+var
+  AddrType: TAddrType;
+  CircleRect: TRect;
+  Offsets: Integer;
+begin
+  inherited;
+  if not View.ValidateAddress then Exit;
+  CheckCache;
+  AddrType := QueryAddrType(0);
+  if AddrType = atNone then Exit;
+  begin
+    case AddrType of
+      atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
+      atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
+      atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
+    end;
+    CircleRect := ARect;
+    CircleRect.Left := ARect.Right - ARect.Height;
+    Offsets := -Ceil(ARect.Height / 5);
+    InflateRect(CircleRect, Offsets, Offsets);
+    OffsetRect(CircleRect, TextMargin + Offsets, 0);
+    ACanvas.Brush.Style := bsSolid;
+    ACanvas.RoundRect(CircleRect, 2, 2);
+  end;
+end;
+
 function TStackRowPainter.GetTopOfStackRowIndex(out AIndex: Int64): Boolean;
 begin
   Result := StackView.Frames.Count > 0;
@@ -2141,6 +2168,46 @@ begin
   inherited;
   if ChangeCode = cmAddressMode then
     UpdateFrameDescriptions;
+end;
+
+procedure TCustomStackView.DoGetHint(var AHintParam: THintParam;
+  var AHint: string);
+var
+  Painter: TAbstractPrimaryRowPainter;
+  AddrType: TAddrType;
+  Offset: TPoint;
+  TmpRect: TRect;
+  ABounds: TLeftRightBounds;
+begin
+  if not ValidateAddress then Exit;
+  if PtInRect(FLastInvalidAddrRect, AHintParam.HitInfo.CursorPos) then Exit;
+  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
+  if Assigned(Painter) then
+  begin
+
+    Offset.X := ScrollOffset.X;
+    Offset.Y := 0;
+    TmpRect := TAddressViewPainter(Painter).ColumnRect(Offset, ctWorkSpace);
+    AHintParam.CursorRect.Left := TmpRect.Right - TmpRect.Height;
+    TmpRect := TAddressViewPainter(Painter).ColumnRect(Offset, ctOpcode);
+    ABounds := TAddressViewPainter(Painter).GetBounds(0);
+    AHintParam.CursorRect.Right :=
+      TmpRect.Left + TextMargin + ABounds.LeftOffset + ABounds.Width;
+    if not PtInRect(AHintParam.CursorRect, AHintParam.HitInfo.CursorPos) then Exit;
+
+    AHintParam.AddrVA := TAddressViewPainter(Painter).GetAddrAtIndex(0);
+    if AHintParam.AddrVA <> 0 then
+    begin
+      DoQueryAddrType(AHintParam.AddrVA, AddrType{%H-});
+      if AddrType = atNone then
+      begin
+        FLastInvalidAddrRect := AHintParam.CursorRect;
+        Exit;
+      end;
+      FLastInvalidAddrRect := TRect.Empty;
+      inherited;
+    end;
+  end;
 end;
 
 procedure TCustomStackView.FramesUpdated;

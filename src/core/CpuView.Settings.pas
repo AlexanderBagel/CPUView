@@ -244,7 +244,7 @@ type
     function DpiToDouble(AValue: Integer; AView: TFWCustomHexView): Double;
     function DoubleToDpi(AValue: Double; AView: TFWCustomHexView): Integer;
 
-    procedure LoadFromAddrHightLightColorMap(Value: TAddrHightLightColorMap);
+    procedure LoadFromAddrHightLightColorMap(Value: TAddressViewColorMap);
     procedure LoadFromAsmColorMap(Value: TAsmColorMap);
     procedure LoadFromDefaultColorMap(Value: THexViewColorMap);
     procedure LoadFromRegColorMap(Value: TRegistersColorMap);
@@ -261,7 +261,7 @@ type
 
     procedure RestoreViewDefSettings(AView: TFWCustomHexView);
 
-    procedure SaveToAddrHightLightColorMap(Value: TAddrHightLightColorMap);
+    procedure SaveToAddrHightLightColorMap(Value: TAddressViewColorMap);
     procedure SaveToAsmColorMap(Value: TAsmColorMap);
     procedure SaveToDefaultColorMap(Value: THexViewColorMap);
     procedure SaveToRegColorMap(Value: TRegistersColorMap);
@@ -442,7 +442,7 @@ begin
 end;
 
 procedure TCpuViewSettins.LoadFromAddrHightLightColorMap(
-  Value: TAddrHightLightColorMap);
+  Value: TAddressViewColorMap);
 begin
   FColors.Add(xmlAddrValidateE, Value.AddrExecuteColor);
   FColors.Add(xmlAddrValidateR, Value.AddrReadColor);
@@ -874,7 +874,7 @@ begin
 end;
 
 procedure TCpuViewSettins.SaveToAddrHightLightColorMap(
-  Value: TAddrHightLightColorMap);
+  Value: TAddressViewColorMap);
 begin
   if ColorMode <> cmCustom then Exit;
   Value.AddrExecuteColor := Color[xmlAddrValidateE];

@@ -36,8 +36,7 @@ interface
 {$message 'View for Call param'}
 {$message 'Highlighting of identical selected values in the dump window'}
 {$message 'Run to user code'}
-{$message 'Display strings in hint with disassembly for executable AddrVA'}
-{$message 'Jmp cache for Dump/Stack'}
+{$message 'Display strings in hint with disassembly for executable AddrVA and in addr validation (blue color)'}
 
 uses
   {$IFDEF FPC}
@@ -888,13 +887,6 @@ end;
 
 procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
   var Hint: string);
-const
-  PostFix: array [TAddrType] of string = (
-    '',
-    'in Assembly.',
-    'in the Dump.',
-    'on the Stack'
-  );
 var
   AddressType: TAddrType;
   AccessStr, Symbol: string;
@@ -905,8 +897,7 @@ begin
     if AddressType = atNone then Exit;
     AccessStr := QueryAccessStr(Param.AddrVA);
     Symbol := QuerySymbolAtAddr(Param.AddrVA);
-    Hint := Format('Addr:  0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]) +
-      sLineBreak + 'Press Ctrl+Click to jump to an address ' + PostFix[AddressType];
+    Hint := Format('Addr:  0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
   end;
 end;
 
@@ -930,18 +921,15 @@ begin
     jsJmpUndo,
     jsJmpRedo:
     begin
-      if Sender <> FStackView then
-      begin
-        ShowDumpAtAddr(AJmpAddr, False);
+      ShowDumpAtAddr(AJmpAddr, False);
 
-        // Блокировка выделения строки вьювером при операции Redo.
-        // Фокусировка и выделение нужной позиции в дампе выполнится во внешнем обработчике.
+      // Блокировка выделения строки вьювером при операции Redo.
+      // Фокусировка и выделение нужной позиции в дампе выполнится во внешнем обработчике.
 
-        // Blocking of row selection by the viewer during Redo operation.
-        // Focusing and selection of the desired position in the dump will be done in an external handler.
+      // Blocking of row selection by the viewer during Redo operation.
+      // Focusing and selection of the desired position in the dump will be done in an external handler.
 
-        Handled := AJmpState = jsJmpRedo;
-      end;
+      Handled := AJmpState = jsJmpRedo;
     end;
     jsJmpDone: Handled := False;
   end;
@@ -1075,7 +1063,6 @@ begin
     if Value = nil then Exit;
     Value.FitColumnsToBestSize;
     FStackView.OnHint := OnGetHint;
-    FStackView.OnJmpTo := OnJmpTo;
     FStackView.OnQueryComment := StackViewQueryComment;
     FStackView.OnQueryAddressType := OnQueryAddressType;
     RefreshView;
