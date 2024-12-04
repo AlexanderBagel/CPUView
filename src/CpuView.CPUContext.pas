@@ -59,7 +59,7 @@ type
     );
 
   // Types of supported operations with the register during a change
-  TModifyAction = (maToggle, maIncrement, maZero, maChange);
+  TModifyAction = (maToggle, maIncrement, maZero, maChange, maValidation);
   TModifyActions = set of TModifyAction;
 
   TRegID = Integer;
@@ -105,7 +105,7 @@ type
       2: (WordValue: Word);
       3: (IntValue: Integer);
       4: (DwordValue: Cardinal);
-      8: (QwordValue: UInt64);
+      8: (QwordValue: Int64); // Yes, not UInt64, since all addr are Int64!
       10: (Ext10: array [0..9] of Byte);
       16: (Ext16: array [0..15] of Byte);
       32: (Ext32: array [0..31] of Byte);

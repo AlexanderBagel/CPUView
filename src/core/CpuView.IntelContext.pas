@@ -817,26 +817,26 @@ begin
   else
     vmDefRegMod := vmReg64;
 
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 000 - RAX
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 001 - RBX
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 002 - RCX
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 003 - RDX
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 004 - RBP
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 005 - RSP
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 006 - RSI
-  Add(crtValue, vmDefRegMod, [maIncrement..maChange]);   // 007 - RDI
-  Add(crtValue, vmDefOnly, [maChange]);                  // 008 - RIP
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 000 - RAX
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 001 - RBX
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 002 - RCX
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 003 - RDX
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 004 - RBP
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 005 - RSP
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 006 - RSI
+  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 007 - RDI
+  Add(crtValue, vmDefOnly, [maChange]);                       // 008 - RIP
 
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 009 - R8
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 010 - R9
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 011 - R10
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 012 - R11
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 013 - R12
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 014 - R13
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 015 - R14
-  Add(crtValue, vmReg64, [maIncrement..maChange]);       // 016 - R15
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 009 - R8
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 010 - R9
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 011 - R10
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 012 - R11
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 013 - R12
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 014 - R13
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 015 - R14
+  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 016 - R15
 
-  Add(crtExtra, vmDefOnly, [maChange]);                  // 017 - EFlags
+  Add(crtExtra, vmDefOnly, [maChange]);                       // 017 - EFlags
 
   Add(crtValue, vmDefOnly);     // 018 - SegGs
   Add(crtValue, vmDefOnly);     // 019 - SegFs
@@ -845,12 +845,12 @@ begin
   Add(crtValue, vmDefOnly);     // 022 - SegCs
   Add(crtValue, vmDefOnly);     // 023 - SegSs
 
-  Add(crtValue, vmDefOnly);     // 024 - DR0
-  Add(crtValue, vmDefOnly);     // 025 - DR1
-  Add(crtValue, vmDefOnly);     // 026 - DR2
-  Add(crtValue, vmDefOnly);     // 027 - DR3
-  Add(crtValue, vmDefOnly);     // 028 - DR6
-  Add(crtValue, vmDefOnly);     // 029 - DR7
+  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 024 - DR0
+  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 025 - DR1
+  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 026 - DR2
+  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 027 - DR3
+  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 028 - DR6
+  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 029 - DR7
 
   Add(crtExtra, vmDefOnly, [maChange]);     // 030 - ControlWord
   Add(crtExtra, vmDefOnly, [maChange]);     // 031 - StatusWord

@@ -606,15 +606,15 @@ procedure TfrmCpuView.LoadSettings;
     AAction.SecondaryShortCuts.Add(KeyShiftToText(AShortCut.Key2, AShortCut.Shift2));
   end;
 
-  procedure AddViewerShortCut(AViewer: TCustomMappedHexView;
+  procedure AddViewerShortCut(AViewer: TFWCustomHexView;
     const AShortCut: TCpuViewShortCut; IsJmpIn: Boolean);
   var
     ViewerShortCut: TViewShortCut;
   begin
     if IsJmpIn then
-      ViewerShortCut := TMappedHexView(AViewer).ShortCuts.JmpTo
+      ViewerShortCut := TFWHexView(AViewer).ShortCuts.JmpTo
     else
-      ViewerShortCut := TMappedHexView(AViewer).ShortCuts.JmpBack;
+      ViewerShortCut := TFWHexView(AViewer).ShortCuts.JmpBack;
     ViewerShortCut.ShortCut := ShortCut(AShortCut.Key1, AShortCut.Shift1);
     ViewerShortCut.SecondaryShortCuts.Clear;
     ViewerShortCut.SecondaryShortCuts.Add(KeyShiftToText(AShortCut.Key2, AShortCut.Shift2));
@@ -648,6 +648,7 @@ begin
   RegView.Width := Round(Settings.CpuViewDlgSettings.SplitterPos[spTopHorz] * (ClientWidth / 100));
   StackView.Width := Round(Settings.CpuViewDlgSettings.SplitterPos[spBottomHorz] * (ClientWidth / 100));
   pnDumps.Height := Round(Settings.CpuViewDlgSettings.SplitterPos[spCenterVert] * (ClientHeight / 100));
+  pnDebug.Top := pnDumps.Top + pnDumps.Height;
 
   if (Core.ShowCallFuncName <> Settings.ShowCallFuncName) or
     (DbgGate.ShowSourceLines <> Settings.ShowSourceLines) or
@@ -673,6 +674,12 @@ begin
 
   AddViewerShortCut(AsmView, Settings.ShotCut[sctViewerJmpIn], True);
   AddViewerShortCut(AsmView, Settings.ShotCut[sctViewerStepBack], False);
+  AddViewerShortCut(DumpView, Settings.ShotCut[sctViewerJmpIn], True);
+  AddViewerShortCut(DumpView, Settings.ShotCut[sctViewerStepBack], False);
+  AddViewerShortCut(StackView, Settings.ShotCut[sctViewerJmpIn], True);
+  AddViewerShortCut(StackView, Settings.ShotCut[sctViewerStepBack], False);
+  AddViewerShortCut(RegView, Settings.ShotCut[sctViewerJmpIn], True);
+  AddViewerShortCut(RegView, Settings.ShotCut[sctViewerStepBack], False);
 
   ExitShortCut := Settings.ShotCut[sctCloseCpuView];
   FExit1ShortCut := ShortCut(ExitShortCut.Key1, ExitShortCut.Shift1);

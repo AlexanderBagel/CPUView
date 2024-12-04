@@ -1049,6 +1049,7 @@ begin
   begin
     FRegView := Value;
     if Value = nil then Exit;
+    FRegView.OnQueryAddressType := OnQueryAddressType;
     FRegView.OnQueryComment := OnRegQueryComment;
     FRegView.OnQueryExternalHint := OnRegQueryExternalComment;
     RefreshView;

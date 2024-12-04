@@ -89,6 +89,7 @@ const
   xmlShowOpcodes = 'showOpcodes';
   xmlShowSrc = 'showSrc';
   xmlUseDebugInfo = 'useDbgInfo';
+  xmlAddrValidation = 'addrValidation';
   xmlDbgLog = 'DbgLog';
   xmlDbgDump = 'CrashDmp';
   xmlBackgroundColor = 'back';
@@ -740,6 +741,7 @@ begin
   FSaveViewersSession := GetNodeAttr(Root, xmlSaveViewersSession);
   FFontName := GetNodeAttr(Root, xmlFont);
   FUseDebugInfo := GetNodeAttr(Root, xmlUseDebugInfo);
+  FValidationAddrVA := GetNodeAttr(Root, xmlAddrValidation);
   FUseDebugLog := GetNodeAttr(Root, xmlDbgLog);
   FUseCrashDump := GetNodeAttr(Root, xmlDbgDump);
   if FSaveFormSession then
@@ -1032,6 +1034,7 @@ begin
   SetNodeAttr(Root, xmlSaveViewersSession, FSaveViewersSession);
   SetNodeAttr(Root, xmlFont, FFontName);
   SetNodeAttr(Root, xmlUseDebugInfo, FUseDebugInfo);
+  SetNodeAttr(Root, xmlAddrValidation, FValidationAddrVA);
   SetNodeAttr(Root, xmlDbgLog, FUseDebugLog);
   SetNodeAttr(Root, xmlDbgDump, FUseCrashDump);
   if FSaveFormSession then
@@ -1257,7 +1260,11 @@ procedure TCpuViewSettins.SetSettingsToRegView(ARegView: TRegView);
 begin
   RestoreViewDefSettings(ARegView);
   ARegView.Font.Height := DoubleToDpi(FRegFontHeight, ARegView);
+  SaveToAddrHightLightColorMap(ARegView.ColorMap);
   SaveToRegColorMap(ARegView.ColorMap);
+  {$message 'Not ready yet!'}
+  //ARegView.ShowHint := ValidationAddrVA;
+  ARegView.ValidateAddress := ValidationAddrVA;
 end;
 
 procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);
@@ -1266,6 +1273,9 @@ begin
   AStackView.Font.Height := DoubleToDpi(FStackFontHeight, AStackView);
   AStackView.ShowHint := ValidationAddrVA;
   AStackView.ValidateAddress := ValidationAddrVA;
+  // ValidateAddress is involved in the calculation of column widths,
+  // so you need to call recalculation
+  AStackView.FitColumnsToBestSize;
   SaveToAddrHightLightColorMap(AStackView.ColorMap);
   SaveToStackColorMap(AStackView.ColorMap);
 end;

@@ -327,7 +327,8 @@ type
     procedure SetValidateAddress(AValue: Boolean);
   protected
     procedure DoChange(ChangeCode: Integer); override;
-    procedure DoQueryAddrType(AddrVA: Int64; var AddrType: TAddrType);
+    procedure DoQueryAddrType(AddrVA: Int64; out AddrType: TAddrType);
+    procedure InitDefault; override;
     procedure InitPainters; override;
     function GetColorMapClass: THexViewColorMapClass; override;
     procedure RestoreViewParam; override;
@@ -335,8 +336,6 @@ type
     property ColorMap: TAddressViewColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
-  public
-    constructor Create(AOwner: TComponent); override;
   published
     property Font;
     property PopupMenu;
@@ -510,7 +509,7 @@ type
   protected
     procedure CorrectCanvasFont(ACanvas: TCanvas; AColumn: TColumnType); override;
     procedure DrawAddress(ACanvas: TCanvas; var ARect: TRect); override;
-    procedure DrawWorkSpace(ACanvas: TCanvas; var ARect: TRect); override;
+    procedure DrawHexPart(ACanvas: TCanvas; var ARect: TRect); override;
   end;
 
   { TCustomStackView }
@@ -631,7 +630,7 @@ type
       var ARect: TRect); override;
     procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
     function GetTextMetricClass: TAbstractTextMetricClass; override;
-    function Owner: TCustomRegView;
+    function View: TCustomRegView;
   end;
 
   { TRegistersRawData }
@@ -651,7 +650,7 @@ type
 
   { TRegistersColorMap }
 
-  TRegistersColorMap = class(THexViewColorMap)
+  TRegistersColorMap = class(TAddressViewColorMap)
   private
     FHintColor: TColor;
     FRegColor: TColor;
@@ -754,6 +753,7 @@ type
     property ShowHint;
     property TabOrder;
     property TabStop;
+    property ValidateAddress;
     property Visible;
     property WheelMultiplyer;
     property OnClick;
@@ -777,6 +777,7 @@ type
     property OnMouseLeave;
     property OnMouseMove;
     property OnMouseUp;
+    property OnQueryAddressType;
     property OnQueryComment;
     property OnQueryExternalHint;
     property OnSelectedContextPopup;
@@ -1582,10 +1583,17 @@ begin
 end;
 
 procedure TCustomAddressView.DoQueryAddrType(AddrVA: Int64;
-  var AddrType: TAddrType);
+  out AddrType: TAddrType);
 begin
+  AddrType := atNone;
   if Assigned(FOnQueryAddr) then
     FOnQueryAddr(Self, AddrVA, AddrType);
+end;
+
+procedure TCustomAddressView.InitDefault;
+begin
+  inherited;
+  FValidateAddress := True;
 end;
 
 procedure TCustomAddressView.InitPainters;
@@ -1604,12 +1612,6 @@ begin
   // колонки пересчитываются автоматически
 
   // columns are recalculated automatically
-end;
-
-constructor TCustomAddressView.Create(AOwner: TComponent);
-begin
-  inherited Create(AOwner);
-  FValidateAddress := True;
 end;
 
 { TAddressViewPainter }
@@ -2069,10 +2071,11 @@ begin
   inherited;
 end;
 
-procedure TStackRowPainter.DrawWorkSpace(ACanvas: TCanvas; var ARect: TRect);
+procedure TStackRowPainter.DrawHexPart(ACanvas: TCanvas; var ARect: TRect);
 var
   AddrType: TAddrType;
-  CircleRect: TRect;
+  ValidateRect: TRect;
+  ABounds: TLeftRightBounds;
   Offsets: Integer;
 begin
   inherited;
@@ -2086,13 +2089,16 @@ begin
       atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
       atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
     end;
-    CircleRect := ARect;
-    CircleRect.Left := ARect.Right - ARect.Height;
+    ValidateRect := ARect;
+    ABounds := GetBounds(0);
+    ValidateRect.Left := ARect.Left + ABounds.LeftOffset + ABounds.Width;
+    ValidateRect.Width := ValidateRect.Height;
+    ValidateRect.Right := Min(ValidateRect.Right, ARect.Right + TextMargin);
+    if ValidateRect.IsEmpty then Exit;
     Offsets := -Ceil(ARect.Height / 5);
-    InflateRect(CircleRect, Offsets, Offsets);
-    OffsetRect(CircleRect, TextMargin + Offsets, 0);
+    InflateRect(ValidateRect, Offsets, Offsets);
     ACanvas.Brush.Style := bsSolid;
-    ACanvas.RoundRect(CircleRect, 2, 2);
+    ACanvas.RoundRect(ValidateRect, 2, 2);
   end;
 end;
 
@@ -2141,6 +2147,12 @@ end;
 procedure TCustomStackView.FitColumnToBestSize(Value: TColumnType);
 begin
   case Value of
+    ctOpcode:
+    begin
+      inherited;
+      if ValidateAddress then
+        Header.ColumnWidth[Value] := Header.ColumnWidth[Value] + RowHeight shr 1;
+    end;
     ctComment: Header.ColumnWidth[Value] := ToDpi(350);
   else
     inherited;
@@ -2175,24 +2187,18 @@ procedure TCustomStackView.DoGetHint(var AHintParam: THintParam;
 var
   Painter: TAbstractPrimaryRowPainter;
   AddrType: TAddrType;
-  Offset: TPoint;
-  TmpRect: TRect;
   ABounds: TLeftRightBounds;
 begin
   if not ValidateAddress then Exit;
   if PtInRect(FLastInvalidAddrRect, AHintParam.HitInfo.CursorPos) then Exit;
+  if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
   Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) then
   begin
-
-    Offset.X := ScrollOffset.X;
-    Offset.Y := 0;
-    TmpRect := TAddressViewPainter(Painter).ColumnRect(Offset, ctWorkSpace);
-    AHintParam.CursorRect.Left := TmpRect.Right - TmpRect.Height;
-    TmpRect := TAddressViewPainter(Painter).ColumnRect(Offset, ctOpcode);
     ABounds := TAddressViewPainter(Painter).GetBounds(0);
-    AHintParam.CursorRect.Right :=
-      TmpRect.Left + TextMargin + ABounds.LeftOffset + ABounds.Width;
+    AHintParam.CursorRect.Left :=
+      AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+    AHintParam.CursorRect.Width := ABounds.Width + RowHeight;
     if not PtInRect(AHintParam.CursorRect, AHintParam.HitInfo.CursorPos) then Exit;
 
     AHintParam.AddrVA := TAddressViewPainter(Painter).GetAddrAtIndex(0);
@@ -2305,7 +2311,7 @@ end;
 
 function TRegisterPainter.AcceptSelection: Boolean;
 begin
-  Result := not Owner.Context.EmptyRow(RowIndex);
+  Result := not View.Context.EmptyRow(RowIndex);
 end;
 
 procedure TRegisterPainter.CopyRowAsString(Builder: TSimplyStringBuilder);
@@ -2348,14 +2354,18 @@ procedure TRegisterPainter.DrawColumn(ACanvas: TCanvas;
   AColumn: TColumnType; var ARect: TRect);
 var
   DrawR: TRect;
-  I: Integer;
+  I, Offsets: Integer;
   Info: TRegister;
   Selected: Boolean;
   ASelData: TSelectData;
+  AParam: TRegParam;
+  ARegValue: TRegValue;
+  AddrType: TAddrType;
+  ValidateRect: TRect;
 begin
   if AColumn = ctNone then
   begin
-    FContext := Owner.Context;
+    FContext := View.Context;
     Exit;
   end;
 
@@ -2366,9 +2376,9 @@ begin
 
     // Reg Name
     if Info.ValueType = crtSelectableHint then
-      ACanvas.Font.Color := TRegistersColorMap(Owner.ColorMap).HintColor
+      ACanvas.Font.Color := View.ColorMap.HintColor
     else
-      ACanvas.Font.Color := TRegistersColorMap(Owner.ColorMap).RegColor;
+      ACanvas.Font.Color := View.ColorMap.RegColor;
     ACanvas.Brush.Style := bsClear;
     DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegQueryString(Info.RegID, rqstDisplayName),
       TextMetric.CharPointer(AColumn, 0));
@@ -2396,15 +2406,41 @@ begin
     if Info.ValueType <> crtSelectableHint then
     begin
       if Info.Modifyed then
-        ACanvas.Font.Color := TRegistersColorMap(Owner.ColorMap).ValueModifiedColor
+        ACanvas.Font.Color := View.ColorMap.ValueModifiedColor
       else
-        ACanvas.Font.Color := TRegistersColorMap(Owner.ColorMap).ValueColor;
+        ACanvas.Font.Color := View.ColorMap.ValueColor;
     end;
     ACanvas.Brush.Style := bsClear;
     DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegQueryString(Info.RegID, rqstValue),
       TextMetric.CharPointer(AColumn, 0));
     Inc(DrawR.Left, TextMetric.CharLength(AColumn, 1,
       Info.ValueSize + Info.ValueSeparatorSize));
+
+    // Value addr validation mark
+    if not View.ValidateAddress then Continue;
+    if Info.ValueType = crtValue then
+    begin
+      if not FContext.RegParam(Info.RegID, AParam) then Continue;
+      if maValidation in AParam.ModifyActions then
+      begin
+        FContext.RegQueryValue(Info.RegID, ARegValue);
+        View.DoQueryAddrType(ARegValue.QwordValue, AddrType);
+        case AddrType of
+          atNone: Continue;
+          atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
+          atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
+          atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
+        end;
+        ValidateRect := DrawR;
+        ValidateRect.Width := ValidateRect.Height;
+        Offsets := -Ceil(ValidateRect.Height / 5);
+        InflateRect(ValidateRect, Offsets, Offsets);
+        OffsetRect(ValidateRect, -1 -
+          TextMetric.CharLength(AColumn, 1, Info.ValueSeparatorSize), 0);
+        ACanvas.Brush.Style := bsSolid;
+        ACanvas.RoundRect(ValidateRect, 2, 2);
+      end;
+    end;
   end;
 end;
 
@@ -2453,9 +2489,9 @@ begin
   Result := TRegisterTextMetrics;
 end;
 
-function TRegisterPainter.Owner: TCustomRegView;
+function TRegisterPainter.View: TCustomRegView;
 begin
-  Result := TCustomRegView(inherited Owner);
+  Result := TCustomRegView(Owner);
 end;
 
 { TRegistersRawData }
