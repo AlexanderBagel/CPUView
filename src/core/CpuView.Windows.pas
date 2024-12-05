@@ -198,6 +198,12 @@ const
   XSTATE_MASK_AVX = 4;
   CONTEXT_ALL = CONTEXT_FULL or CONTEXT_FLOATING_POINT or CONTEXT_DEBUG_REGISTERS;
 
+  RWE_Flags = PAGE_EXECUTE_READWRITE or PAGE_EXECUTE_WRITECOPY;
+  ReadFlags = PAGE_READONLY or PAGE_READWRITE or PAGE_WRITECOPY or
+    PAGE_EXECUTE or PAGE_EXECUTE_READ or RWE_Flags;
+  WriteFlags = PAGE_READWRITE or PAGE_WRITECOPY or RWE_Flags;
+  ExecuteFlags = PAGE_EXECUTE or PAGE_EXECUTE_READ or RWE_Flags;
+
   function OpenThread(dwDesiredAccess: DWORD; bInheritHandle: BOOL;
     dwThreadId: DWORD): THandle; stdcall; external kernel32;
   function GetThreadContext(hThread: THandle; Context: PContext): BOOL;
@@ -830,20 +836,12 @@ begin
         Include(RegionData.Access, raProtect);
         Exit;
       end;
-      if MBI.Protect and (PAGE_EXECUTE_READ or PAGE_EXECUTE_READWRITE) <> 0 then
-      begin
+      if MBI.Protect and ExecuteFlags <> 0 then
         Include(RegionData.Access, raExecute);
+      if MBI.Protect and ReadFlags <> 0 then
         Include(RegionData.Access, raRead);
-      end;
-      if MBI.Protect and (PAGE_READONLY or PAGE_READWRITE) <> 0 then
-        Include(RegionData.Access, raRead);
-      if MBI.Protect and (
-        PAGE_EXECUTE_READWRITE or
-        PAGE_WRITECOPY or PAGE_EXECUTE_WRITECOPY) <> 0 then
-      begin
-        Include(RegionData.Access, raRead);
+      if MBI.Protect and WriteFlags <> 0 then
         Include(RegionData.Access, raWrite);
-      end;
     end;
   end;
 end;
@@ -855,11 +853,7 @@ function TCommonUtils.ReadData(AddrVA: Pointer; var Buff;
   begin
     Result := MBI.State = MEM_COMMIT;
     if Result then
-      Result := MBI.Protect and (
-        PAGE_EXECUTE_READ or
-        PAGE_EXECUTE_READWRITE or
-        PAGE_READONLY or
-        PAGE_READWRITE) <> 0;
+      Result := MBI.Protect and ReadFlags <> 0;
     if Result then
       Result := (MBI.Protect and PAGE_GUARD) = 0;
   end;

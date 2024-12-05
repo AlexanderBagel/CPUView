@@ -29,6 +29,7 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
+{$message 'Min/Max col width to FWHexView for each coltype'}
 {$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
@@ -79,6 +80,12 @@ type
     View: TDumpView;
     Stream: TBufferedROStream;
     LastAddrVA: Int64;
+  end;
+
+  TAddrCacheItem = record
+    Region: TRegionData;
+    Symbol: string;
+    Disassembly: string;
   end;
 
   TCpuViewCore = class;
@@ -136,13 +143,12 @@ type
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
     FInvalidReg: TRegionData;
-    FKnownFunctionAddrVA: TDictionary<Int64, string>;
-    FKnownRegionData: TDictionary<Int64, TRegionData>;
     FLastStackLimit: TStackLimit;
     FLockSelChange: Boolean;
     FLastCachedAddrVA: Int64;
     FLastCtx: TCommonCpuContext;
     FRegView: TRegView;
+    FSessionCache: TDictionary<Int64, TAddrCacheItem>;
     FShowCallFuncName: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
@@ -173,6 +179,7 @@ type
       AColumn: TColumnType; var AComment: string);
     procedure OnRegQueryExternalComment(Sender: TObject;
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
+    function QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     procedure SetAsmView(const Value: TAsmView);
     procedure SetRegView(const Value: TRegView);
     procedure SetStackView(const Value: TStackView);
@@ -416,53 +423,46 @@ end;
 
 function TCpuViewCore.QueryAccessStr(AddrVA: Int64): string;
 var
-  RegionData: TRegionData;
+  CacheItem: TAddrCacheItem;
 begin
   Result := 'No access';
-  if QueryRegion(AddrVA, RegionData) then
-    Result := FormatAccessString(RegionData);
+  if QueryCacheItem(AddrVA, CacheItem) then
+    Result := FormatAccessString(CacheItem.Region);
 end;
 
 function TCpuViewCore.QueryAddressType(AddrVA: Int64): TAddrType;
 var
-  ARegionData: TRegionData;
+  CacheItem: TAddrCacheItem;
 begin
   Result := atNone;
-  if not QueryRegion(AddrVA, ARegionData) then Exit;
-  if (raExecute in ARegionData.Access) then
+  if not QueryCacheItem(AddrVA, CacheItem) then Exit;
+  if (raExecute in CacheItem.Region.Access) then
     Exit(atExecute);
   if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
     Exit(atStack);
-  if (raRead in ARegionData.Access) then
+  if (raRead in CacheItem.Region.Access) then
     Result := atRead;
 end;
 
 function TCpuViewCore.QueryRegion(AddrVA: Int64; out RegionData: TRegionData
   ): Boolean;
+var
+  CacheItem: TAddrCacheItem;
 begin
   RegionData := Default(TRegionData);
-  Result := FKnownRegionData.TryGetValue(AddrVA, RegionData);
-  if not Result then
-  begin
-    Result := FUtils.QueryRegion(AddrVA, RegionData);
-    if Result then
-      FKnownRegionData.Add(AddrVA, RegionData);
-  end;
+  Result := QueryCacheItem(AddrVA, CacheItem);
+  if Result then
+    RegionData := CacheItem.Region;
 end;
 
 function TCpuViewCore.QuerySymbolAtAddr(AddrVA: Int64): string;
+var
+  CacheItem: TAddrCacheItem;
 begin
-  Result := '';
-  if not FKnownFunctionAddrVA.TryGetValue(AddrVA, Result) then
-  begin
-    Result := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
-    // держим кэш на 1024 адреса, этого будет достаточно
-    // -------------------------------------------------------------------------
-    // keep the cache for 1024 addresses, this will be enough
-    if FKnownFunctionAddrVA.Count > 1024 then
-      FKnownFunctionAddrVA.Clear;
-    FKnownFunctionAddrVA.Add(AddrVA, Result);
-  end;
+  if QueryCacheItem(AddrVA, CacheItem) then
+    Result := CacheItem.Symbol
+  else
+    Result := '';
 end;
 
 procedure TCpuViewCore.BuildAsmWindow(AAddress: Int64);
@@ -551,8 +551,7 @@ begin
   FDisassemblyStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
   FStackStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
-  FKnownFunctionAddrVA := TDictionary<Int64, string>.Create;
-  FKnownRegionData := TDictionary<Int64, TRegionData>.Create;
+  FSessionCache := TDictionary<Int64, TAddrCacheItem>.Create;
   FShowCallFuncName := True;
   FAsmJmpStack := TJumpStack.Create;
   FDBase := TCpuViewDBase.Create;
@@ -567,8 +566,7 @@ begin
   FAsmStream.Free;
   FDisassemblyStream.Free;
   FStackStream.Free;
-  FKnownFunctionAddrVA.Free;
-  FKnownRegionData.Free;
+  FSessionCache.Free;
   FAsmJmpStack.Free;
   FDebugger.Free;
   FUtils.Free;
@@ -897,7 +895,7 @@ begin
     if AddressType = atNone then Exit;
     AccessStr := QueryAccessStr(Param.AddrVA);
     Symbol := QuerySymbolAtAddr(Param.AddrVA);
-    Hint := Format('Addr:  0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
+    Hint := Format('Addr: 0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
   end;
 end;
 
@@ -959,6 +957,41 @@ begin
     AComment := '(' + AComment + ')';
 end;
 
+function TCpuViewCore.QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem
+  ): Boolean;
+var
+  AddrPtr: Int64;
+  AddrPtrItem: TAddrCacheItem;
+begin
+  AItem := Default(TAddrCacheItem);
+  Result := FSessionCache.TryGetValue(AddrVA, AItem);
+  if not Result then
+  try
+    Result := FUtils.QueryRegion(AddrVA, AItem.Region);
+    if not Result then Exit;
+    if raRead in AItem.Region.Access then
+    begin
+      AItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
+      if AItem.Symbol = '' then
+      begin
+        AddrPtr := 0;
+        if Debugger.ReadMemory(AddrVA, AddrPtr, Debugger.PointerSize) then
+        begin
+          if QueryCacheItem(AddrPtr, AddrPtrItem) then
+          begin
+            if AddrPtrItem.Symbol <> '' then
+              AItem.Symbol := Format('[0x%x] -> %s', [AddrPtr, AddrPtrItem.Symbol])
+            else
+              AItem.Symbol := Format('[0x%x]', [AddrPtr]);
+          end;
+        end;
+      end;
+    end;
+  finally
+    FSessionCache.Add(AddrVA, AItem);
+  end;
+end;
+
 procedure TCpuViewCore.RefreshView(Forced: Boolean);
 begin
   if (FDebugger = nil) or not FDebugger.IsActive then Exit;
@@ -1000,8 +1033,7 @@ begin
   FAsmSelStart := 0;
   FAsmSelEnd := 0;
   FCacheListIndex := 0;
-  FKnownFunctionAddrVA.Clear;
-  FKnownRegionData.Clear;
+  FSessionCache.Clear;
 end;
 
 procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: Int64;
