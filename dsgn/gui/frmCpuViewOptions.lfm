@@ -1,7 +1,7 @@
 inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
-  Height = 456
-  ClientHeight = 456
-  Constraints.MinHeight = 456
+  Height = 700
+  ClientHeight = 700
+  Constraints.MinHeight = 700
   DesignLeft = 492
   DesignTop = 232
   object cbFont: TComboBox[0]
@@ -33,12 +33,12 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbAsmView: TGroupBox[3]
     Left = 10
-    Height = 200
+    Height = 264
     Top = 56
     Width = 749
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Display viewer parts:'
-    ClientHeight = 170
+    ClientHeight = 234
     ClientWidth = 745
     TabOrder = 2
     object cbDisplayFuncName: TCheckBox
@@ -74,19 +74,36 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 3
       OnClick = cbSymbolsClick
     end
-    object cbAddrValidation: TCheckBox
-      Left = 10
+    object cbForceFindSymbols: TCheckBox
+      Left = 32
       Height = 29
       Top = 136
-      Width = 347
-      Caption = 'Color highlighting of available addresses'
+      Width = 368
+      Caption = 'In-depth search for debugging information'
       TabOrder = 4
+      OnClick = cbSymbolsClick
+    end
+    object cbStackChains: TCheckBox
+      Left = 32
+      Height = 29
+      Top = 168
+      Width = 244
+      Caption = 'Collect stack address chains'
+      TabOrder = 5
+    end
+    object cbDasmPreview: TCheckBox
+      Left = 10
+      Height = 29
+      Top = 200
+      Width = 252
+      Caption = 'Disassembly preview in hints'
+      TabOrder = 6
     end
   end
   object gbSessions: TGroupBox[4]
     Left = 10
     Height = 104
-    Top = 264
+    Top = 512
     Width = 749
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Session settings:'
@@ -113,7 +130,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object cbDbgLog: TCheckBox[5]
     Left = 10
     Height = 29
-    Top = 376
+    Top = 624
     Width = 213
     Caption = '(DEBUG) Use debug log'
     TabOrder = 4
@@ -121,7 +138,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object cbDbgCrash: TCheckBox[6]
     Left = 10
     Height = 29
-    Top = 408
+    Top = 656
     Width = 265
     Caption = '(DEBUG) Generate crash dump'
     TabOrder = 5
@@ -129,14 +146,82 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object btnReset: TButton[7]
     Left = 592
     Height = 38
-    Top = 376
+    Top = 624
     Width = 164
     Anchors = [akTop, akRight]
     Caption = 'Reset to Default'
     TabOrder = 6
     OnClick = btnResetClick
   end
-  object FontDialog: TFontDialog[8]
+  object gbAddressValidation: TGroupBox[8]
+    Left = 10
+    Height = 176
+    Top = 328
+    Width = 749
+    Anchors = [akTop, akLeft, akRight]
+    Caption = 'Address validation:'
+    ClientHeight = 146
+    ClientWidth = 745
+    TabOrder = 7
+    object cbAddrValidation: TCheckBox
+      Left = 10
+      Height = 29
+      Top = 8
+      Width = 203
+      Caption = 'Use address validation'
+      TabOrder = 0
+      OnClick = cbSymbolsClick
+    end
+    object cbDumpColorMarks: TCheckBox
+      Left = 32
+      Height = 29
+      Top = 40
+      Width = 256
+      Caption = 'Highlight addresses in Dump'
+      TabOrder = 1
+    end
+    object cbDumpHints: TCheckBox
+      Left = 320
+      Height = 29
+      Top = 40
+      Width = 140
+      Caption = 'Hints in Dump'
+      TabOrder = 2
+    end
+    object cbRegColorMarks: TCheckBox
+      Left = 32
+      Height = 29
+      Top = 72
+      Width = 278
+      Caption = 'Highlight addresses in Registers'
+      TabOrder = 3
+    end
+    object cbRegHints: TCheckBox
+      Left = 320
+      Height = 29
+      Top = 72
+      Width = 162
+      Caption = 'Hints in Registers'
+      TabOrder = 4
+    end
+    object cbStackColorMarks: TCheckBox
+      Left = 32
+      Height = 29
+      Top = 104
+      Width = 248
+      Caption = 'Highlight addresses in Stack'
+      TabOrder = 5
+    end
+    object cbStackHints: TCheckBox
+      Left = 320
+      Height = 29
+      Top = 104
+      Width = 132
+      Caption = 'Hints in Stack'
+      TabOrder = 6
+    end
+  end
+  object FontDialog: TFontDialog[9]
     MinFontSize = 0
     MaxFontSize = 0
     Left = 496

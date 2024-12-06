@@ -124,6 +124,10 @@ type
   { TContextAbstractSettings }
 
   TContextAbstractSettings = class
+  private
+    FAddrValidation: Boolean;
+    FHints: Boolean;
+    FFontHeight: Double;
   protected
     function GetContextName: string; virtual; abstract;
     procedure InternalLoadFromXML(Root: IXMLNode); virtual; abstract;
@@ -135,6 +139,9 @@ type
     procedure SaveToContext(ACtx: TAbstractCPUContext); virtual; abstract;
     procedure LoadFromXML(Root: IXMLNode);
     procedure SaveToXML(Root: IXMLNode);
+    property AddrValidation: Boolean read FAddrValidation write FAddrValidation;
+    property Hints: Boolean read FHints write FHints;
+    property FontHeight: Double read FFontHeight write FFontHeight;
   end;
 
   TContextSettingsClass = class of TContextAbstractSettings;

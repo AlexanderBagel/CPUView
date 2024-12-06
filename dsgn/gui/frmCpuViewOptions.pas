@@ -42,9 +42,19 @@ type
     cbDbgLog: TCheckBox;
     cbDbgCrash: TCheckBox;
     cbAddrValidation: TCheckBox;
+    cbForceFindSymbols: TCheckBox;
+    cbStackChains: TCheckBox;
+    cbDasmPreview: TCheckBox;
+    cbDumpColorMarks: TCheckBox;
+    cbDumpHints: TCheckBox;
+    cbRegColorMarks: TCheckBox;
+    cbRegHints: TCheckBox;
+    cbStackColorMarks: TCheckBox;
+    cbStackHints: TCheckBox;
     FontDialog: TFontDialog;
     gbAsmView: TGroupBox;
     gbSessions: TGroupBox;
+    gbAddressValidation: TGroupBox;
     lblFont: TLabel;
     procedure btnFontBrowseClick(Sender: TObject);
     procedure btnResetClick(Sender: TObject);
@@ -102,6 +112,15 @@ procedure TCpuViewMainOptionsFrame.UpdateDebugSymbolsIndepended;
 begin
   cbDisplayFuncName.Enabled := cbSymbols.Checked;
   cbShowSourceLines.Enabled := cbSymbols.Checked;
+  cbForceFindSymbols.Enabled := cbSymbols.Checked;
+  cbStackChains.Enabled := cbSymbols.Checked;
+
+  cbDumpColorMarks.Enabled := cbAddrValidation.Checked;
+  cbDumpHints.Enabled := cbAddrValidation.Checked;
+  cbRegColorMarks.Enabled := cbAddrValidation.Checked;
+  cbRegHints.Enabled := cbAddrValidation.Checked;
+  cbStackColorMarks.Enabled := cbAddrValidation.Checked;
+  cbStackHints.Enabled := cbAddrValidation.Checked;
 end;
 
 procedure TCpuViewMainOptionsFrame.UpdateFrameControl;
@@ -111,11 +130,20 @@ begin
   cbShowOpcodes.Checked :=  Settings.ShowOpcodes;
   cbShowSourceLines.Checked := Settings.ShowSourceLines;
   cbSymbols.Checked := Settings.UseDebugInfo;
-  cbAddrValidation.Checked := Settings.ValidationAddrVA;
+  cbAddrValidation.Checked := Settings.UseAddrValidation;
   cbForm.Checked := Settings.SaveFormSession;
   cbViewers.Checked := Settings.SaveViewersSession;
   cbDbgLog.Checked := Settings.UseDebugLog;
   cbDbgCrash.Checked := Settings.UseCrashDump;
+  cbForceFindSymbols.Checked := Settings.InDeepDbgInfo;
+  cbStackChains.Checked := Settings.StackChains;
+  cbDumpColorMarks.Checked := Settings.ValidationDump;
+  cbRegColorMarks.Checked := Settings.ValidationReg;
+  cbStackColorMarks.Checked := Settings.ValidationStack;
+  cbDumpHints.Checked := Settings.HintInDump;
+  cbRegHints.Checked := Settings.HintInReg;
+  cbStackHints.Checked := Settings.HintInStack;
+  cbDasmPreview.Checked := Settings.DisassemblyInHint;
   UpdateDebugSymbolsIndepended;
 end;
 
@@ -130,12 +158,21 @@ begin
   Settings.ShowCallFuncName := cbDisplayFuncName.Checked;
   Settings.ShowOpcodes := cbShowOpcodes.Checked;
   Settings.ShowSourceLines := cbShowSourceLines.Checked;
-  Settings.ValidationAddrVA := cbAddrValidation.Checked;
+  Settings.UseAddrValidation := cbAddrValidation.Checked;
   Settings.UseDebugInfo := cbSymbols.Checked;
   Settings.SaveFormSession := cbForm.Checked;
   Settings.SaveViewersSession := cbViewers.Checked;
   Settings.UseDebugLog := cbDbgLog.Checked;
   Settings.UseCrashDump := cbDbgCrash.Checked;
+  Settings.InDeepDbgInfo := cbForceFindSymbols.Checked;
+  Settings.StackChains := cbStackChains.Checked;
+  Settings.ValidationDump := cbDumpColorMarks.Checked;
+  Settings.ValidationReg := cbRegColorMarks.Checked;
+  Settings.ValidationStack := cbStackColorMarks.Checked;
+  Settings.HintInDump := cbDumpHints.Checked;
+  Settings.HintInReg := cbRegHints.Checked;
+  Settings.HintInStack := cbStackHints.Checked;
+  Settings.DisassemblyInHint := cbDasmPreview.Checked;
 end;
 
 function TCpuViewMainOptionsFrame.IsMainFrame: Boolean;

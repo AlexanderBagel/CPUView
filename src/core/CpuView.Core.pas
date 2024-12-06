@@ -142,6 +142,7 @@ type
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
+    FInDeepDbgInfo: Boolean;
     FInvalidReg: TRegionData;
     FLastStackLimit: TStackLimit;
     FLockSelChange: Boolean;
@@ -150,6 +151,7 @@ type
     FRegView: TRegView;
     FSessionCache: TDictionary<Int64, TAddrCacheItem>;
     FShowCallFuncName: Boolean;
+    FStackChains: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
     FOldAsmScroll: TOnVerticalScrollEvent;
@@ -233,6 +235,8 @@ type
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
     property ShowCallFuncName: Boolean read FShowCallFuncName write FShowCallFuncName;
+    property UseInDeepDbgInfo: Boolean read FInDeepDbgInfo write FInDeepDbgInfo;
+    property UseStackChains: Boolean read FStackChains write FStackChains;
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
 
@@ -968,27 +972,37 @@ begin
   if not Result then
   try
     Result := FUtils.QueryRegion(AddrVA, AItem.Region);
+
+    // Blocking of possible recursion
+    if UseInDeepDbgInfo then
+      FSessionCache.Add(AddrVA, AItem);
+
     if not Result then Exit;
     if raRead in AItem.Region.Access then
     begin
       AItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
       if AItem.Symbol = '' then
       begin
+        // Lock stack chains
+        if AddrInStack(AddrVA) and not UseStackChains then Exit;
         AddrPtr := 0;
         if Debugger.ReadMemory(AddrVA, AddrPtr, Debugger.PointerSize) then
         begin
-          if QueryCacheItem(AddrPtr, AddrPtrItem) then
-          begin
-            if AddrPtrItem.Symbol <> '' then
-              AItem.Symbol := Format('[0x%x] -> %s', [AddrPtr, AddrPtrItem.Symbol])
-            else
-              AItem.Symbol := Format('[0x%x]', [AddrPtr]);
-          end;
+          // Lock in-deep search
+          if UseInDeepDbgInfo then
+            QueryCacheItem(AddrPtr, AddrPtrItem)
+          else
+            AddrPtrItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
+
+          if AddrPtrItem.Symbol <> '' then
+            AItem.Symbol := Format('[0x%x] -> %s', [AddrPtr, AddrPtrItem.Symbol])
+          else
+            AItem.Symbol := Format('[0x%x]', [AddrPtr]);
         end;
       end;
     end;
   finally
-    FSessionCache.Add(AddrVA, AItem);
+    FSessionCache.AddOrSetValue(AddrVA, AItem);
   end;
 end;
 

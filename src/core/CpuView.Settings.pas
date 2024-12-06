@@ -89,7 +89,6 @@ const
   xmlShowOpcodes = 'showOpcodes';
   xmlShowSrc = 'showSrc';
   xmlUseDebugInfo = 'useDbgInfo';
-  xmlAddrValidation = 'addrValidation';
   xmlDbgLog = 'DbgLog';
   xmlDbgDump = 'CrashDmp';
   xmlBackgroundColor = 'back';
@@ -164,6 +163,12 @@ const
   xmlAddrValidateR = 'addrRead';
   xmlAddrValidateS = 'addrStack';
 
+  xmlValidation = 'useValidation';
+  xmlHint = 'hint';
+  xmlInDeepDbgInfo = 'useInDeepDbgInfo';
+  xmlStackChains = 'useStackChains';
+  xmlDisassemblyInHint = 'useDasmInHint';
+
   // not used
   xmlContext = 'ctx';
   xmlContextName = 'name';
@@ -183,6 +188,14 @@ type
     EncodeType: TCharEncoderType;
     EncodingName: string;
     FontHeight: Double;
+    AddrValidation: Boolean;
+    Hints: Boolean;
+  end;
+
+  TStackSettings = record
+    FontHeight: Double;
+    AddrValidation: Boolean;
+    Hints: Boolean;
   end;
 
   TSplitters = (spTopHorz, spBottomHorz, spCenterVert);
@@ -224,23 +237,29 @@ type
     FColors: TDictionary<string, TColor>;
     FColorsMap: TList<TColorMapItem>;
     FCpuViewDlgSettings: TCpuViewDlgSettings;
+    FDisassemblyInHint: Boolean;
     FDumpSettings: TDumpSettings;
+    FInDeepDbgInfo: Boolean;
     FFontName: string;
-    FRegFontHeight: Double;
     FSaveFormSession: Boolean;
     FSaveViewersSession: Boolean;
     FShotCutMode: TShortCutMode;
     FShortCuts: array [TShortCutType] of TCpuViewShortCut;
-    FStackFontHeight: Double;
+    FStackSettings: TStackSettings;
+    FStackChains: Boolean;
     FRegSettings: TContextAbstractSettings;
     FUseDebugInfo: Boolean;
     FUseDebugLog: Boolean;
     FUseCrashDump: Boolean;
-    FValidationAddrVA: Boolean;
+    FUseAddrValidation: Boolean;
     function GetColor(const Index: string): TColor;
-    procedure SetColor(const Index: string; Value: TColor);
+    function GetHintInReg: Boolean;
     function GetShotCut(Index: TShortCutType): TCpuViewShortCut;
+    function GetValidationReg: Boolean;
+    procedure SetColor(const Index: string; Value: TColor);
+    procedure SetHintInReg(AValue: Boolean);
     procedure SetShotCut(Index: TShortCutType; const AValue: TCpuViewShortCut);
+    procedure SetValidationReg(AValue: Boolean);
   private
     function DpiToDouble(AValue: Integer; AView: TFWCustomHexView): Double;
     function DoubleToDpi(AValue: Double; AView: TFWCustomHexView): Integer;
@@ -312,18 +331,27 @@ type
     property ColorMode: TColorMode read FColorMode write FColorMode;
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
-    property ShowCallFuncName: Boolean read FAsmSettings.DisplayFunc write FAsmSettings.DisplayFunc;
+    property DisassemblyInHint: Boolean read FDisassemblyInHint write FDisassemblyInHint;
+    property InDeepDbgInfo: Boolean read FInDeepDbgInfo write FInDeepDbgInfo;
+    property HintInDump: Boolean read FDumpSettings.Hints write FDumpSettings.Hints;
+    property HintInReg: Boolean read GetHintInReg write SetHintInReg;
+    property HintInStack: Boolean read FStackSettings.Hints write FStackSettings.Hints;
     property FontName: string read FFontName write FFontName;
     property SaveFormSession: Boolean read FSaveFormSession write FSaveFormSession;
     property SaveViewersSession: Boolean read FSaveViewersSession write FSaveViewersSession;
     property ShotCutMode: TShortCutMode read FShotCutMode write FShotCutMode;
     property ShotCut[Index: TShortCutType]: TCpuViewShortCut read GetShotCut write SetShotCut;
+    property ShowCallFuncName: Boolean read FAsmSettings.DisplayFunc write FAsmSettings.DisplayFunc;
     property ShowOpcodes: Boolean read FAsmSettings.ShowOpcodes write FAsmSettings.ShowOpcodes;
     property ShowSourceLines: Boolean read FAsmSettings.ShowSourceLines write FAsmSettings.ShowSourceLines;
+    property StackChains: Boolean read FStackChains write FStackChains;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
-    property ValidationAddrVA: Boolean read FValidationAddrVA write FValidationAddrVA;
+    property UseAddrValidation: Boolean read FUseAddrValidation write FUseAddrValidation;
+    property ValidationDump: Boolean read FDumpSettings.AddrValidation write FDumpSettings.AddrValidation;
+    property ValidationReg: Boolean read GetValidationReg write SetValidationReg;
+    property ValidationStack: Boolean read FStackSettings.AddrValidation write FStackSettings.AddrValidation;
   end;
 
   function KeyShiftToText(Key: Word; Shift: TShiftState): string;
@@ -442,6 +470,16 @@ begin
   Result := Round(AValue * AView.CurrentPPI / 96);
 end;
 
+function TCpuViewSettins.GetHintInReg: Boolean;
+begin
+  Result := FRegSettings.Hints;
+end;
+
+function TCpuViewSettins.GetValidationReg: Boolean;
+begin
+  Result := FRegSettings.AddrValidation;
+end;
+
 procedure TCpuViewSettins.LoadFromAddrHightLightColorMap(
   Value: TAddressViewColorMap);
 begin
@@ -517,12 +555,12 @@ end;
 
 procedure TCpuViewSettins.GetSessionFromRegView(ARegView: TRegView);
 begin
-  FRegFontHeight := DpiToDouble(ARegView.Font.Height, ARegView);
+  FRegSettings.FontHeight := DpiToDouble(ARegView.Font.Height, ARegView);
 end;
 
 procedure TCpuViewSettins.GetSessionFromStackView(AStackView: TStackView);
 begin
-  FStackFontHeight := DpiToDouble(AStackView.Font.Height, AStackView);
+  FStackSettings.FontHeight := DpiToDouble(AStackView.Font.Height, AStackView);
 end;
 
 procedure TCpuViewSettins.FillCustomShortCuts;
@@ -588,6 +626,8 @@ begin
 
   FDumpSettings := Default(TDumpSettings);
   FDumpSettings.FontHeight := DefaultFontHeight;
+  FDumpSettings.AddrValidation := True;
+  FDumpSettings.Hints := True;
 
   {$IFDEF MSWINDOWS}
   FFontName := 'Consolas';
@@ -596,18 +636,25 @@ begin
   FFontName := 'DejaVu Sans Mono';
   {$ENDIF}
 
-  FRegFontHeight := DefaultFontHeight;
+  FRegSettings.FontHeight := DefaultFontHeight;
+  FRegSettings.AddrValidation := True;
+  FRegSettings.Hints := True;
   FRegSettings.InitDefault;
 
   FSaveFormSession := True;
   FSaveViewersSession := True;
 
-  FStackFontHeight := DefaultFontHeight;
+  FStackSettings.FontHeight := DefaultFontHeight;
+  FStackSettings.AddrValidation := True;
+  FStackSettings.Hints := True;
 
   FUseDebugInfo := True;
   FUseDebugLog := True;
   FUseCrashDump := True;
-  FValidationAddrVA := True;
+  FUseAddrValidation := True;
+  FInDeepDbgInfo := True;
+  FStackChains := True;
+  FDisassemblyInHint := True;
 end;
 
 procedure TCpuViewSettins.InitDefaultShortCuts;
@@ -741,9 +788,12 @@ begin
   FSaveViewersSession := GetNodeAttr(Root, xmlSaveViewersSession);
   FFontName := GetNodeAttr(Root, xmlFont);
   FUseDebugInfo := GetNodeAttr(Root, xmlUseDebugInfo);
-  FValidationAddrVA := GetNodeAttr(Root, xmlAddrValidation);
+  FUseAddrValidation := GetNodeAttr(Root, xmlValidation);
   FUseDebugLog := GetNodeAttr(Root, xmlDbgLog);
   FUseCrashDump := GetNodeAttr(Root, xmlDbgDump);
+  FInDeepDbgInfo := GetNodeAttr(Root, xmlInDeepDbgInfo);
+  FStackChains := GetNodeAttr(Root, xmlStackChains);
+  FDisassemblyInHint := GetNodeAttr(Root, xmlDisassemblyInHint);
   if FSaveFormSession then
   begin
     FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
@@ -795,6 +845,8 @@ begin
   FDumpSettings.EncodingName := GetNodeAttr(Node, xmlEncoderName);
   FDumpSettings.CodePage := GetNodeAttr(Node, xmlEncoderCP);
   FDumpSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
+  FDumpSettings.AddrValidation := GetNodeAttr(Root, xmlValidation);
+  FDumpSettings.Hints := GetNodeAttr(Root, xmlHint);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_Full(Root: IXMLNode);
@@ -826,7 +878,9 @@ end;
 
 procedure TCpuViewSettins.LoadFromXML_RegSettings(Root: IXMLNode);
 begin
-  FRegFontHeight := XMLReadDouble(Root, xmlFontSize);
+  FRegSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
+  FRegSettings.AddrValidation := GetNodeAttr(Root, xmlValidation);
+  FRegSettings.Hints := GetNodeAttr(Root, xmlHint);
   FRegSettings.LoadFromXML(Root);
 end;
 
@@ -850,7 +904,9 @@ end;
 
 procedure TCpuViewSettins.LoadFromXML_StackSettings(Root: IXMLNode);
 begin
-  FStackFontHeight := XMLReadDouble(Root, xmlFontSize);
+  FStackSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
+  FStackSettings.AddrValidation := GetNodeAttr(Root, xmlValidation);
+  FStackSettings.Hints := GetNodeAttr(Root, xmlHint);
 end;
 
 procedure TCpuViewSettins.Reset(APart: TSettingPart);
@@ -1034,9 +1090,12 @@ begin
   SetNodeAttr(Root, xmlSaveViewersSession, FSaveViewersSession);
   SetNodeAttr(Root, xmlFont, FFontName);
   SetNodeAttr(Root, xmlUseDebugInfo, FUseDebugInfo);
-  SetNodeAttr(Root, xmlAddrValidation, FValidationAddrVA);
+  SetNodeAttr(Root, xmlValidation, FUseAddrValidation);
   SetNodeAttr(Root, xmlDbgLog, FUseDebugLog);
   SetNodeAttr(Root, xmlDbgDump, FUseCrashDump);
+  SetNodeAttr(Root, xmlInDeepDbgInfo, FInDeepDbgInfo);
+  SetNodeAttr(Root, xmlStackChains, FStackChains);
+  SetNodeAttr(Root, xmlDisassemblyInHint, FDisassemblyInHint);
   if FSaveFormSession then
   begin
     SetNodeAttr(Root, xmlLeft, FCpuViewDlgSettings.BoundsRect.Left);
@@ -1078,6 +1137,8 @@ begin
     GetEnumName(TypeInfo(TCharEncoderType), Integer(FDumpSettings.EncodeType)));
   SetNodeAttr(Encoder, xmlEncoderName, FDumpSettings.EncodingName);
   SetNodeAttr(Encoder, xmlEncoderCP, FDumpSettings.CodePage);
+  SetNodeAttr(Root, xmlValidation, FDumpSettings.AddrValidation);
+  SetNodeAttr(Root, xmlHint, FDumpSettings.Hints);
 end;
 
 procedure TCpuViewSettins.SaveToXML_Full(Root: IXMLNode);
@@ -1103,7 +1164,9 @@ end;
 
 procedure TCpuViewSettins.SaveToXML_RegSettings(Root: IXMLNode);
 begin
-  XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
+  XMLWriteDouble(Root, xmlFontSize, FRegSettings.FontHeight);
+  SetNodeAttr(Root, xmlValidation, FRegSettings.AddrValidation);
+  SetNodeAttr(Root, xmlHint, FRegSettings.Hints);
   FRegSettings.SaveToXML(Root);
 end;
 
@@ -1127,7 +1190,19 @@ end;
 
 procedure TCpuViewSettins.SaveToXML_StackSettings(Root: IXMLNode);
 begin
-  XMLWriteDouble(Root, xmlFontSize, FRegFontHeight);
+  XMLWriteDouble(Root, xmlFontSize, FStackSettings.FontHeight);
+  SetNodeAttr(Root, xmlValidation, FStackSettings.AddrValidation);
+  SetNodeAttr(Root, xmlHint, FStackSettings.Hints);
+end;
+
+procedure TCpuViewSettins.SetHintInReg(AValue: Boolean);
+begin
+  FRegSettings.Hints := AValue;
+end;
+
+procedure TCpuViewSettins.SetValidationReg(AValue: Boolean);
+begin
+  FRegSettings.AddrValidation := AValue;
 end;
 
 procedure TCpuViewSettins.SetShotCut(Index: TShortCutType;
@@ -1252,27 +1327,27 @@ begin
   ADumpView.Encoder.EncodeType := FDumpSettings.EncodeType;
   ADumpView.Encoder.CodePage := FDumpSettings.CodePage;
   ADumpView.Encoder.EncodingName := FDumpSettings.EncodingName;
-  ADumpView.ShowHint := ValidationAddrVA;
-  ADumpView.ValidateAddress := ValidationAddrVA;
+  ADumpView.ShowHint := UseAddrValidation and HintInDump;
+  ADumpView.ValidateAddress := UseAddrValidation and ValidationDump;
 end;
 
 procedure TCpuViewSettins.SetSettingsToRegView(ARegView: TRegView);
 begin
   RestoreViewDefSettings(ARegView);
-  ARegView.Font.Height := DoubleToDpi(FRegFontHeight, ARegView);
+  ARegView.Font.Height := DoubleToDpi(FRegSettings.FontHeight, ARegView);
   SaveToAddrHightLightColorMap(ARegView.ColorMap);
   SaveToRegColorMap(ARegView.ColorMap);
   {$message 'Not ready yet!'}
-  //ARegView.ShowHint := ValidationAddrVA;
-  ARegView.ValidateAddress := ValidationAddrVA;
+  //ARegView.ShowHint := ValidationAddrVA and HintInReg;
+  ARegView.ValidateAddress := UseAddrValidation and ValidationReg;
 end;
 
 procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);
 begin
   RestoreViewDefSettings(AStackView);
-  AStackView.Font.Height := DoubleToDpi(FStackFontHeight, AStackView);
-  AStackView.ShowHint := ValidationAddrVA;
-  AStackView.ValidateAddress := ValidationAddrVA;
+  AStackView.Font.Height := DoubleToDpi(FStackSettings.FontHeight, AStackView);
+  AStackView.ShowHint := UseAddrValidation and HintInStack;
+  AStackView.ValidateAddress := UseAddrValidation and ValidationStack;
   // ValidateAddress is involved in the calculation of column widths,
   // so you need to call recalculation
   AStackView.FitColumnsToBestSize;
