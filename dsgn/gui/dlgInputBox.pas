@@ -99,12 +99,21 @@ end;
 { TfrmInputBox }
 
 procedure TfrmInputBox.edAddressChange(Sender: TObject);
+
+  function TryGetAddr(out AInputAddr: Int64): Boolean;
+  begin
+    AInputAddr := 0;
+    Result := TryStrToInt64(edAddress.Text, AInputAddr);
+    if not Result then
+      Result := TryStrToInt64('$' + edAddress.Text, AInputAddr);
+  end;
+
 var
   ANewAddrVA: Int64;
 begin
   if edAddress.Visible then
   begin
-    if not TryStrToInt64(edAddress.Text, ANewAddrVA) then
+    if not TryGetAddr(ANewAddrVA) then
       btnOk.Enabled := False
     else
       btnOk.Enabled := FCallback(ANewAddrVA);

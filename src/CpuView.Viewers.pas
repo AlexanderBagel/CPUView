@@ -202,6 +202,7 @@ type
     function GetCaretNextRowIndex(FromIndex: Int64;
       AColumn: TColumnType = ctNone): Int64; override;
     function GetColorMapClass: THexViewColorMapClass; override;
+    function GetDefaultCaretChangeMode: TCaretChangeMode; override;
     function GetHeaderClass: THeaderClass; override;
     function GetOverloadPainterClass(Value: TPrimaryRowPainterClass): TPrimaryRowPainterClass; override;
     procedure InitPainters; override;
@@ -526,6 +527,7 @@ type
     function CopyCommandEnabled(Value: TCopyStyle): Boolean; override;
     procedure DoChange(ChangeCode: Integer); override;
     procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
+    function GetDefaultCaretChangeMode: TCaretChangeMode; override;
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
     procedure InitDefault; override;
     procedure InitPainters; override;
@@ -1381,6 +1383,11 @@ begin
   Result := TAsmColorMap;
 end;
 
+function TCustomAsmView.GetDefaultCaretChangeMode: TCaretChangeMode;
+begin
+  Result := ccmSelectRow;
+end;
+
 function TCustomAsmView.GetHeaderClass: THeaderClass;
 begin
   Result := TAsmViewHeader;
@@ -1578,7 +1585,7 @@ end;
 procedure TCustomAddressView.DoChange(ChangeCode: Integer);
 begin
   inherited;
-  if ChangeCode in [cmFont, cmData] then
+  if ChangeCode = cmFont then
     FitColumnsToBestSize;
 end;
 
@@ -2214,6 +2221,11 @@ begin
       inherited;
     end;
   end;
+end;
+
+function TCustomStackView.GetDefaultCaretChangeMode: TCaretChangeMode;
+begin
+  Result := ccmSelectRow;
 end;
 
 procedure TCustomStackView.FramesUpdated;

@@ -316,9 +316,7 @@ begin
     MNU_GOTODMP:
     begin
       AParam := GetMnuParam;
-      Core.ShowDumpAtAddr(AParam.AddrVA);
-      ActiveDumpView.SelStart := AParam.AddrVA;
-      ActiveDumpView.SelEnd := AParam.AddrVA + AParam.MemSize - 1;
+      Core.ShowDumpAtAddr(AParam.AddrVA, AParam.MemSize);
       ActiveControl := ActiveDumpView;
     end;
     MNU_GOTOASM:

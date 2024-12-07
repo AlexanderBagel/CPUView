@@ -561,12 +561,10 @@ end;
 
 procedure TfrmCpuView.InternalShowInDump(AddrVA: Int64);
 begin
-  Core.ShowDumpAtAddr(AddrVA);
-  ActiveDumpView.FocusOnAddress(AddrVA, ccmSetNewSelection);
   if ActiveViewIndex = 0 then
-    ActiveDumpView.SelEnd := AddrVA + AsmView.SelectedRawLength - 1
+    Core.ShowDumpAtAddr(AddrVA, AsmView.SelectedRawLength)
   else
-    ActiveDumpView.SelEnd := AddrVA + DbgGate.PointerSize - 1;
+    Core.ShowDumpAtAddr(AddrVA);
   ActiveControl := ActiveDumpView;
 end;
 

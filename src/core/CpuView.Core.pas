@@ -118,7 +118,7 @@ type
     procedure JumpClear;
     procedure Reset;
     procedure Restore(DefAddrVA: Int64);
-    procedure Update(Index: Integer; AddrVA: Int64; PushToJmpStack: Boolean);
+    procedure Update(Index: Integer; AddrVA: Int64; ASelLength: Integer; PushToJmpStack: Boolean);
     property AddressMode: TAddressMode read FAddressMode write SetAddressMode;
     property ItemIndex: Integer read FItemIndex write SetItemIndex;
     property LastAddrVA: Int64 read GetLastAddrVA write SetLastAddrVA;
@@ -216,7 +216,8 @@ type
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean;
     function QuerySymbolAtAddr(AddrVA: Int64): string;
     procedure ShowDisasmAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True);
-    procedure ShowDumpAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True);
+    procedure ShowDumpAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True); overload;
+    procedure ShowDumpAtAddr(AddrVA: Int64; ASelLength: Integer; PushToJmpStack: Boolean = True); overload;
     procedure ShowStackAtAddr(AddrVA: Int64);
     procedure UpdateAfterSettingsChange;
     function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean;
@@ -385,11 +386,11 @@ begin
   begin
     if FItems.List[I].LastAddrVA = 0 then
       FItems.List[I].LastAddrVA := DefAddrVA;
-    Update(I, FItems.List[I].LastAddrVA, False);
+    Update(I, FItems.List[I].LastAddrVA, 0, False);
   end;
 end;
 
-procedure TDumpViewList.Update(Index: Integer; AddrVA: Int64;
+procedure TDumpViewList.Update(Index: Integer; AddrVA: Int64; ASelLength: Integer;
   PushToJmpStack: Boolean);
 var
   RegData: TRegionData;
@@ -400,7 +401,7 @@ begin
   AView := FItems.List[Index].View;
   if PushToJmpStack then
   begin
-    AView.JumpToAddress(AddrVA);
+    AView.JumpToAddress(AddrVA, ASelLength);
     Exit;
   end;
   if not FCore.QueryRegion(AddrVA, RegData) then Exit;
@@ -409,9 +410,7 @@ begin
   AStream.SetAddrWindow(RegData.BaseAddr, RegData.RegionSize);
   AView.SetDataStream(AStream, RegData.BaseAddr);
   AView.AddressMode := AddressMode;
-  AView.FocusOnAddress(AddrVA, ccmReset);
-  AView.SelStart := AddrVA;
-  AView.SelEnd := AddrVA + FCore.Debugger.PointerSize - 1;
+  AView.FocusOnAddress(AddrVA, ccmSelectPointer);
   FItems.List[Index].LastAddrVA := AddrVA;
 end;
 
@@ -918,21 +917,11 @@ begin
         atRead: ShowDumpAtAddr(AJmpAddr);
         atStack: ShowStackAtAddr(AJmpAddr);
       end;
+      Handled := AddrType <> atNone;
     end;
     jsJmpPushToStack,
     jsJmpUndo,
-    jsJmpRedo:
-    begin
-      ShowDumpAtAddr(AJmpAddr, False);
-
-      // Блокировка выделения строки вьювером при операции Redo.
-      // Фокусировка и выделение нужной позиции в дампе выполнится во внешнем обработчике.
-
-      // Blocking of row selection by the viewer during Redo operation.
-      // Focusing and selection of the desired position in the dump will be done in an external handler.
-
-      Handled := AJmpState = jsJmpRedo;
-    end;
+    jsJmpRedo: ShowDumpAtAddr(AJmpAddr, False);
     jsJmpDone: Handled := False;
   end;
 end;
@@ -1152,10 +1141,16 @@ end;
 
 procedure TCpuViewCore.ShowDumpAtAddr(AddrVA: Int64; PushToJmpStack: Boolean);
 begin
+  ShowDumpAtAddr(AddrVA, 0, PushToJmpStack);
+end;
+
+procedure TCpuViewCore.ShowDumpAtAddr(AddrVA: Int64; ASelLength: Integer;
+  PushToJmpStack: Boolean);
+begin
   if FDumpViewList.Count = 0 then Exit;
   if (AddrVA = 0) and CanWork then
     AddrVA := FDebugger.CurrentInstructionPoint;
-  FDumpViewList.Update(FDumpViewList.ItemIndex, AddrVA, PushToJmpStack);
+  FDumpViewList.Update(FDumpViewList.ItemIndex, AddrVA, ASelLength, PushToJmpStack);
 end;
 
 procedure TCpuViewCore.ShowStackAtAddr(AddrVA: Int64);

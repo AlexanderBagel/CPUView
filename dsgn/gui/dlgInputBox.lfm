@@ -9,7 +9,7 @@ object frmInputBox: TfrmInputBox
   ClientWidth = 443
   DesignTimePPI = 144
   Position = poScreenCenter
-  LCLVersion = '3.99.0.0'
+  LCLVersion = '4.99.0.0'
   object lblPromt: TLabel
     Left = 16
     Height = 25
