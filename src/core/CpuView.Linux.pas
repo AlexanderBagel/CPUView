@@ -68,6 +68,7 @@ type
     function GetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
     function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function NeedUpdateReadData: Boolean; override;
+    function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
     function SetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
@@ -871,6 +872,17 @@ end;
 function TCommonUtils.NeedUpdateReadData: Boolean;
 begin
   Result := False;
+end;
+
+function TCommonUtils.QueryModuleName(AddrVA: Int64; out AModuleName: string
+  ): Boolean;
+var
+  MBI: TMemoryBasicInformation;
+begin
+  AModuleName := '';
+  Result := VirtualQueryMBI(AddrVA, MBI);
+  if Result then
+    AModuleName := MBI.MappedFile;
 end;
 
 function TCommonUtils.QueryRegion(AddrVA: Int64; out RegionData: TRegionData

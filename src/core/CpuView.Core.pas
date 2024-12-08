@@ -213,6 +213,7 @@ type
     function AddrInStack(AddrVA: Int64): Boolean;
     function QueryAccessStr(AddrVA: Int64): string;
     function QueryAddressType(AddrVA: Int64): TAddrType;
+    function QueryModuleName(AddrVA: Int64): string;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean;
     function QuerySymbolAtAddr(AddrVA: Int64): string;
     procedure ShowDisasmAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True);
@@ -445,6 +446,11 @@ begin
     Exit(atStack);
   if (raRead in CacheItem.Region.Access) then
     Result := atRead;
+end;
+
+function TCpuViewCore.QueryModuleName(AddrVA: Int64): string;
+begin
+  FUtils.QueryModuleName(AddrVA, Result);
 end;
 
 function TCpuViewCore.QueryRegion(AddrVA: Int64; out RegionData: TRegionData

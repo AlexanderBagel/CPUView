@@ -69,6 +69,7 @@ type
     function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; virtual; abstract;
     function NeedUpdateReadData: Boolean; virtual;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; virtual; abstract;
+    function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; virtual; abstract;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; virtual; abstract;
     function SetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; virtual; abstract;
     procedure Update; virtual; abstract;

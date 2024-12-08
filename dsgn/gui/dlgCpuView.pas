@@ -580,16 +580,20 @@ var
 begin
   StatusBar.Panels[0].Text := Format('Pid: %d, Tid: %d, State: %s',
     [DbgGate.ProcessID, DbgGate.ThreadID, DbgStates[DbgGate.DebugState]]);
+  StatusBar.Panels[1].Text := Format('Module: "%s"',
+    [ExtractFileName(FCore.QueryModuleName(AsmView.SelectedInstructionAddr))]);
   AddrVA := ActiveViewerSelectedValue;
   AccessStr := FCore.QueryAccessStr(AddrVA);
   Symbol := FCore.QuerySymbolAtAddr(AddrVA);
-  StatusBar.Panels[1].Text := Format('Addr:  0x%x (%s) %s', [AddrVA, AccessStr, Symbol]);
+  StatusBar.Panels[2].Text := Format('Addr:  0x%x (%s) %s', [AddrVA, AccessStr, Symbol]);
   AMeasureCanvas := MeasureCanvas;
   try
     StatusBar.Panels[0].Width :=
       AMeasureCanvas.Canvas.TextWidth(StatusBar.Panels[0].Text) + ToDpi(16);
     StatusBar.Panels[1].Width :=
       AMeasureCanvas.Canvas.TextWidth(StatusBar.Panels[1].Text) + ToDpi(16);
+    StatusBar.Panels[2].Width :=
+      AMeasureCanvas.Canvas.TextWidth(StatusBar.Panels[2].Text) + ToDpi(16);
   finally
     AMeasureCanvas.Free;
   end;

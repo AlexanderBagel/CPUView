@@ -47,6 +47,10 @@ object frmCpuView: TfrmCpuView
           Width = 300
         end      
         item
+          Text = 'Module: ""'
+          Width = 200
+        end      
+        item
           Text = 'Addr: 0x0 (No access)'
           Width = 350
         end      

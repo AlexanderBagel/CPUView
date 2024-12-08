@@ -47,6 +47,7 @@ type
     destructor Destroy; override;
     function GetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
     function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
     function SetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
@@ -225,6 +226,8 @@ const
     stdcall; external kernel32;
   function Wow64SetThreadContext(hThread: THandle; const lpContext: TWow64Context): BOOL;
     stdcall; external kernel32;
+  function GetMappedFileNameW(hProcess: THandle; lpv: Pointer;
+    lpFilename: LPCWSTR; nSize: DWORD): DWORD; stdcall; external 'psapi.dll';
 
 // CONTEXT structure for AMD64 needs to be aligned on a 16-byte boundary
 function Amd64Align(Src: Pointer): Pointer;
@@ -812,6 +815,18 @@ begin
   else
     Result := GetThreadNativeStackLimit(FProcessHandle, ThreadID);
   {$ENDIF}
+end;
+
+function TCommonUtils.QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean;
+var
+  ModulePath: UnicodeString;
+  ALength: DWORD;
+begin
+  SetLength(ModulePath, MAX_PATH);
+  ALength := GetMappedFileNameW(FProcessHandle, Pointer(AddrVA), @ModulePath[1], MAX_PATH);
+  Result := ALength > 0;
+  SetLength(ModulePath, ALength);
+  AModuleName := string(ModulePath);
 end;
 
 function TCommonUtils.QueryRegion(AddrVA: Int64;
