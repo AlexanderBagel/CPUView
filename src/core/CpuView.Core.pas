@@ -30,7 +30,6 @@ interface
 }
 
 {$message 'Min/Max col width to FWHexView for each coltype'}
-{$message 'After "Run" command, stack data is not cleaned, "return AddrVA" from the frame is hanging around'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
 {$message 'The x87/SIMD registers are not editable'}
@@ -80,6 +79,7 @@ type
     View: TDumpView;
     Stream: TBufferedROStream;
     LastAddrVA: Int64;
+    Inited: Boolean;
   end;
 
   TAddrCacheItem = record
@@ -400,11 +400,8 @@ var
 begin
   if not CheckIndex(Index) then Exit;
   AView := FItems.List[Index].View;
-  if PushToJmpStack then
-  begin
-    AView.JumpToAddress(AddrVA, ASelLength);
+  if PushToJmpStack and AView.JumpToAddress(AddrVA, ASelLength) then
     Exit;
-  end;
   if not FCore.QueryRegion(AddrVA, RegData) then Exit;
   AStream := FItems.List[Index].Stream;
   AStream.Stream.OnUpdated := FOnUpdate;
@@ -413,6 +410,11 @@ begin
   AView.AddressMode := AddressMode;
   AView.FocusOnAddress(AddrVA, ccmSelectPointer);
   FItems.List[Index].LastAddrVA := AddrVA;
+  if not FItems.List[Index].Inited then
+  begin
+    FItems.List[Index].Inited := True;
+    AView.FitColumnsToBestSize;
+  end;
 end;
 
 { TCpuViewCore }
@@ -870,7 +872,7 @@ begin
       if Assigned(FStackView) then
       begin
         FStackView.Frames.Clear;
-        FStackView.Invalidate;
+        FStackView.FramesUpdated;
         FStackView.JumpClear;
       end;
       FDumpViewList.JumpClear;
