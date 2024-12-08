@@ -476,6 +476,7 @@ begin
   end;
 
   UpdateContext;
+  DoThreadChange;
   DoStateChange;
 
   CpuViewDebugLog.Log('DebugGate: OnCallStackCtxChanged end', False);

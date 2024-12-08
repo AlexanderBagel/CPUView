@@ -154,6 +154,7 @@ type
     FStackChains: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
+    FThreadChange: Boolean;
     FOldAsmScroll: TOnVerticalScrollEvent;
     FOldAsmSelect: TNotifyEvent;
     FUtils: TCommonUtils;
@@ -181,6 +182,7 @@ type
       AColumn: TColumnType; var AComment: string);
     procedure OnRegQueryExternalComment(Sender: TObject;
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
+    procedure OnThreadChange(Sender: TObject);
     function QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     procedure SetAsmView(const Value: TAsmView);
     procedure SetRegView(const Value: TRegView);
@@ -554,10 +556,11 @@ begin
   RemoteStream := TRemoteStream.Create(FUtils);
   FStackStream := TBufferedROStream.Create(RemoteStream, soOwned);
   FDebugger := ADebuggerClass.Create(nil, FUtils);
+  FDebugger.OnBreakPointsChange := OnBreakPointsChange;
   FDebugger.OnChange := OnDebugerChage;
   FDebugger.OnContextChange := OnContextChange;
   FDebugger.OnStateChange := OnDebugerStateChange;
-  FDebugger.OnBreakPointsChange := OnBreakPointsChange;
+  FDebugger.OnThreadChange := OnThreadChange;
   FAsmStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   FDisassemblyStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
@@ -854,8 +857,9 @@ begin
       UpdateStreamsProcessID;
     adsPaused:
     begin
-      if Assigned(FDebugger) and (FDebugger.CurrentInstructionPoint <> FAsmView.InstructionPoint) then
+      if Assigned(FDebugger) and (FThreadChange or (FDebugger.CurrentInstructionPoint <> FAsmView.InstructionPoint)) then
       begin
+        FThreadChange := False;
         FUtils.Update;
         RefreshView;
       end;
@@ -956,6 +960,11 @@ begin
   end;
   if AComment <> '' then
     AComment := '(' + AComment + ')';
+end;
+
+procedure TCpuViewCore.OnThreadChange(Sender: TObject);
+begin
+  FThreadChange := True;
 end;
 
 function TCpuViewCore.QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem

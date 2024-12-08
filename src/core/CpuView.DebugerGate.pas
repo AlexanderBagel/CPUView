@@ -67,7 +67,7 @@ type
     FChange: TNotifyEvent;
     FErrorMessage: string;
     FShowSourceLines, FUseDebugInfo: Boolean;
-    FBreakPointsChange, FCtxChange, FStateChange: TNotifyEvent;
+    FBreakPointsChange, FCtxChange, FStateChange, FThreadChange: TNotifyEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
     procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
@@ -75,6 +75,7 @@ type
     procedure DoChange;
     procedure DoError(const AMessage: string);
     procedure DoStateChange;
+    procedure DoThreadChange;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure UpdateContext; virtual;
   public
@@ -117,6 +118,7 @@ type
     property OnChange: TNotifyEvent read FChange write FChange;
     property OnContextChange: TNotifyEvent read FCtxChange write FCtxChange;
     property OnStateChange: TNotifyEvent read FStateChange write FStateChange;
+    property OnThreadChange: TNotifyEvent read FThreadChange write FThreadChange;
     property OnBreakPointsChange: TNotifyEvent read FBreakPointsChange write FBreakPointsChange;
   end;
 
@@ -177,6 +179,12 @@ procedure TAbstractDebugger.DoStateChange;
 begin
   if Assigned(FStateChange) then
     FStateChange(Self);
+end;
+
+procedure TAbstractDebugger.DoThreadChange;
+begin
+  if Assigned(FThreadChange) then
+    FThreadChange(Self);
 end;
 
 procedure TAbstractDebugger.FillThreadStackFrames(ALimit: TStackLimit;
