@@ -85,7 +85,8 @@ type
   TAddrCacheItem = record
     Region: TRegionData;
     Symbol: string;
-    Disassembly: string;
+    InDeepSymbol: Boolean; // Flag means that the character for the address was calculated by recursive analysis
+    AsmLines, HintLines: string;
   end;
 
   TCpuViewCore = class;
@@ -162,6 +163,7 @@ type
     function CanWork: Boolean;
     function DisasmBuffSize: Integer;
     procedure DoReset;
+    function FormatInstructionToAsmLine(const AIns: TInstruction): TAsmLine;
     function GetAddrMode: TAddressMode;
     procedure OnAsmCacheEnd(Sender: TObject);
     procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
@@ -217,7 +219,7 @@ type
     function QueryAddressType(AddrVA: Int64): TAddrType;
     function QueryModuleName(AddrVA: Int64): string;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean;
-    function QuerySymbolAtAddr(AddrVA: Int64): string;
+    function QuerySymbolAtAddr(AddrVA: Int64; IncludeInDeepSymbol: Boolean = True): string;
     procedure ShowDisasmAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True);
     procedure ShowDumpAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True); overload;
     procedure ShowDumpAtAddr(AddrVA: Int64; ASelLength: Integer; PushToJmpStack: Boolean = True); overload;
@@ -468,12 +470,17 @@ begin
     RegionData := CacheItem.Region;
 end;
 
-function TCpuViewCore.QuerySymbolAtAddr(AddrVA: Int64): string;
+function TCpuViewCore.QuerySymbolAtAddr(AddrVA: Int64; IncludeInDeepSymbol: Boolean): string;
 var
   CacheItem: TAddrCacheItem;
 begin
   if QueryCacheItem(AddrVA, CacheItem) then
-    Result := CacheItem.Symbol
+  begin
+    if CacheItem.InDeepSymbol and not IncludeInDeepSymbol then
+      Result := ''
+    else
+      Result := CacheItem.Symbol;
+  end
   else
     Result := '';
 end;
@@ -619,32 +626,14 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
     List: TList<TInstruction>;
     Inst: TInstruction;
     AsmLine: TAsmLine;
-    SpaceIndex: Integer;
   begin
-    List := Debugger.Disassembly(FromAddr, FromBuff, BufSize);
+    List := Debugger.Disassembly(FromAddr, FromBuff, BufSize, Debugger.ShowSourceLines);
     try
       for Inst in List do
       begin
-        AsmLine.AddrVA := FromAddr;
         if Inst.Len > BufSize then
           Break;
-        AsmLine.DecodedStr := Inst.AsString;
-        AsmLine.HintStr := Inst.Hint;
-        AsmLine.Len := Inst.Len;
-        AsmLine.JmpTo := Inst.JmpTo;
-        AsmLine.CallInstruction := False;
-        if ShowCallFuncName and (AsmLine.JmpTo <> 0) then
-        begin
-          if AsmLine.DecodedStr.StartsWith('CALL') then
-          begin
-            SpaceIndex := Pos(' ', AsmLine.HintStr);
-            if SpaceIndex = 0 then
-              SpaceIndex := Length(AsmLine.HintStr) + 1;
-            AsmLine.DecodedStr := 'CALL ' + Copy(AsmLine.HintStr, 1, SpaceIndex - 1);
-            AsmLine.HintStr := '';
-            AsmLine.CallInstruction := True;
-          end;
-        end;
+        AsmLine := FormatInstructionToAsmLine(Inst);
         FAddrIndex.TryAdd(FromAddr, FCacheList.Count);
         FCacheList.Add(AsmLine);
         Inc(FromAddr, AsmLine.Len);
@@ -656,6 +645,7 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
 
     if BufSize > 0 then
     begin
+      AsmLine.AddrVA := FromAddr;
       AsmLine.DecodedStr := '???';
       AsmLine.Len := BufSize;
       AsmLine.JmpTo := 0;
@@ -755,6 +745,31 @@ procedure TCpuViewCore.DoReset;
 begin
   if Assigned(FReset) then
     FReset(Self);
+end;
+
+function TCpuViewCore.FormatInstructionToAsmLine(const AIns: TInstruction
+  ): TAsmLine;
+var
+  SpaceIndex: Integer;
+begin
+  Result.AddrVA := AIns.AddrVA;
+  Result.DecodedStr := AIns.AsString;
+  Result.HintStr := AIns.Hint;
+  Result.Len := AIns.Len;
+  Result.JmpTo := AIns.JmpTo;
+  Result.CallInstruction := False;
+  if ShowCallFuncName and (Result.JmpTo <> 0) then
+  begin
+    if Result.DecodedStr.StartsWith('CALL') then
+    begin
+      SpaceIndex := Pos(' ', Result.HintStr);
+      if SpaceIndex = 0 then
+        SpaceIndex := Length(Result.HintStr) + 1;
+      Result.DecodedStr := 'CALL ' + Copy(Result.HintStr, 1, SpaceIndex - 1);
+      Result.HintStr := '';
+      Result.CallInstruction := True;
+    end;
+  end;
 end;
 
 function TCpuViewCore.GetAddrMode: TAddressMode;
@@ -972,6 +987,11 @@ function TCpuViewCore.QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem
 var
   AddrPtr: Int64;
   AddrPtrItem: TAddrCacheItem;
+  Buff: array of Byte;
+  List: TList<TInstruction>;
+  Inst: TInstruction;
+  AsmLine: TAsmLine;
+  I: Integer;
 begin
   AItem := Default(TAddrCacheItem);
   Result := FSessionCache.TryGetValue(AddrVA, AItem);
@@ -1004,9 +1024,31 @@ begin
             AItem.Symbol := Format('[0x%x] -> %s', [AddrPtr, AddrPtrItem.Symbol])
           else
             AItem.Symbol := Format('[0x%x]', [AddrPtr]);
+          AItem.InDeepSymbol := True;
         end;
       end;
     end;
+
+    if raExecute in AItem.Region.Access then
+    begin
+      // 10 instructions of maximum size (15)
+      SetLength(Buff, 150);
+      if Debugger.ReadMemory(AddrVA, Buff[0], 150) then
+      begin
+        List := Debugger.Disassembly(AddrVA, @Buff[0], 150, False);
+        try
+          for I := 0 to Min(9, List.Count - 1) do
+          begin
+            AsmLine := FormatInstructionToAsmLine(List[I]);
+            AItem.AsmLines := AItem.AsmLines + AsmLine.DecodedStr + sLineBreak;
+            AItem.HintLines := AItem.HintLines + AsmLine.HintStr + sLineBreak;
+          end;
+        finally
+          List.Free;
+        end;
+      end;
+    end;
+
   finally
     FSessionCache.AddOrSetValue(AddrVA, AItem);
   end;

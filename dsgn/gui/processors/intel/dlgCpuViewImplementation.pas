@@ -203,7 +203,7 @@ begin
       end;
       HintParam.AddrVA := Expression.Value;
       ValueAccess := Core.QueryAccessStr(HintParam.AddrVA);
-      Symbol := Core.QuerySymbolAtAddr(HintParam.AddrVA);
+      Symbol := Core.QuerySymbolAtAddr(HintParam.AddrVA, Expression.MemSize = 0);
       if Symbol <> '' then
         Symbol := ' ' + Symbol;
       if Core.AddrInDump(HintParam.AddrVA) then

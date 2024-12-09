@@ -84,7 +84,8 @@ type
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; virtual; abstract;
     function CurrentInstructionPoint: Int64; virtual; abstract;
     function DebugState: TAbstractDebugState; virtual; abstract;
-    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer): TList<TInstruction>; virtual; abstract;
+    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer;
+      AShowSourceLines: Boolean): TList<TInstruction>; virtual; abstract;
     function IsActive: Boolean; virtual; abstract;
     function IsActiveJmp: Boolean; virtual; abstract;
     procedure FillThreadStackFrames(ALimit: TStackLimit;

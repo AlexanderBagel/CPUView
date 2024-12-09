@@ -158,7 +158,8 @@ type
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; override;
     function CurrentInstructionPoint: Int64; override;
     function DebugState: TAbstractDebugState; override;
-    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer): TListEx<TInstruction>; override;
+    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer;
+      AShowSourceLines: Boolean): TListEx<TInstruction>; override;
     function IsActive: Boolean; override;
     function IsActiveJmp: Boolean; override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
@@ -316,14 +317,9 @@ begin
   FSupportStream.Position := CurrentIP;
   ALen := FSupportStream.Read(InstructionOpcode[0], 16);
   if ALen = 0 then Exit;
-  List := Disassembly(CurrentIP, @InstructionOpcode[0], 16);
+  List := Disassembly(CurrentIP, @InstructionOpcode[0], 16, False);
   try
-    for I := 0 to List.Count - 1 do
-      if List.List[I].Len > 0 then
-      begin
-        Result := List[I];
-        Break;
-      end;
+    Result := List[0];
   finally
     List.Free;
   end;
@@ -732,7 +728,7 @@ begin
 end;
 
 function TCpuViewDebugGate.Disassembly(AddrVA: Int64; pBuff: PByte;
-  nSize: Integer): TListEx<TInstruction>;
+  nSize: Integer; AShowSourceLines: Boolean): TListEx<TInstruction>;
 var
   Disasm: TDbgAsmDecoder;
   Process: TDbgProcess;
@@ -752,7 +748,7 @@ begin
   if Disasm = nil then Exit;
   while nSize > 0 do
   begin
-    if ShowSourceLines then
+    if AShowSourceLines then
     begin
       Instruction.AsString := QuerySymbolAtAddr(AddrVA, qsSourceLine);
       if Instruction.AsString <> '' then

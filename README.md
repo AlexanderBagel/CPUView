@@ -41,8 +41,9 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Crosscompiling support
 * Supports thread switching with instantaneous change of displayed information about the active thread
 * Command to jump the selected address in any of the windows
+* Bidirectional jump stack in each editor
 
-### The disassembler supports:
+### The disassembler window supports:
 * Output debugging information
 * Jump direction display
 * Active jump highlighting
@@ -53,6 +54,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Instruction coloring for easy code reading
 * Breakpoints (display and modify)
 * Bookmarks synchronization (not yet implemented)
+* Display the disassembler for each jump in the tooltip (not yet implemented)
 
 ### Register window:
 * Contains debugging information for each register (RAX..R15)
@@ -64,12 +66,14 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Quick hint on active jump instructions
 * LastError and LastStatus code with description (Windows only)
 * Highlight of changed registers
+* Highlighting and hinting to validated addresses
 
 ### Stack supports:
 * Debug information
 * Active and previous frames highlighting
 * Return address highlighting
 * Offsets
+* Highlighting and hinting to validated addresses
 
 ### Dump supports:
 * Offsets
@@ -77,6 +81,8 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * 17 display mode (include Long Double 80 bit)
 * 6 text encoding mode
 * 5 Copy mode (include pascal array)
+* Highlighting and hinting to validated addresses
+* Quick jumps to found validated addresses (via Ctrl+Click)
 * Selections (not yet implemented)
 * Address recognition and highlighting (not yet implemented)
 
