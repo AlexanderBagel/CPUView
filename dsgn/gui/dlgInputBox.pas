@@ -51,6 +51,14 @@ implementation
 
 {$R *.lfm}
 
+function TryGetAddr(edAddress: TEdit; out AInputAddr: Int64): Boolean;
+begin
+  AInputAddr := 0;
+  Result := TryStrToInt64(edAddress.Text, AInputAddr);
+  if not Result then
+    Result := TryStrToInt64('$' + edAddress.Text, AInputAddr);
+end;
+
 function QueryAddress(const ACaption, APromt: string; var AAddrVA: Int64;
   ACallback: TQueryAddrCallback): Boolean;
 var
@@ -64,7 +72,7 @@ begin
     frmInputBox.FCallback := ACallback;
     frmInputBox.edAddress.Text := '0x' + IntToHex(AAddrVA, 1);
     Result := (frmInputBox.ShowModal = mrOK) and
-      TryStrToInt64(frmInputBox.edAddress.Text, ANewAddrVA);
+      TryGetAddr(frmInputBox.edAddress, ANewAddrVA);
     if Result then
       AAddrVA := ANewAddrVA;
   finally
@@ -99,21 +107,12 @@ end;
 { TfrmInputBox }
 
 procedure TfrmInputBox.edAddressChange(Sender: TObject);
-
-  function TryGetAddr(out AInputAddr: Int64): Boolean;
-  begin
-    AInputAddr := 0;
-    Result := TryStrToInt64(edAddress.Text, AInputAddr);
-    if not Result then
-      Result := TryStrToInt64('$' + edAddress.Text, AInputAddr);
-  end;
-
 var
   ANewAddrVA: Int64;
 begin
   if edAddress.Visible then
   begin
-    if not TryGetAddr(ANewAddrVA) then
+    if not TryGetAddr(edAddress, ANewAddrVA) then
       btnOk.Enabled := False
     else
       btnOk.Enabled := FCallback(ANewAddrVA);
