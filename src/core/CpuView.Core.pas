@@ -29,6 +29,8 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
+{$message 'Jumping up is no longer displayed!!!! Need fix'}
+
 {$message 'Min/Max col width to FWHexView for each coltype'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
@@ -72,7 +74,7 @@ type
     DecodedStr, HintStr: string;
     Len: Integer;
     JmpTo: Int64;
-    CallInstruction: Boolean;
+    LinkIndex: Integer;
   end;
 
   TDumpViewRec = record
@@ -695,8 +697,9 @@ begin
     if Line.Len = 0 then
       FAsmView.DataMap.AddComment(Line.AddrVA, Line.DecodedStr)
     else
-      if Line.CallInstruction then
-        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, '', Line.JmpTo, 5, Length(Line.DecodedStr) - 5)
+      if Line.LinkIndex > 0 then
+        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, '',
+          Line.JmpTo, Line.LinkIndex, Length(Line.DecodedStr) - Line.LinkIndex)
       else
         FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
     for I := 1 to Min(CacheVisibleRows, FCacheList.Count - AIndex - 1) do
@@ -705,8 +708,9 @@ begin
       if Line.Len = 0 then
         FAsmView.DataMap.AddComment(Line.DecodedStr)
       else
-        if Line.CallInstruction then
-          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, '', Line.JmpTo, 5, Length(Line.DecodedStr) - 5)
+        if Line.LinkIndex > 0 then
+          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, '', Line.JmpTo,
+            Line.LinkIndex, Length(Line.DecodedStr) - Line.LinkIndex)
         else
           FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
     end;
@@ -757,17 +761,25 @@ begin
   Result.HintStr := AIns.Hint;
   Result.Len := AIns.Len;
   Result.JmpTo := AIns.JmpTo;
-  Result.CallInstruction := False;
-  if ShowCallFuncName and (Result.JmpTo <> 0) then
+  Result.LinkIndex := 0;
+  if Result.JmpTo <> 0 then
   begin
-    if Result.DecodedStr.StartsWith('CALL') then
+    Result.LinkIndex := Pos(' ', Result.DecodedStr);
+    SpaceIndex := Pos(' ', Result.HintStr);
+    if SpaceIndex = 0 then
     begin
-      SpaceIndex := Pos(' ', Result.HintStr);
-      if SpaceIndex = 0 then
-        SpaceIndex := Length(Result.HintStr) + 1;
-      Result.DecodedStr := 'CALL ' + Copy(Result.HintStr, 1, SpaceIndex - 1);
-      Result.HintStr := '';
-      Result.CallInstruction := True;
+      if Result.HintStr.StartsWith('__$dll$') then
+        SpaceIndex := Length(Result.HintStr) + 1
+      else
+        Exit;
+    end;
+    if ShowCallFuncName then
+    begin
+      if Result.DecodedStr.StartsWith('CALL') then
+      begin
+        Result.DecodedStr := 'CALL ' + Copy(Result.HintStr, 1, SpaceIndex - 1);
+        Result.HintStr := '';
+      end;
     end;
   end;
 end;

@@ -737,6 +737,7 @@ var
   ACodeBytes, ACode, RipSimbol: string;
   AnInfo: TDbgInstInfo;
   ExternalAddr, RipAddr: Int64;
+  SpaceIndex: Integer;
 begin
   CpuViewDebugLog.Log(Format('DebugGate: Disassembly(AddrVA: 0x%x, nSize: %d)', [AddrVA, nSize]), True);
 
@@ -776,7 +777,15 @@ begin
       Instruction.Hint := '';
 
     if AnInfo.InstrType = itJump then
-      Instruction.JmpTo := ExternalAddr
+    begin
+      Instruction.JmpTo := ExternalAddr;
+      SpaceIndex := Pos(' ', Instruction.AsString);
+      if SpaceIndex > 0 then
+      begin
+        SetLength(Instruction.AsString, SpaceIndex);
+        Instruction.AsString := Instruction.AsString + '0x' + IntToHex(ExternalAddr, 1);
+      end;
+    end
     else
     begin
       Instruction.JmpTo := 0;
