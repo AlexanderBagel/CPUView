@@ -58,9 +58,9 @@ type
     crtHint             // the usual “decorative” hint
     );
 
-  // Types of supported operations with the register during a change
-  TModifyAction = (maToggle, maIncrement, maZero, maChange, maValidation);
-  TModifyActions = set of TModifyAction;
+  // Types of supported register operations when changing or displaying a register
+  TRegisterFlag = (rfToggle, rfIncrement, rfZero, rfChangeValue, rfValidation, rfHint);
+  TRegisterFlags = set of TRegisterFlag;
 
   TRegID = Integer;
 
@@ -84,7 +84,7 @@ type
     RowIndex, ColIndex: Integer; // link to Map
     RegType: TContextRegType;
     Modifyed: Boolean;
-    ModifyActions: TModifyActions;
+    Flags: TRegisterFlags;
     SupportedViewMode: TRegViewModes;
     ViewMode: TRegViewMode;
     procedure Reset;
@@ -115,7 +115,7 @@ type
   TContextQueryExternalRegHintEvent = procedure(Sender: TObject;
     const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string) of object;
 
-  TRegQueryStringType = (rqstName, rqstDisplayName, rqstValue);
+  TRegQueryStringType = (rqstName, rqstDisplayName, rqstValue, rqstHint);
 
   TAbstractCPUContext = class;
 
@@ -204,7 +204,7 @@ type
   TCustomRegData = record
     RegID: Integer; // link to KnownRegs
     RegType: TContextRegType;
-    RegName, Value: string;
+    RegName, Value, Hint: string;
     Modifyed: Boolean;
     NameGlyphCount,
     ValueGlyphCount,
@@ -240,20 +240,21 @@ type
 
   TCommonCpuContext = class(TAbstractCPUContext)
   strict private
+    FLastReg: TCustomRegData;
     FMap: TRegMap;
     FKnownRegs: TListEx<TRegParam>;
     FThreadID: Cardinal;
     procedure SynhronizeMapToKnownRegs;
   protected
-    LastReg: TCustomRegData;
     procedure BuildMap; virtual; abstract;
     procedure DoChangeViewMode(RegID: Integer; const Value: TRegViewMode); virtual; abstract;
     function GetViewMode(RegID: Integer): TRegViewMode; override;
     procedure InitKnownRegs; virtual; abstract;
     procedure SetViewMode(RegID: Integer; const Value: TRegViewMode); override;
-    procedure UpdateLastRegData(RegID: Integer); virtual; abstract;
+    procedure UpdateLastRegData(RegID: Integer; SetModifyed: Boolean); virtual;
     procedure UpdateMap(RebuildRegList: Boolean = False);
     property KnownRegs: TListEx<TRegParam> read FKnownRegs;
+    property LastReg: TCustomRegData read FLastReg;
     property Map: TRegMap read FMap;
   protected
     function ExtractBit(Value: DWORD; Index: Integer): string;
@@ -266,6 +267,7 @@ type
     procedure FillRegData(RegID: TRegID); overload;
     procedure FillRegData(RowIndex, ColIndex: Integer); overload;
     procedure FillSeparator;
+    function RegHint(RegID: TRegID): string; virtual; abstract;
     function RegValue(Value: PByte; ValueLen: Integer;
       AValueFmt: TRegViewMode): string;
     function RegValueFmt(Value: PByte; ValueLen: Integer): string;
@@ -436,7 +438,7 @@ end;
 constructor TCommonCpuContext.Create(AOwner: TComponent);
 begin
   inherited;
-  LastReg.RegID := -1;
+  FLastReg.RegID := -1;
   FMap := TRegMap.Create(True);
   FKnownRegs := TListEx<TRegParam>.Create;
   UpdateMap(True);
@@ -485,11 +487,11 @@ end;
 procedure TCommonCpuContext.FillReg(const RegName, Value: string;
   NameGlyphCount, ValueGlyphCount, ValueSeparatorSize: Integer);
 begin
-  LastReg.RegName := RegName;
-  LastReg.Value := Value;
-  LastReg.NameGlyphCount := NameGlyphCount;
-  LastReg.ValueGlyphCount := ValueGlyphCount;
-  LastReg.ValueSeparatorSize := ValueSeparatorSize;
+  FLastReg.RegName := RegName;
+  FLastReg.Value := Value;
+  FLastReg.NameGlyphCount := NameGlyphCount;
+  FLastReg.ValueGlyphCount := ValueGlyphCount;
+  FLastReg.ValueSeparatorSize := ValueSeparatorSize;
 end;
 
 procedure TCommonCpuContext.FillRegData(RowIndex, ColIndex: Integer);
@@ -503,19 +505,20 @@ var
   RegParam: TRegParam;
 begin
   // check cache
-  if LastReg.RegID = RegID then Exit;
+  if FLastReg.RegID = RegID then Exit;
 
   if (RegID < 0) or (RegID >= KnownRegs.Count) then Exit;
 
   // real fill reg data
-  LastReg.RegID := RegID;
+  FLastReg.RegID := RegID;
 
   RegParam := KnownRegs[RegID];
-  LastReg.RegType := RegParam.RegType;
-  LastReg.Modifyed := RegParam.Modifyed;
+  FLastReg.RegType := RegParam.RegType;
+  FLastReg.Modifyed := RegParam.Modifyed;
+  FLastReg.Hint := RegHint(FLastReg.RegID);
 
   // update
-  UpdateLastRegData(RegID);
+  UpdateLastRegData(RegID, False);
 end;
 
 procedure TCommonCpuContext.FillReg(const RegName, Value: string;
@@ -542,12 +545,12 @@ end;
 function TCommonCpuContext.RegInfo(ARegID: TRegID): TRegister;
 begin
   FillRegData(ARegID);
-  Result.Modifyed := LastReg.Modifyed;
-  Result.RegID := LastReg.RegID;
-  Result.RegNameSize := LastReg.NameGlyphCount;
-  Result.ValueSize := LastReg.ValueGlyphCount;
-  Result.ValueSeparatorSize := LastReg.ValueSeparatorSize;
-  Result.ValueType := LastReg.RegType;
+  Result.Modifyed := FLastReg.Modifyed;
+  Result.RegID := FLastReg.RegID;
+  Result.RegNameSize := FLastReg.NameGlyphCount;
+  Result.ValueSize := FLastReg.ValueGlyphCount;
+  Result.ValueSeparatorSize := FLastReg.ValueSeparatorSize;
+  Result.ValueType := FLastReg.RegType;
 end;
 
 function TCommonCpuContext.RegInfo(ARowIndex, AColIndex: Integer): TRegister;
@@ -571,20 +574,21 @@ function TCommonCpuContext.RegQueryString(ARegID: TRegID;
 begin
   FillRegData(ARegID);
   case AType of
-    rqstName: Result := LastReg.RegName;
+    rqstName: Result := FLastReg.RegName;
     rqstDisplayName:
     begin
-      if LastReg.NameGlyphCount = 0 then
+      if FLastReg.NameGlyphCount = 0 then
         Result := ''
       else
       begin
-        if LastReg.NameGlyphCount >= Length(LastReg.RegName) then
-          Result := LastReg.RegName
+        if FLastReg.NameGlyphCount >= Length(FLastReg.RegName) then
+          Result := FLastReg.RegName
         else
-          Result := Copy(LastReg.RegName, 1, LastReg.NameGlyphCount);
+          Result := Copy(FLastReg.RegName, 1, FLastReg.NameGlyphCount);
       end;
     end;
-    rqstValue: Result := LastReg.Value;
+    rqstValue: Result := FLastReg.Value;
+    rqstHint: Result := FLastReg.Hint;
   else
     Result := '';
   end;
@@ -648,7 +652,7 @@ end;
 
 function TCommonCpuContext.RegValueFmt(Value: PByte; ValueLen: Integer): string;
 begin
-  Result := RegValue(Value, ValueLen, KnownRegs.List[LastReg.RegID].ViewMode);
+  Result := RegValue(Value, ValueLen, KnownRegs.List[FLastReg.RegID].ViewMode);
 end;
 
 procedure TCommonCpuContext.SetBitValue(var AField: DWORD; Index,
@@ -694,6 +698,13 @@ begin
       if I >= 0 then
         KnownRegs.List[I].SetRowParam(Row, Field);
     end;
+end;
+
+procedure TCommonCpuContext.UpdateLastRegData(RegID: Integer;
+  SetModifyed: Boolean);
+begin
+  if SetModifyed then
+    FLastReg.Modifyed := True;
 end;
 
 procedure TCommonCpuContext.UpdateMap(RebuildRegList: Boolean);

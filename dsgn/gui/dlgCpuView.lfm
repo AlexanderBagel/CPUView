@@ -86,6 +86,8 @@ object frmCpuView: TfrmCpuView
       Top = 1
       Width = 710
       Align = alRight
+      ParentShowHint = False
+      ShowHint = True
       TabOrder = 1
       OnDblClick = RegViewDblClick
       OnSelectedContextPopup = RegViewSelectedContextPopup

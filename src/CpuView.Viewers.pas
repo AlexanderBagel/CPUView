@@ -630,6 +630,7 @@ type
     procedure CopyRowAsString(Builder: TSimplyStringBuilder); override;
     procedure DrawColumn(ACanvas: TCanvas; AColumn: TColumnType;
       var ARect: TRect); override;
+    function GetBounds(const AHitInfo: TMouseHitInfo; out ABounds: TLeftRightBounds): Integer;
     procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
     function GetTextMetricClass: TAbstractTextMetricClass; override;
     function View: TCustomRegView;
@@ -699,6 +700,7 @@ type
     procedure ContextViewModeCommandExecute(Value: TRegViewMode);
     function CopyCommandEnabled(Value: TCopyStyle): Boolean; override;
     procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
+    procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
     procedure DoSelectionChage(AStartAddr, AEndAddr: Int64); override;
     function GetCaretChangeMode(APainter: TAbstractPrimaryRowPainter;
       AColumn: TColumnType; Shift: TShiftState): TCaretChangeMode; override;
@@ -768,6 +770,7 @@ type
     property OnEndDrag;
     property OnEnter;
     property OnExit;
+    property OnHint;
     property OnKeyDown;
     property OnKeyPress;
     property OnKeyUp;
@@ -2434,7 +2437,7 @@ begin
     if Info.ValueType = crtValue then
     begin
       if not FContext.RegParam(Info.RegID, AParam) then Continue;
-      if maValidation in AParam.ModifyActions then
+      if rfValidation in AParam.Flags then
       begin
         FContext.RegQueryValue(Info.RegID, ARegValue);
         View.DoQueryAddrType(ARegValue.QwordValue, AddrType);
@@ -2457,7 +2460,8 @@ begin
   end;
 end;
 
-procedure TRegisterPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
+function TRegisterPainter.GetBounds(const AHitInfo: TMouseHitInfo;
+  out ABounds: TLeftRightBounds): Integer;
 
   function GlyphLen(Index: Integer): Integer;
   begin
@@ -2468,13 +2472,11 @@ var
   I, RegCount, LeftOffset, FieldLength: Integer;
   Info: TRegister;
 begin
-  // контекста может еще не быть, а вот GetHitInfo уже может прийти!
-  // The context may not be there yet, but GetHitInfo may already be called!
+  Result := -1;
+  ABounds := Default(TLeftRightBounds);
   if FContext = nil then Exit;
   LeftOffset := AHitInfo.ColumnStart;
   Inc(LeftOffset, TextMargin);
-
-  AHitInfo.SelectPoint.ValueOffset := -1;
   RegCount := FContext.RegCount(AHitInfo.SelectPoint.RowIndex);
   for I := 0 to RegCount - 1 do
   begin
@@ -2483,13 +2485,24 @@ begin
     if (AHitInfo.ScrolledCursorPos.X >= LeftOffset) and
       (AHitInfo.ScrolledCursorPos.X < LeftOffset + FieldLength) then
     begin
-      AHitInfo.SelectPoint.ValueOffset := I;
-      AHitInfo.SelectPoint.CharIndex := I;
+      ABounds.LeftOffset := LeftOffset;
+      ABounds.Width := FieldLength;
+      Result := I;
       Break;
     end;
     Inc(LeftOffset, FieldLength + GlyphLen(Info.ValueSeparatorSize));
   end;
+end;
 
+procedure TRegisterPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
+var
+  ABounds: TLeftRightBounds;
+begin
+  // контекста может еще не быть, а вот GetHitInfo уже может прийти!
+  // The context may not be there yet, but GetHitInfo may already be called!
+  if FContext = nil then Exit;
+  AHitInfo.SelectPoint.ValueOffset := GetBounds(AHitInfo, ABounds);
+  AHitInfo.SelectPoint.CharIndex := AHitInfo.SelectPoint.ValueOffset;
   if FContext.EmptyRow(AHitInfo.SelectPoint.RowIndex) or
     (AHitInfo.SelectPoint.ValueOffset < 0) then
     AHitInfo.SelectPoint.Column := ctNone
@@ -2732,6 +2745,36 @@ begin
     FPopup(Self, MousePos, HitInfo.SelectPoint.RowIndex,
       HitInfo.SelectPoint.ValueOffset, Handled);
   inherited;
+end;
+
+procedure TCustomRegView.DoGetHint(var AHintParam: THintParam;
+  var AHint: string);
+var
+  RegID: Integer;
+  RegParam: TRegParam;
+  RegValue: TRegValue;
+  Painter: TAbstractPrimaryRowPainter;
+  ABounds: TLeftRightBounds;
+begin
+  RegID := Context.RegInfo(AHintParam.HitInfo.SelectPoint.RowIndex,
+    AHintParam.HitInfo.SelectPoint.ValueOffset).RegID;
+  Context.RegParam(RegID, RegParam);
+  if rfHint in RegParam.Flags then
+    AHint := Context.RegQueryString(RegID, rqstHint);
+  if rfValidation in RegParam.Flags then
+  begin
+    Context.RegQueryValue(RegID, RegValue);
+    AHintParam.AddrVA := RegValue.QwordValue;
+    inherited;
+  end;
+  if AHint = '' then Exit;
+  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
+  if Assigned(Painter) then
+  begin
+    if TRegisterPainter(Painter).GetBounds(AHintParam.HitInfo, ABounds) < 0 then Exit;
+    AHintParam.CursorRect.Left := ABounds.LeftOffset;
+    AHintParam.CursorRect.Width := ABounds.Width;
+  end;
 end;
 
 procedure TCustomRegView.DoSelectionChage(AStartAddr, AEndAddr: Int64);

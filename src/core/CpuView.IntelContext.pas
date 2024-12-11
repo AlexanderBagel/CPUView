@@ -113,7 +113,8 @@ type
     procedure BuildMap; override;
     procedure DoChangeViewMode(ARegID: TRegID; const Value: TRegViewMode); override;
     procedure InitKnownRegs; override;
-    procedure UpdateLastRegData(ARegID: TRegID); override;
+    function RegHint(RegID: TRegID): string; override;
+    procedure UpdateLastRegData(ARegID: TRegID; SetModifyed: Boolean); override;
   protected
     function StToR(Index: Integer): Integer;
     function RToSt(Index: Integer): Integer;
@@ -788,7 +789,7 @@ end;
 procedure TIntelCpuContext.InitKnownRegs;
 
   procedure Add(RegType: TContextRegType; SupportedViewMode: TRegViewModes;
-    ModifyActions: TModifyActions = []);
+    AFlags: TRegisterFlags = []);
   var
     R: TRegParam;
   begin
@@ -796,11 +797,7 @@ procedure TIntelCpuContext.InitKnownRegs;
     R.ColIndex := -1;
     R.RegType := RegType;
     R.Modifyed := False;
-    {%H-}case RegType of
-      crtBitValue: ModifyActions := [maToggle];
-      crtEnumValue: ModifyActions := [maChange];
-    end;
-    R.ModifyActions := ModifyActions;
+    R.Flags := AFlags;
     R.SupportedViewMode := SupportedViewMode;
     R.ViewMode := rvmHex;
     KnownRegs.Add(R);
@@ -817,44 +814,52 @@ begin
   else
     vmDefRegMod := vmReg64;
 
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 000 - RAX
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 001 - RBX
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 002 - RCX
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 003 - RDX
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 004 - RBP
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 005 - RSP
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 006 - RSI
-  Add(crtValue, vmDefRegMod, [maIncrement..maValidation]);    // 007 - RDI
-  Add(crtValue, vmDefOnly, [maChange]);                       // 008 - RIP
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 000 - RAX
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 001 - RBX
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 002 - RCX
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 003 - RDX
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 004 - RBP
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 005 - RSP
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 006 - RSI
+  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 007 - RDI
+  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 008 - RIP
 
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 009 - R8
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 010 - R9
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 011 - R10
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 012 - R11
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 013 - R12
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 014 - R13
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 015 - R14
-  Add(crtValue, vmReg64, [maIncrement..maValidation]);        // 016 - R15
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 009 - R8
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 010 - R9
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 011 - R10
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 012 - R11
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 013 - R12
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 014 - R13
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 015 - R14
+  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 016 - R15
 
-  Add(crtExtra, vmDefOnly, [maChange]);                       // 017 - EFlags
+  Add(crtExtra, vmDefOnly, [rfChangeValue]);                  // 017 - EFlags
 
-  Add(crtValue, vmDefOnly);     // 018 - SegGs
-  Add(crtValue, vmDefOnly);     // 019 - SegFs
-  Add(crtValue, vmDefOnly);     // 020 - SegEs
-  Add(crtValue, vmDefOnly);     // 021 - SegDs
-  Add(crtValue, vmDefOnly);     // 022 - SegCs
-  Add(crtValue, vmDefOnly);     // 023 - SegSs
+  if Context.x86Context then
+  begin
+    Add(crtValue, vmDefOnly);               // 018 - SegGs
+    Add(crtValue, vmDefOnly, [rfHint]);     // 019 - SegFs
+  end
+  else
+  begin
+    Add(crtValue, vmDefOnly, [rfHint]);     // 018 - SegGs
+    Add(crtValue, vmDefOnly);               // 019 - SegFs
+  end;
+  Add(crtValue, vmDefOnly);                 // 020 - SegEs
+  Add(crtValue, vmDefOnly);                 // 021 - SegDs
+  Add(crtValue, vmDefOnly);                 // 022 - SegCs
+  Add(crtValue, vmDefOnly);                 // 023 - SegSs
 
-  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 024 - DR0
-  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 025 - DR1
-  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 026 - DR2
-  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 027 - DR3
-  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 028 - DR6
-  Add(crtValue, vmDefOnly, [maZero..maValidation]);     // 029 - DR7
+  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 024 - DR0
+  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 025 - DR1
+  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 026 - DR2
+  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 027 - DR3
+  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 028 - DR6
+  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 029 - DR7
 
-  Add(crtExtra, vmDefOnly, [maChange]);     // 030 - ControlWord
-  Add(crtExtra, vmDefOnly, [maChange]);     // 031 - StatusWord
-  Add(crtExtra, vmDefOnly, [maChange]);     // 032 - TagWord
+  Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 030 - ControlWord
+  Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 031 - StatusWord
+  Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 032 - TagWord
 
   Add(crtValue, vmX87Reg64);    // 033 - MM0
   Add(crtValue, vmX87Reg64);    // 034 - MM1
@@ -883,7 +888,7 @@ begin
   Add(crtValue, vmX87Reg80);    // 055 - ST6
   Add(crtValue, vmX87Reg80);    // 056 - ST7
 
-  Add(crtExtra, vmDefOnly, [maChange]);     // 057 - MxCsr
+  Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 057 - MxCsr
 
   Add(crtValue, vmSimdReg);     // 058 - XMM0
   Add(crtValue, vmSimdReg);     // 059 - XMM1
@@ -925,78 +930,78 @@ begin
 
   // EFlags bits
 
-  Add(crtBitValue, vmDefOnly);  // 091 - CF
-  Add(crtBitValue, vmDefOnly);  // 092 - PF
-  Add(crtBitValue, vmDefOnly);  // 093 - AF
-  Add(crtBitValue, vmDefOnly);  // 094 - ZF
-  Add(crtBitValue, vmDefOnly);  // 095 - SF
-  Add(crtBitValue, vmDefOnly);  // 096 - TF
-  Add(crtBitValue, vmDefOnly);  // 097 - IF
-  Add(crtBitValue, vmDefOnly);  // 098 - DF
-  Add(crtBitValue, vmDefOnly);  // 099 - OF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 091 - CF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 092 - PF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 093 - AF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 094 - ZF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 095 - SF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 096 - TF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 097 - IF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 098 - DF
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);  // 099 - OF
 
   // Advanced Fields
 
-  Add(crtExtra, vmDefOnly, [maZero, maChange]);     // 100 - LastError
-  Add(crtExtra, vmDefOnly, [maZero, maChange]);     // 101 - LastStatus
+  Add(crtExtra, vmDefOnly, [rfZero, rfChangeValue]);     // 100 - LastError
+  Add(crtExtra, vmDefOnly, [rfZero, rfChangeValue]);     // 101 - LastStatus
 
   // x87TagWords
 
-  Add(crtEnumValue, vmDefOnly);  // 102 - TW0
-  Add(crtEnumValue, vmDefOnly);  // 103 - TW1
-  Add(crtEnumValue, vmDefOnly);  // 104 - TW2
-  Add(crtEnumValue, vmDefOnly);  // 105 - TW3
-  Add(crtEnumValue, vmDefOnly);  // 106 - TW4
-  Add(crtEnumValue, vmDefOnly);  // 107 - TW5
-  Add(crtEnumValue, vmDefOnly);  // 108 - TW6
-  Add(crtEnumValue, vmDefOnly);  // 109 - TW7
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 102 - TW0
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 103 - TW1
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 104 - TW2
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 105 - TW3
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 106 - TW4
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 107 - TW5
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 108 - TW6
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue]);  // 109 - TW7
 
   // x87StatusWord bits
 
-  Add(crtBitValue, vmDefOnly);  // 110 - ES
-  Add(crtBitValue, vmDefOnly);  // 111 - IE
-  Add(crtBitValue, vmDefOnly);  // 112 - DE
-  Add(crtBitValue, vmDefOnly);  // 113 - ZE
-  Add(crtBitValue, vmDefOnly);  // 114 - OE
-  Add(crtBitValue, vmDefOnly);  // 115 - UE
-  Add(crtBitValue, vmDefOnly);  // 116 - B
-  Add(crtBitValue, vmDefOnly);  // 117 - C0
-  Add(crtBitValue, vmDefOnly);  // 118 - C1
-  Add(crtBitValue, vmDefOnly);  // 119 - C2
-  Add(crtBitValue, vmDefOnly);  // 120 - C3
-  Add(crtBitValue, vmDefOnly);  // 121 - PE
-  Add(crtBitValue, vmDefOnly);  // 122 - SF
-  Add(crtEnumValue, vmDefOnly); // 123 - TOP
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 110 - ES
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 111 - IE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 112 - DE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 113 - ZE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 114 - OE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 115 - UE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 116 - B
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 117 - C0
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 118 - C1
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 119 - C2
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 120 - C3
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 121 - PE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 122 - SF
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue, rfHint]);  // 123 - TOP
 
   // x87ControlWord bits
 
-  Add(crtBitValue, vmDefOnly);  // 124 - IM
-  Add(crtBitValue, vmDefOnly);  // 125 - DM
-  Add(crtBitValue, vmDefOnly);  // 126 - ZM
-  Add(crtBitValue, vmDefOnly);  // 127 - OM
-  Add(crtBitValue, vmDefOnly);  // 128 - UM
-  Add(crtBitValue, vmDefOnly);  // 129 - PM
-  Add(crtEnumValue, vmDefOnly); // 130 - PC
-  Add(crtBitValue, vmDefOnly);  // 131 - IC
-  Add(crtEnumValue, vmDefOnly); // 132 - RC
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 124 - IM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 125 - DM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 126 - ZM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 127 - OM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 128 - UM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 129 - PM
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue, rfHint]);  // 130 - PC
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 131 - IC
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue, rfHint]);  // 132 - RC
 
   // MxCsr bits
 
-  Add(crtBitValue, vmDefOnly);  // 133 - IE
-  Add(crtBitValue, vmDefOnly);  // 134 - DE
-  Add(crtBitValue, vmDefOnly);  // 135 - ZE
-  Add(crtBitValue, vmDefOnly);  // 136 - OE
-  Add(crtBitValue, vmDefOnly);  // 137 - UE
-  Add(crtBitValue, vmDefOnly);  // 138 - PE
-  Add(crtBitValue, vmDefOnly);  // 139 - IM
-  Add(crtBitValue, vmDefOnly);  // 140 - DM
-  Add(crtBitValue, vmDefOnly);  // 141 - ZM
-  Add(crtBitValue, vmDefOnly);  // 142 - UM
-  Add(crtBitValue, vmDefOnly);  // 143 - UM
-  Add(crtBitValue, vmDefOnly);  // 144 - PM
-  Add(crtBitValue, vmDefOnly);  // 145 - DAZ
-  Add(crtBitValue, vmDefOnly);  // 146 - FTZ
-  Add(crtEnumValue, vmDefOnly); // 147 - RC
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 133 - IE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 134 - DE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 135 - ZE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 136 - OE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 137 - UE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 138 - PE
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 139 - IM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 140 - DM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 141 - ZM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 142 - UM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 143 - UM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 144 - PM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 145 - DAZ
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 146 - FTZ
+  Add(crtEnumValue, vmDefOnly, [rfChangeValue, rfHint]);  // 147 - RC
 
   // x87 Hint regs
 
@@ -1019,7 +1024,7 @@ begin
 
   // x87ControlWord precision + rounding for Simple Mode
 
-  Add(crtExtra, vmDefOnly);     // 157 - PC + RC
+  Add(crtExtra, vmDefOnly, [rfHint]);     // 157 - PC + RC
 
   // Def Reg Debug Data Hint
 
@@ -1153,6 +1158,29 @@ begin
   end
   else
     Result := RegDescriptor(ExtendedRegIndex[Idx], ADescriptor);
+end;
+
+function TIntelCpuContext.RegHint(RegID: TRegID): string;
+const
+  GsFsName: array[18..19] of string = ('GS (x64).', 'FS (x86).');
+begin
+  case RegID of
+    {$IFDEF MSWINDOWS}
+    18, 19: // SegGs + SegFs
+      Result :=
+        'The TEB of the current thread can be accessed as an offset of segment register ' + GsFsName[RegID] + sLineBreak +
+        'The TEB can be used to get a lot of information on the process without calling Win32 API.';
+    {$ENDIF}
+    30: // ControlWord
+      Result := 'The 16-bit x87 FPU control word controls the precision of the x87 FPU and rounding method used.' + sLineBreak +
+        'It also contains the x87 FPU floating-point exception mask bits.';
+    31: // StatusWord
+      Result := 'The 16-bit x87 FPU status register indicates the current state of the x87 FPU.';
+    32: // TagWord
+      Result := 'The 16-bit tag word indicates the contents of each the 8 registers in the x87 FPU data-register stack (one 2-bit tag per register).';
+  else
+    Result := '';
+  end;
 end;
 
 function TIntelCpuContext.RegQueryEnumString(ARegID: TRegID;
@@ -1298,8 +1326,7 @@ begin
         101: FContext.LastStatus := ANewRegValue.DwordValue;
       end;
       KnownRegs.List[ARegID].Modifyed := True;
-      UpdateLastRegData(ARegID);
-      LastReg.Modifyed := True;
+      UpdateLastRegData(ARegID, True);
       UpdateQueryRegs;
       DoChange(cctDataChange);
     end;
@@ -1425,8 +1452,7 @@ begin
       FContext.TagWord := TagWordCtx.TagWord;
     end;
     // Update LastReg cache...
-    UpdateLastRegData(ARegID);
-    LastReg.Modifyed := True;
+    UpdateLastRegData(ARegID, True);
     UpdateQueryRegs;
     DoChange(cctDataChange);
   end;
@@ -1770,7 +1796,7 @@ begin
   Context := ACtx;
 end;
 
-procedure TIntelCpuContext.UpdateLastRegData(ARegID: TRegID);
+procedure TIntelCpuContext.UpdateLastRegData(ARegID: TRegID; SetModifyed: Boolean);
 
   function ExtFmt(Index: Integer): string;
   var
@@ -1835,6 +1861,7 @@ var
   AHint: string;
   ARegValue: TRegValue;
 begin
+  inherited;
   if FContext.x86Context then
   begin
     Pfx := 'E';
@@ -2181,8 +2208,7 @@ begin
   // RAX..R15, DR0..DR3
   for I in [0..16, 24..27] do
   begin
-    LastReg.RegID := I;
-    UpdateLastRegData(I);
+    FillRegData(I);
     RegQueryValue(I, RegValue);
     AddReg(LastReg.RegName, RegValue.QwordValue);
   end;

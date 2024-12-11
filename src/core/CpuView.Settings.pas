@@ -1337,8 +1337,6 @@ begin
   ARegView.Font.Height := DoubleToDpi(FRegSettings.FontHeight, ARegView);
   SaveToAddrHightLightColorMap(ARegView.ColorMap);
   SaveToRegColorMap(ARegView.ColorMap);
-  {$message 'Not ready yet!'}
-  //ARegView.ShowHint := ValidationAddrVA and HintInReg;
   ARegView.ValidateAddress := UseAddrValidation and ValidationReg;
 end;
 

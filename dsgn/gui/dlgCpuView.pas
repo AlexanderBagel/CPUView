@@ -478,12 +478,12 @@ begin
   Handled := RegView.Context.RegParam(FContextRegister.RegID, FContextRegisterParam) and
     (RegView.ReadDataAtSelStart(FContextRegValue, SizeOf(FContextRegValue)) > 0);
   if not Handled then Exit;
-  if maToggle in FContextRegisterParam.ModifyActions then
+  if rfToggle in FContextRegisterParam.Flags then
   begin
     acRegModifyToggle.Execute;
     Exit;
   end;
-  if maChange in FContextRegisterParam.ModifyActions then
+  if rfChangeValue in FContextRegisterParam.Flags then
     acRegModifyNewValue.Execute;
 end;
 
@@ -772,7 +772,7 @@ begin
   TAction(Sender).Visible :=
     (FDbgGate.DebugState = adsPaused) and
     (FContextRegister.RegID >= 0) and
-    (TModifyAction(TAction(Sender).Tag) in FContextRegisterParam.ModifyActions);
+    (TRegisterFlag(TAction(Sender).Tag) in FContextRegisterParam.Flags);
 end;
 
 procedure TfrmCpuView.acViewFitColumnToBestSizeExecute(Sender: TObject);
@@ -824,7 +824,7 @@ begin
   if RegView.Focused then
   begin
     if not ((FContextRegister.RegID >= 0) and
-      (maChange in FContextRegisterParam.ModifyActions) and
+      (rfChangeValue in FContextRegisterParam.Flags) and
       (FContextRegisterParam.RegType = crtValue)) then
     begin
       TAction(Sender).Enabled := False;
