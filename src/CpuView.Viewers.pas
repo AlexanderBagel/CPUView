@@ -2761,7 +2761,7 @@ begin
   Context.RegParam(RegID, RegParam);
   if rfHint in RegParam.Flags then
     AHint := Context.RegQueryString(RegID, rqstHint);
-  if rfValidation in RegParam.Flags then
+  if ValidateAddress and (rfValidation in RegParam.Flags) then
   begin
     Context.RegQueryValue(RegID, RegValue);
     AHintParam.AddrVA := RegValue.QwordValue;

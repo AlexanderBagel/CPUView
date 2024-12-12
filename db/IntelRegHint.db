@@ -1,0 +1,54 @@
+17 The FLAGS register is the status register that contains the current state of an x86 CPU.
+18 The TEB of the current thread can be accessed as an offset of segment register GS (x64)./nThe TEB can be used to get a lot of information on the process without calling Win32 API.
+19 The TEB of the current thread can be accessed as an offset of segment register FS (x86)./nThe TEB can be used to get a lot of information on the process without calling Win32 API.
+30 The 16-bit x87 FPU control word controls the precision of the x87 FPU and rounding method used./nIt also contains the x87 FPU floating-point exception mask bits.
+31 The 16-bit x87 FPU status register indicates the current state of the x87 FPU.
+32 The 16-bit tag word indicates the contents of each the 8 registers in the x87 FPU data-register stack (one 2-bit tag per register).
+57 The 32-bit MXCSR register contains control and status information for SIMD floating-point operations.
+91 CF (bit 0) : Carry flag - Set if an arithmetic operation generates a carry or a borrow out of the most-significant bit of the result; cleared otherwise./nThis flag indicates an overflow condition for unsigned-integer arithmetic. It is also used in multiple-precision arithmetic.
+92 PF (bit 2) : Parity flag - Set if the least-significant byte of the result contains an even number of 1 bits; cleared otherwise.
+93 AF (bit 4) : Auxiliary Carry flag - Set if an arithmetic operation generates a carry or a borrow out of bit/n3 of the result; cleared otherwise. This flag is used in binary-coded decimal (BCD) arithmetic.
+94 ZF (bit 6) : Zero flag - Set if the result is zero; cleared otherwise.
+95 SF (bit 7) : Sign flag - Set equal to the most-significant bit of the result, which is the sign bit of a signed/ninteger. (0 indicates a positive value and 1 indicates a negative value.)
+96 TF (bit 8) : Trap flag - Set to enable single-step mode for debugging; clear to disable single-step mode.
+97 IF (bit 9) : Interrupt enable flag - Controls the response of the processor to maskable interrupt requests./nSet to respond to maskable interrupts; cleared to inhibit maskable interrupts.
+98 DF (bit 10) : The direction flag controls string instructions (MOVS, CMPS, SCAS, LODS, and STOS). Setting the DF flag causes the string instructions/nto auto-decrement (to process strings from high addresses to low addresses). Clearing the DF flag causes the string instructions to auto-increment/n(process strings from low addresses to high addresses).
+99 OF (bit 11) : Overflow flag - Set if the integer result is too large a positive number or too small a negative/nnumber (excluding the sign-bit) to fit in the destination operand; cleared otherwise. This flag indicates an overflow/ncondition for signed-integer (two’s complement) arithmetic.
+110 The error/exception summary status flag (bit 7) is set when any of the unmasked exception flags are set.
+111 The processor reports an invalid operation exception (bit 0) in response to one or more invalid arithmetic operands.
+112 The processor reports the denormal-operand exception (bit 2) if an arithmetic instruction attempts to operate on a denormal operand.
+113 The processor reports the floating-point divide-by-zero exception (bit 3) whenever an instruction attempts to divide a finite non-zero operand by 0.
+114 The processor reports a floating-point numeric overflow exception (bit 4) whenever the rounded result of an instruction exceeds the largest allowable finite value that will fit into the destination operand.
+115 The processor detects a potential floating-point numeric underflow condition (bit 5) whenever the result of rounding with unbounded exponent is non-zero and tiny.
+116 The busy flag (bit 15) indicates if the FPU is busy (B=1) while executing an instruction, or is idle (B=0)./nThe B-bit (bit 15) is included for 8087 compatibility only. It reflects the contents of the ES flag.
+117 The C0 condition code flag (bit 8) is used to indicate the results of floating-point comparison and arithmetic operations.
+118 The C1 condition code flag (bit 9) is used to indicate the results of floating-point comparison and arithmetic operations.
+119 The C2 condition code flag (bit 10) is used to indicate the results of floating-point comparison and arithmetic operations.
+120 The C3 condition code flag (bit 14) is used to indicate the results of floating-point comparison and arithmetic operations.
+121 The inexact-result/precision exception (bit 6) occurs if the result of an operation is not exactly representable in the destination format.
+122 The stack fault flag (bit 6 of the x87 FPU status word) indicates that stack overflow or stack underflow has occurred with data\nin the x87 FPU data register stack.
+123 A pointer to the x87 FPU data register that is currently at the top of the x87 FPU register stack is contained in bits 11 through 13/nof the x87 FPU status word. This pointer, which is commonly referred to as TOP (for top-of-stack), is a binary value from 0 to 7.
+124 The invalid operation exception mask (bit 0). When the mask bit is set, its corresponding exception is blocked from being generated.
+125 The denormal-operand exception mask (bit 2). When the mask bit is set, its corresponding exception is blocked from being generated.
+126 The floating-point divide-by-zero exception mask (bit 3). When the mask bit is set, its corresponding exception is blocked from being generated.
+127 The floating-point numeric overflow exception mask (bit 4). When the mask bit is set, its corresponding exception is blocked from being generated.
+128 The potential floating-point numeric underflow condition mask (bit 5). When the mask bit is set, its corresponding exception is blocked from being generated.
+129 The inexact-result/precision exception mask (bit 6). When the mask bit is set, its corresponding exception is blocked from being generated.
+130 The precision-control (PC) field (bits 8 and 9 of the x87 FPU control word) determines the precision (64, 53, or 24 bits) of floating-point calculations made by the x87 FPU
+131 The infinity control flag (bit 12 of the x87 FPU control word) is provided for compatibility with the Intel 287 Math Coprocessor;\nit is not meaningful for later version x87 FPU coprocessors or IA-32 processors.
+132 The rounding-control (RC) field of the x87 FPU control register (bits 10 and 11) controls how the results of x87 FPU floating-point instructions are rounded.
+133 Bit 0 (IE) : Invalid Operation Flag; indicate whether a SIMD floating-point exception has been detected.
+134 Bit 1 (DE) : Denormal Flag; indicate whether a SIMD floating-point exception has been detected.
+135 Bit 2 (ZE) : Divide-by-Zero Flag; indicate whether a SIMD floating-point exception has been detected.
+136 Bit 3 (OE) : Overflow Flag; indicate whether a SIMD floating-point exception has been detected.
+137 Bit 4 (UE) : Underflow Flag; indicate whether a SIMD floating-point exception has been detected.
+138 Bit 5 (PE) : Precision Flag; indicate whether a SIMD floating-point exception has been detected.
+139 Bit 7 (IM) : Invalid Operation Mask. When the mask bit is set, its corresponding exception is blocked from being generated.
+140 Bit 8 (DM) : Denormal Mask. When the mask bit is set, its corresponding exception is blocked from being generated.
+141 Bit 9 (ZM) : Divide-by-Zero Mask. When the mask bit is set, its corresponding exception is blocked from being generated.
+142 Bit 10 (OM) : Overflow Mask. When the mask bit is set, its corresponding exception is blocked from being generated.
+143 Bit 11 (UM) : Underflow Mask. When the mask bit is set, its corresponding exception is blocked from being generated.
+144 Bit 12 (PM) : Precision Mask. When the mask bit is set, its corresponding exception is blocked from being generated.
+145 Bit 6 (DAZ) of the MXCSR register enables the denormals-are-zeros mode, which controls the processor’s response to a SIMD floating-point\ndenormal operand condition.
+146 Bit 15 (FTZ) of the MXCSR register enables the flush-to-zero mode, which controls the masked response to a SIMD floating-point underflow condition.
+147 Bits 13 and 14 of the MXCSR register (the rounding control [RC] field) control how the results of SIMD floating-point instructions are rounded.

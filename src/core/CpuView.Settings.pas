@@ -1337,6 +1337,7 @@ begin
   ARegView.Font.Height := DoubleToDpi(FRegSettings.FontHeight, ARegView);
   SaveToAddrHightLightColorMap(ARegView.ColorMap);
   SaveToRegColorMap(ARegView.ColorMap);
+  ARegView.ShowHint := HintInReg;
   ARegView.ValidateAddress := UseAddrValidation and ValidationReg;
 end;
 

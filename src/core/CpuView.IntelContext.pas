@@ -43,6 +43,7 @@ uses
 {$IFDEF LINUX}
   CpuView.Linux,
 {$ENDIF}
+  CpuView.DBase,
   CpuView.IntelContext.Types;
 
 type
@@ -567,7 +568,7 @@ begin
     Row := Add(Map, 139); // IM
     Add(Row, 140);        // DM
     Add(Row, 141);        // ZM
-    Add(Row, 142);        // UM
+    Add(Row, 142);        // OM
     Add(Row, 143);        // UM
     Add(Row, 144);        // PM
     Row := Add(Map, 145); // DAZ
@@ -833,7 +834,7 @@ begin
   Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 015 - R14
   Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 016 - R15
 
-  Add(crtExtra, vmDefOnly, [rfChangeValue]);                  // 017 - EFlags
+  Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);          // 017 - EFlags
 
   if Context.x86Context then
   begin
@@ -996,7 +997,7 @@ begin
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 139 - IM
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 140 - DM
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 141 - ZM
-  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 142 - UM
+  Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 142 - OM
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 143 - UM
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 144 - PM
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 145 - DAZ
@@ -1161,26 +1162,10 @@ begin
 end;
 
 function TIntelCpuContext.RegHint(RegID: TRegID): string;
-const
-  GsFsName: array[18..19] of string = ('GS (x64).', 'FS (x86).');
 begin
-  case RegID of
-    {$IFDEF MSWINDOWS}
-    18, 19: // SegGs + SegFs
-      Result :=
-        'The TEB of the current thread can be accessed as an offset of segment register ' + GsFsName[RegID] + sLineBreak +
-        'The TEB can be used to get a lot of information on the process without calling Win32 API.';
-    {$ENDIF}
-    30: // ControlWord
-      Result := 'The 16-bit x87 FPU control word controls the precision of the x87 FPU and rounding method used.' + sLineBreak +
-        'It also contains the x87 FPU floating-point exception mask bits.';
-    31: // StatusWord
-      Result := 'The 16-bit x87 FPU status register indicates the current state of the x87 FPU.';
-    32: // TagWord
-      Result := 'The 16-bit tag word indicates the contents of each the 8 registers in the x87 FPU data-register stack (one 2-bit tag per register).';
-  else
-    Result := '';
-  end;
+  Result := CpuViewDBase.GetRegHintStr(RegID);
+  if Result <> '' then
+    Result := StringReplace(Result, '/n', sLineBreak, [rfReplaceAll]);
 end;
 
 function TIntelCpuContext.RegQueryEnumString(ARegID: TRegID;

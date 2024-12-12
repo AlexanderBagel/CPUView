@@ -21,6 +21,8 @@ unit CpuView.DBase;
   {$MODE DELPHI}
 {$ENDIF}
 
+{$I CpuViewCfg.inc}
+
 interface
 
 uses
@@ -35,9 +37,13 @@ type
   { TCpuViewDBase }
 
   TCpuViewDBase = class
+  private class var
+    FInstance: TCpuViewDBase;
+    class destructor Destroy;
   private
     FLastError: TDictionary<Integer, string>;
     FLastStatus: TDictionary<Cardinal, string>;
+    FRegHint: TDictionary<Integer, string>;
     {$IFDEF FPC}
     procedure LazarusInit;
     {$ENDIF}
@@ -46,14 +52,30 @@ type
     destructor Destroy; override;
     function GetLastErrorStr(AErrorCode: Integer): string;
     function GetLastStatusStr(AStatusCode: Cardinal): string;
+    function GetRegHintStr(ARegID: Integer): string;
     procedure LoadFromFolder(const AFolderPath: string);
   end;
 
+  function CpuViewDBase: TCpuViewDBase;
+
 implementation
+
+function CpuViewDBase: TCpuViewDBase;
+begin
+  if TCpuViewDBase.FInstance = nil then
+    TCpuViewDBase.FInstance := TCpuViewDBase.Create;
+  Result := TCpuViewDBase.FInstance;
+end;
 
 { TCpuViewDBase }
 
 {$IFDEF FPC}
+
+class destructor TCpuViewDBase.Destroy;
+begin
+  FreeAndNil(FInstance);
+end;
+
 procedure TCpuViewDBase.LazarusInit;
 var
   Path, Value: string;
@@ -110,6 +132,9 @@ const
   LastError = 'LinLastError.db';
   LastStatus = 'LinLastStatus.db';
   {$ENDIF}
+  {$IFDEF USE_INTEL_CTX}
+  RegHint = 'IntelRegHint.db';
+  {$ENDIF}
 var
   APath, ALine: string;
   AError, Idx: Integer;
@@ -118,6 +143,7 @@ var
 begin
   FLastError.Clear;
   FLastStatus.Clear;
+  FRegHint.Clear;
   if not DirectoryExists(AFolderPath) then Exit;
   APath := IncludeTrailingPathDelimiter(AFolderPath) + LastError;
   if FileExists(APath) then
@@ -151,12 +177,29 @@ begin
       S.Free;
     end;
   end;
+  APath := IncludeTrailingPathDelimiter(AFolderPath) + RegHint;
+  if FileExists(APath) then
+  begin
+    S := TStringList.Create;
+    try
+      S.LoadFromFile(APath);
+      for ALine in S do
+      begin
+        Idx := Pos(' ', ALine);
+        if TryStrToInt(Copy(ALine, 1, Idx - 1), AError) then
+          FRegHint.TryAdd(AError, Copy(ALine, Idx + 1, Length(ALine)));
+      end;
+    finally
+      S.Free;
+    end;
+  end;
 end;
 
 constructor TCpuViewDBase.Create;
 begin
   FLastError := TDictionary<Integer, string>.Create;
   FLastStatus := TDictionary<Cardinal, string>.Create;
+  FRegHint := TDictionary<Integer, string>.Create;
   {$IFDEF FPC}
   LazarusInit;
   {$ENDIF}
@@ -166,6 +209,7 @@ destructor TCpuViewDBase.Destroy;
 begin
   FLastError.Free;
   FLastStatus.Free;
+  FRegHint.Free;
   inherited Destroy;
 end;
 
@@ -179,6 +223,12 @@ function TCpuViewDBase.GetLastStatusStr(AStatusCode: Cardinal): string;
 begin
   Result := '';
   FLastStatus.TryGetValue(AStatusCode, Result);
+end;
+
+function TCpuViewDBase.GetRegHintStr(ARegID: Integer): string;
+begin
+  Result := '';
+  FRegHint.TryGetValue(ARegID, Result);
 end;
 
 end.

@@ -141,7 +141,6 @@ type
     FAsmStream: TBufferedROStream;
     FCacheList: TListEx<TAsmLine>;
     FCacheListIndex: Integer;
-    FDBase: TCpuViewDBase;
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
@@ -230,7 +229,6 @@ type
     function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean;
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
-    property DBase: TCpuViewDBase read FDBase;
     property Debugger: TAbstractDebugger read FDebugger;
     property DumpViewList: TDumpViewList read FDumpViewList;
     // Адрес от которого был построен последний кэш.
@@ -577,12 +575,10 @@ begin
   FSessionCache := TDictionary<Int64, TAddrCacheItem>.Create;
   FShowCallFuncName := True;
   FAsmJmpStack := TJumpStack.Create;
-  FDBase := TCpuViewDBase.Create;
 end;
 
 destructor TCpuViewCore.Destroy;
 begin
-  FDBase.Free;
   FCacheList.Free;
   FDumpViewList.Free;
   FAddrIndex.Free;
@@ -982,8 +978,8 @@ procedure TCpuViewCore.OnRegQueryExternalComment(Sender: TObject;
 begin
   AComment := '';
   case ARegType of
-    ertLastError: AComment := DBase.GetLastErrorStr(AValue.IntValue);
-    ertLastStatus: AComment := DBase.GetLastStatusStr(AValue.DwordValue);
+    ertLastError: AComment := CpuViewDBase.GetLastErrorStr(AValue.IntValue);
+    ertLastStatus: AComment := CpuViewDBase.GetLastStatusStr(AValue.DwordValue);
   end;
   if AComment <> '' then
     AComment := '(' + AComment + ')';
