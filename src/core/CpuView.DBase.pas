@@ -37,9 +37,6 @@ type
   { TCpuViewDBase }
 
   TCpuViewDBase = class
-  private class var
-    FInstance: TCpuViewDBase;
-    class destructor Destroy;
   private
     FLastError: TDictionary<Integer, string>;
     FLastStatus: TDictionary<Cardinal, string>;
@@ -56,26 +53,11 @@ type
     procedure LoadFromFolder(const AFolderPath: string);
   end;
 
-  function CpuViewDBase: TCpuViewDBase;
-
 implementation
-
-function CpuViewDBase: TCpuViewDBase;
-begin
-  if TCpuViewDBase.FInstance = nil then
-    TCpuViewDBase.FInstance := TCpuViewDBase.Create;
-  Result := TCpuViewDBase.FInstance;
-end;
 
 { TCpuViewDBase }
 
 {$IFDEF FPC}
-
-class destructor TCpuViewDBase.Destroy;
-begin
-  FreeAndNil(FInstance);
-end;
-
 procedure TCpuViewDBase.LazarusInit;
 var
   Path, Value: string;

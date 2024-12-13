@@ -43,7 +43,6 @@ uses
 {$IFDEF LINUX}
   CpuView.Linux,
 {$ENDIF}
-  CpuView.DBase,
   CpuView.IntelContext.Types;
 
 type
@@ -1162,8 +1161,12 @@ begin
 end;
 
 function TIntelCpuContext.RegHint(RegID: TRegID): string;
+var
+  AValue: TRegValue;
 begin
-  Result := CpuViewDBase.GetRegHintStr(RegID);
+  AValue := Default(TRegValue);
+  AValue.IntValue := RegID;
+  DoQueryExternalRegHint(AValue, ertRegID, Result);
   if Result <> '' then
     Result := StringReplace(Result, '/n', sLineBreak, [rfReplaceAll]);
 end;

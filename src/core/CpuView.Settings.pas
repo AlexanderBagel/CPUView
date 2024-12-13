@@ -180,6 +180,7 @@ type
     ShowOpcodes: Boolean;
     ShowSourceLines: Boolean;
     FontHeight: Double;
+    Hints: Boolean;
   end;
 
   TDumpSettings = record
@@ -333,6 +334,7 @@ type
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
     property DisassemblyInHint: Boolean read FDisassemblyInHint write FDisassemblyInHint;
     property InDeepDbgInfo: Boolean read FInDeepDbgInfo write FInDeepDbgInfo;
+    property HintInAsm: Boolean read FAsmSettings.Hints write FAsmSettings.Hints;
     property HintInDump: Boolean read FDumpSettings.Hints write FDumpSettings.Hints;
     property HintInReg: Boolean read GetHintInReg write SetHintInReg;
     property HintInStack: Boolean read FStackSettings.Hints write FStackSettings.Hints;
@@ -618,6 +620,7 @@ begin
   FAsmSettings.ShowOpcodes := True;
   FAsmSettings.ShowSourceLines := True;
   FAsmSettings.FontHeight := DefaultFontHeight;
+  FAsmSettings.Hints := True;
 
   FCpuViewDlgSettings := Default(TCpuViewDlgSettings);
   FCpuViewDlgSettings.SplitterPos[spTopHorz] := 34;
@@ -767,6 +770,7 @@ begin
   FAsmSettings.DisplayFunc := GetNodeAttr(Root, xmlShowFuncName);
   FAsmSettings.ShowOpcodes := GetNodeAttr(Root, xmlShowOpcodes);
   FAsmSettings.ShowSourceLines := GetNodeAttr(Root, xmlShowSrc);
+  FAsmSettings.Hints := GetNodeAttr(Root, xmlHint);
 
   ColNode := FindNode(Root, xmlColumns);
   if ColNode = nil then Exit;
@@ -1067,6 +1071,7 @@ begin
   SetNodeAttr(Root, xmlShowFuncName, FAsmSettings.DisplayFunc);
   SetNodeAttr(Root, xmlShowOpcodes, FAsmSettings.ShowOpcodes);
   SetNodeAttr(Root, xmlShowSrc, FAsmSettings.ShowSourceLines);
+  SetNodeAttr(Root, xmlHint, FDumpSettings.Hints);
 
   ColNode := NewChild(Root, xmlColumns);
   Columns := [ctWorkSpace..ctComment];
@@ -1311,6 +1316,7 @@ begin
       FAsmSettings.ColumnWidth[I] := DoubleToDpi(AAsmView.Header.ColumnWidth[I], AAsmView);
   if not FAsmSettings.ShowOpcodes then
     AAsmView.Header.Columns := AAsmView.Header.Columns - [ctOpcode];
+  AAsmView.ShowHint := HintInAsm;
 end;
 
 procedure TCpuViewSettins.SetSettingsToContext(AContext: TAbstractCPUContext);
@@ -1327,6 +1333,7 @@ begin
   ADumpView.Encoder.EncodeType := FDumpSettings.EncodeType;
   ADumpView.Encoder.CodePage := FDumpSettings.CodePage;
   ADumpView.Encoder.EncodingName := FDumpSettings.EncodingName;
+  // Without validation, the dump doesn't know about the addresses
   ADumpView.ShowHint := UseAddrValidation and HintInDump;
   ADumpView.ValidateAddress := UseAddrValidation and ValidationDump;
 end;
@@ -1345,7 +1352,7 @@ procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);
 begin
   RestoreViewDefSettings(AStackView);
   AStackView.Font.Height := DoubleToDpi(FStackSettings.FontHeight, AStackView);
-  AStackView.ShowHint := UseAddrValidation and HintInStack;
+  AStackView.ShowHint := HintInStack;
   AStackView.ValidateAddress := UseAddrValidation and ValidationStack;
   // ValidateAddress is involved in the calculation of column widths,
   // so you need to call recalculation

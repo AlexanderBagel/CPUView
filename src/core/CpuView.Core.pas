@@ -29,8 +29,6 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
-{$message 'Jumping up is no longer displayed!!!! Need fix'}
-
 {$message 'Min/Max col width to FWHexView for each coltype'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
@@ -141,6 +139,7 @@ type
     FAsmStream: TBufferedROStream;
     FCacheList: TListEx<TAsmLine>;
     FCacheListIndex: Integer;
+    FDBase: TCpuViewDBase;
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
@@ -230,6 +229,7 @@ type
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
     property Debugger: TAbstractDebugger read FDebugger;
+    property DBase: TCpuViewDBase read FDBase;
     property DumpViewList: TDumpViewList read FDumpViewList;
     // Адрес от которого был построен последний кэш.
     // Необходим для правильного выполнения операций Undo/Redo в кэше переходов.
@@ -575,6 +575,7 @@ begin
   FSessionCache := TDictionary<Int64, TAddrCacheItem>.Create;
   FShowCallFuncName := True;
   FAsmJmpStack := TJumpStack.Create;
+  FDBase := TCpuViewDBase.Create;
 end;
 
 destructor TCpuViewCore.Destroy;
@@ -589,6 +590,7 @@ begin
   FAsmJmpStack.Free;
   FDebugger.Free;
   FUtils.Free;
+  FDBase.Free;
   inherited;
 end;
 
@@ -978,8 +980,9 @@ procedure TCpuViewCore.OnRegQueryExternalComment(Sender: TObject;
 begin
   AComment := '';
   case ARegType of
-    ertLastError: AComment := CpuViewDBase.GetLastErrorStr(AValue.IntValue);
-    ertLastStatus: AComment := CpuViewDBase.GetLastStatusStr(AValue.DwordValue);
+    ertLastError: AComment := DBase.GetLastErrorStr(AValue.IntValue);
+    ertLastStatus: AComment := DBase.GetLastStatusStr(AValue.DwordValue);
+    ertRegID: AComment := DBase.GetRegHintStr(AValue.IntValue);
   end;
   if AComment <> '' then
     AComment := '(' + AComment + ')';
@@ -997,9 +1000,9 @@ var
   AddrPtrItem: TAddrCacheItem;
   Buff: array of Byte;
   List: TList<TInstruction>;
-  Inst: TInstruction;
   AsmLine: TAsmLine;
   I: Integer;
+  LockStackChains: Boolean;
 begin
   AItem := Default(TAddrCacheItem);
   Result := FSessionCache.TryGetValue(AddrVA, AItem);
@@ -1015,15 +1018,15 @@ begin
     if raRead in AItem.Region.Access then
     begin
       AItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
-      if AItem.Symbol = '' then
+      if (AItem.Symbol = '') and not (raExecute in AItem.Region.Access) then
       begin
-        // Lock stack chains
-        if AddrInStack(AddrVA) and not UseStackChains then Exit;
         AddrPtr := 0;
         if Debugger.ReadMemory(AddrVA, AddrPtr, Debugger.PointerSize) then
         begin
+          // Lock stack chains
+          LockStackChains := AddrInStack(AddrVA) and not UseStackChains;
           // Lock in-deep search
-          if UseInDeepDbgInfo then
+          if UseInDeepDbgInfo and not LockStackChains then
             QueryCacheItem(AddrPtr, AddrPtrItem)
           else
             AddrPtrItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
@@ -1134,7 +1137,9 @@ begin
     FAsmView.OnCacheEnd := OnAsmCacheEnd;
     FAsmView.OnJmpTo := OnAsmJmpTo;
     FAsmView.OnSelectionChange := OnAsmSelectionChange;
+    FAsmView.OnQueryAddressType := OnQueryAddressType;
     FAsmView.OnQueryComment := OnAsmQueryComment;
+    FAsmView.OnHint := OnGetHint;
     FOldAsmScroll := FAsmView.OnVerticalScroll;
     FAsmView.OnVerticalScroll := OnAsmScroll;
     FAsmView.FitColumnsToBestSize;

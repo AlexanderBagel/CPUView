@@ -33,6 +33,7 @@ uses
   {$ELSE}
   Windows,
   UITypes,
+  Types,
   {$ENDIF}
   Messages,
   Classes,
@@ -171,6 +172,9 @@ type
     property Visible default False;
   end;
 
+  TAddrType = (atNone, atExecute, atRead, atStack);
+  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType) of object;
+
   { TCustomAsmView }
 
   TCustomAsmView = class(TCustomMappedHexView)
@@ -184,6 +188,7 @@ type
     FCurrentIPIsActiveJmp: Boolean;
     FHighlightReg: string;
     FCacheEnd: TNotifyEvent;
+    FOnQueryAddr: TOnQueryAddrType;
     procedure DoScrollStep(AStep: TScrollStepDirection);
     function GetColorMap: TAsmColorMap;
     procedure SetColorMap(const Value: TAsmColorMap);
@@ -197,6 +202,7 @@ type
     procedure DoCacheEnd;
     procedure DoDrawToken(ACanvas: TCanvas; ATokenParam: TDrawParam;
       const ARect: TRect; AToken: PChar; var ATokenLen: Integer); override;
+    procedure DoQueryAddrType(AddrVA: Int64; out AddrType: TAddrType);
     function GetCaretPreviosRowIndex(FromIndex: Int64;
       AColumn: TColumnType = ctNone): Int64; override;
     function GetCaretNextRowIndex(FromIndex: Int64;
@@ -206,6 +212,7 @@ type
     function GetHeaderClass: THeaderClass; override;
     function GetOverloadPainterClass(Value: TPrimaryRowPainterClass): TPrimaryRowPainterClass; override;
     procedure InitPainters; override;
+    function IsJumpValid(AJmpToAddr: Int64): Boolean; override;
   protected
     // Lock Vertical Scroll
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -226,6 +233,7 @@ type
   protected
     property ColorMap: TAsmColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property OnCacheEnd: TNotifyEvent read FCacheEnd write FCacheEnd;
+    property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
     property OnVerticalScroll: TOnVerticalScrollEvent read FOnScroll write FOnScroll;
   end;
 
@@ -275,6 +283,7 @@ type
     property OnEnter;
     property OnExit;
     property OnJmpTo;
+    property OnHint;
     property OnKeyDown;
     property OnKeyPress;
     property OnKeyUp;
@@ -286,6 +295,7 @@ type
     property OnMouseLeave;
     property OnMouseMove;
     property OnMouseUp;
+    property OnQueryAddressType;
     property OnQueryComment;
     property OnSelectionChange;
     property OnStartDock;
@@ -315,9 +325,6 @@ type
 
   { TCustomAddressView }
 
-  TAddrType = (atNone, atExecute, atRead, atStack);
-  TOnQueryAddrType = procedure(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType) of object;
-
   TCustomAddressView = class(TFWCustomHexView)
   private
     FLastInvalidAddrRect: TRect;
@@ -342,10 +349,6 @@ type
     property PopupMenu;
   end;
 
-  TLeftRightBounds = record
-    LeftOffset, Width: Integer;
-  end;
-
   { TAddressViewPainter }
 
   TAddressViewPainter = class(TRowHexPainter)
@@ -359,7 +362,7 @@ type
   protected
     function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo;
       var AddrIndex: Integer): Int64;
-    function GetBounds(AIndex: Integer): TLeftRightBounds;
+    function GetBounds(AIndex: Integer): TBoundaries;
     function View: TCustomAddressView;
   end;
 
@@ -630,7 +633,7 @@ type
     procedure CopyRowAsString(Builder: TSimplyStringBuilder); override;
     procedure DrawColumn(ACanvas: TCanvas; AColumn: TColumnType;
       var ARect: TRect); override;
-    function GetBounds(const AHitInfo: TMouseHitInfo; out ABounds: TLeftRightBounds): Integer;
+    function GetBounds(const AHitInfo: TMouseHitInfo; out ABounds: TBoundaries): Integer;
     procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
     function GetTextMetricClass: TAbstractTextMetricClass; override;
     function View: TCustomRegView;
@@ -1328,6 +1331,14 @@ begin
       DoScrollStep(ssdWheelDown);
 end;
 
+procedure TCustomAsmView.DoQueryAddrType(AddrVA: Int64;
+  out AddrType: TAddrType);
+begin
+  AddrType := atNone;
+  if Assigned(FOnQueryAddr) then
+    FOnQueryAddr(Self, AddrVA, AddrType);
+end;
+
 procedure TCustomAsmView.DoScrollStep(AStep: TScrollStepDirection);
 var
   SavedColumn: TColumnType;
@@ -1413,6 +1424,14 @@ procedure TCustomAsmView.InitPainters;
 begin
   inherited;
   PostPainters.Add(TExecutionPointPostPainter.Create(Self));
+end;
+
+function TCustomAsmView.IsJumpValid(AJmpToAddr: Int64): Boolean;
+var
+  AddrType: TAddrType;
+begin
+  DoQueryAddrType(AJmpToAddr, AddrType);
+  Result := AddrType = atExecute;
 end;
 
 procedure TCustomAsmView.KeyDown(var Key: Word; Shift: TShiftState);
@@ -1649,7 +1668,7 @@ function TAddressViewPainter.GetAddressAtCursor(
   const AMouseHitInfo: TMouseHitInfo; var AddrIndex: Integer): Int64;
 var
   I, L: Integer;
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
 begin
   Result := 0;
   AddrIndex := -1;
@@ -1668,7 +1687,7 @@ begin
   end;
 end;
 
-function TAddressViewPainter.GetBounds(AIndex: Integer): TLeftRightBounds;
+function TAddressViewPainter.GetBounds(AIndex: Integer): TBoundaries;
 var
   AByteCount, ASelStart, ASelEnd: Integer;
 begin
@@ -1718,7 +1737,7 @@ procedure TDumpPainter.DrawHexPart(ACanvas: TCanvas; var ARect: TRect);
 var
   AddrType: TAddrType;
   I: Integer;
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
 begin
   inherited;
   if not View.ValidateAddress then Exit;
@@ -1752,7 +1771,7 @@ end;
 procedure TDumpPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
 var
   I, L: Integer;
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
 begin
   inherited;
   if not View.ValidateAddress then Exit;
@@ -1784,27 +1803,27 @@ var
   Painter: TAbstractPrimaryRowPainter;
   AddrType: TAddrType;
   AddrIndex: Integer;
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
 begin
   if not ValidateAddress then Exit;
   if ByteViewMode in [bvmFloat32..bvmText] then Exit;
-  if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
-  if PtInRect(FLastInvalidAddrRect, AHintParam.HitInfo.CursorPos) then Exit;
-  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
+  if AHintParam.MouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  if PtInRect(FLastInvalidAddrRect, AHintParam.MouseHitInfo.CursorPos) then Exit;
+  Painter := GetRowPainter(AHintParam.MouseHitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) then
   begin
     AHintParam.AddrVA := TAddressViewPainter(Painter).GetAddressAtCursor(
-      AHintParam.HitInfo, AddrIndex{%H-});
+      AHintParam.MouseHitInfo, AddrIndex{%H-});
     if (AddrIndex >= 0) and (AHintParam.AddrVA <> 0) then
     begin
       ABounds := TAddressViewPainter(Painter).GetBounds(AddrIndex);
-      AHintParam.CursorRect.Left :=
-        AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
-      AHintParam.CursorRect.Width := ABounds.Width;
+      AHintParam.HintInfo.CursorRect.Left :=
+        AHintParam.MouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+      AHintParam.HintInfo.CursorRect.Width := ABounds.Width;
       DoQueryAddrType(AHintParam.AddrVA, AddrType{%H-});
       if AddrType = atNone then
       begin
-        FLastInvalidAddrRect := AHintParam.CursorRect;
+        FLastInvalidAddrRect := AHintParam.HintInfo.CursorRect;
         Exit;
       end;
       FLastInvalidAddrRect := TRect.Empty;
@@ -2086,7 +2105,7 @@ procedure TStackRowPainter.DrawHexPart(ACanvas: TCanvas; var ARect: TRect);
 var
   AddrType: TAddrType;
   ValidateRect: TRect;
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
   Offsets: Integer;
 begin
   inherited;
@@ -2198,19 +2217,18 @@ procedure TCustomStackView.DoGetHint(var AHintParam: THintParam;
 var
   Painter: TAbstractPrimaryRowPainter;
   AddrType: TAddrType;
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
 begin
-  if not ValidateAddress then Exit;
-  if PtInRect(FLastInvalidAddrRect, AHintParam.HitInfo.CursorPos) then Exit;
-  if AHintParam.HitInfo.SelectPoint.Column <> ctOpcode then Exit;
-  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
+  if PtInRect(FLastInvalidAddrRect, AHintParam.MouseHitInfo.CursorPos) then Exit;
+  if AHintParam.MouseHitInfo.SelectPoint.Column <> ctOpcode then Exit;
+  Painter := GetRowPainter(AHintParam.MouseHitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) then
   begin
     ABounds := TAddressViewPainter(Painter).GetBounds(0);
-    AHintParam.CursorRect.Left :=
-      AHintParam.HitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
-    AHintParam.CursorRect.Width := ABounds.Width + RowHeight;
-    if not PtInRect(AHintParam.CursorRect, AHintParam.HitInfo.CursorPos) then Exit;
+    AHintParam.HintInfo.CursorRect.Left :=
+      AHintParam.MouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+    AHintParam.HintInfo.CursorRect.Width := ABounds.Width + RowHeight;
+    if not PtInRect(AHintParam.HintInfo.CursorRect, AHintParam.MouseHitInfo.CursorPos) then Exit;
 
     AHintParam.AddrVA := TAddressViewPainter(Painter).GetAddrAtIndex(0);
     if AHintParam.AddrVA <> 0 then
@@ -2218,7 +2236,7 @@ begin
       DoQueryAddrType(AHintParam.AddrVA, AddrType{%H-});
       if AddrType = atNone then
       begin
-        FLastInvalidAddrRect := AHintParam.CursorRect;
+        FLastInvalidAddrRect := AHintParam.HintInfo.CursorRect;
         Exit;
       end;
       FLastInvalidAddrRect := TRect.Empty;
@@ -2461,7 +2479,7 @@ begin
 end;
 
 function TRegisterPainter.GetBounds(const AHitInfo: TMouseHitInfo;
-  out ABounds: TLeftRightBounds): Integer;
+  out ABounds: TBoundaries): Integer;
 
   function GlyphLen(Index: Integer): Integer;
   begin
@@ -2473,7 +2491,7 @@ var
   Info: TRegister;
 begin
   Result := -1;
-  ABounds := Default(TLeftRightBounds);
+  ABounds := Default(TBoundaries);
   if FContext = nil then Exit;
   LeftOffset := AHitInfo.ColumnStart;
   Inc(LeftOffset, TextMargin);
@@ -2496,7 +2514,7 @@ end;
 
 procedure TRegisterPainter.GetHitInfo(var AHitInfo: TMouseHitInfo);
 var
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
 begin
   // контекста может еще не быть, а вот GetHitInfo уже может прийти!
   // The context may not be there yet, but GetHitInfo may already be called!
@@ -2754,26 +2772,26 @@ var
   RegParam: TRegParam;
   RegValue: TRegValue;
   Painter: TAbstractPrimaryRowPainter;
-  ABounds: TLeftRightBounds;
+  ABounds: TBoundaries;
 begin
-  RegID := Context.RegInfo(AHintParam.HitInfo.SelectPoint.RowIndex,
-    AHintParam.HitInfo.SelectPoint.ValueOffset).RegID;
+  RegID := Context.RegInfo(AHintParam.MouseHitInfo.SelectPoint.RowIndex,
+    AHintParam.MouseHitInfo.SelectPoint.ValueOffset).RegID;
   Context.RegParam(RegID, RegParam);
   if rfHint in RegParam.Flags then
     AHint := Context.RegQueryString(RegID, rqstHint);
-  if ValidateAddress and (rfValidation in RegParam.Flags) then
+  if rfValidation in RegParam.Flags then
   begin
     Context.RegQueryValue(RegID, RegValue);
     AHintParam.AddrVA := RegValue.QwordValue;
     inherited;
   end;
   if AHint = '' then Exit;
-  Painter := GetRowPainter(AHintParam.HitInfo.SelectPoint.RowIndex);
+  Painter := GetRowPainter(AHintParam.MouseHitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) then
   begin
-    if TRegisterPainter(Painter).GetBounds(AHintParam.HitInfo, ABounds) < 0 then Exit;
-    AHintParam.CursorRect.Left := ABounds.LeftOffset;
-    AHintParam.CursorRect.Width := ABounds.Width;
+    if TRegisterPainter(Painter).GetBounds(AHintParam.MouseHitInfo, ABounds) < 0 then Exit;
+    AHintParam.HintInfo.CursorRect.Left := ABounds.LeftOffset;
+    AHintParam.HintInfo.CursorRect.Width := ABounds.Width;
   end;
 end;
 

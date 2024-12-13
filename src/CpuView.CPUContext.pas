@@ -111,7 +111,7 @@ type
       32: (Ext32: array [0..31] of Byte);
   end;
 
-  TExternalRegType = (ertLastError, ertLastStatus);
+  TExternalRegType = (ertLastError, ertLastStatus, ertRegID);
   TContextQueryExternalRegHintEvent = procedure(Sender: TObject;
     const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string) of object;
 
