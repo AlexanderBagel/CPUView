@@ -330,10 +330,14 @@ type
     FLastInvalidAddrRect: TRect;
     FOnQueryAddr: TOnQueryAddrType;
     FValidateAddress: Boolean;
+    FValidateType: array [TAddrValidationType] of Boolean;
     function GetColorMap: TAddressViewColorMap;
+    function GetValidateType(Index: TAddrValidationType): Boolean;
     procedure SetColorMap(AValue: TAddressViewColorMap);
     procedure SetValidateAddress(AValue: Boolean);
+    procedure SetValidateType(Index: TAddrValidationType; AValue: Boolean);
   protected
+    function CanDrawValidation(AAddrType: TAddrType): Boolean;
     procedure DoChange(ChangeCode: Integer); override;
     procedure DoQueryAddrType(AddrVA: Int64; out AddrType: TAddrType);
     procedure InitDefault; override;
@@ -344,6 +348,8 @@ type
     property ColorMap: TAddressViewColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
+  public
+    property ValidateType[Index: TAddrValidationType]: Boolean read GetValidateType write SetValidateType;
   published
     property Font;
     property PopupMenu;
@@ -687,6 +693,8 @@ type
   private
     FContext: TAbstractCPUContext;
     FActiveRegParam: TRegParam;
+    FHintFlag: Boolean;
+    FHintsReg: Boolean;
     FPopup: TOnSelectedContextPopupEvent;
     FSelectedRegName: string;
     FSelectedRegValue: TRegValue;
@@ -726,6 +734,8 @@ type
     property SelectedRegName: string read FSelectedRegName;
   protected
     property ColorMap: TRegistersColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
+    property HintForReg: Boolean read FHintsReg write FHintsReg default True;
+    property HintForFlag: Boolean read FHintFlag write FHintFlag default True;
     property OnQueryExternalHint: TContextQueryExternalRegHintEvent read FQueryExternalHint write FQueryExternalHint;
     property OnSelectedContextPopup: TOnSelectedContextPopupEvent read FPopup write FPopup;
   end;
@@ -753,6 +763,8 @@ type
     property Encoder;
     property Font;
     property HideSelection;
+    property HintForFlag;
+    property HintForReg;
     property NoDataText;
     property ParentFont;
     property ParentShowHint;
@@ -1586,23 +1598,15 @@ end;
 
 { TCustomAddressView }
 
-procedure TCustomAddressView.SetValidateAddress(AValue: Boolean);
-begin
-  if ValidateAddress <> AValue then
-  begin
-    FValidateAddress := AValue;
-    Invalidate;
-  end;
-end;
-
 function TCustomAddressView.GetColorMap: TAddressViewColorMap;
 begin
   Result := TAddressViewColorMap(inherited ColorMap);
 end;
 
-procedure TCustomAddressView.SetColorMap(AValue: TAddressViewColorMap);
+function TCustomAddressView.GetValidateType(Index: TAddrValidationType
+  ): Boolean;
 begin
-  ColorMap.Assign(AValue);
+  Result := FValidateType[Index];
 end;
 
 procedure TCustomAddressView.DoChange(ChangeCode: Integer);
@@ -1624,6 +1628,9 @@ procedure TCustomAddressView.InitDefault;
 begin
   inherited;
   FValidateAddress := True;
+  FValidateType[avtExecutable] := True;
+  FValidateType[avtReadable] := True;
+  FValidateType[avtStack] := True;
 end;
 
 procedure TCustomAddressView.InitPainters;
@@ -1642,6 +1649,36 @@ begin
   // колонки пересчитываются автоматически
 
   // columns are recalculated automatically
+end;
+
+procedure TCustomAddressView.SetColorMap(AValue: TAddressViewColorMap);
+begin
+  ColorMap.Assign(AValue);
+end;
+
+procedure TCustomAddressView.SetValidateAddress(AValue: Boolean);
+begin
+  if ValidateAddress <> AValue then
+  begin
+    FValidateAddress := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TCustomAddressView.SetValidateType(Index: TAddrValidationType;
+  AValue: Boolean);
+begin
+  FValidateType[Index] := AValue;
+end;
+
+function TCustomAddressView.CanDrawValidation(AAddrType: TAddrType): Boolean;
+begin
+  case AAddrType of
+    atNone: Result := False;
+    atExecute: Result := ValidateType[avtExecutable];
+    atRead: Result := ValidateType[avtReadable];
+    atStack: Result := ValidateType[avtStack];
+  end;
 end;
 
 { TAddressViewPainter }
@@ -1746,7 +1783,7 @@ begin
   for I := 0 to BytesInRow div IfThen(AddressMode = am32bit, 4, 8) - 1 do
   begin
     AddrType := QueryAddrType(I);
-    if AddrType <> atNone then
+    if View.CanDrawValidation(AddrType) then
     begin
       case AddrType of
         atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
@@ -2112,7 +2149,7 @@ begin
   if not View.ValidateAddress then Exit;
   CheckCache;
   AddrType := QueryAddrType(0);
-  if AddrType = atNone then Exit;
+  if View.CanDrawValidation(AddrType) then
   begin
     case AddrType of
       atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
@@ -2459,8 +2496,8 @@ begin
       begin
         FContext.RegQueryValue(Info.RegID, ARegValue);
         View.DoQueryAddrType(ARegValue.QwordValue, AddrType);
+        if not View.CanDrawValidation(AddrType) then Continue;
         case AddrType of
-          atNone: Continue;
           atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
           atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
           atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
@@ -2777,9 +2814,9 @@ begin
   RegID := Context.RegInfo(AHintParam.MouseHitInfo.SelectPoint.RowIndex,
     AHintParam.MouseHitInfo.SelectPoint.ValueOffset).RegID;
   Context.RegParam(RegID, RegParam);
-  if rfHint in RegParam.Flags then
+  if HintForFlag and (rfHint in RegParam.Flags) then
     AHint := Context.RegQueryString(RegID, rqstHint);
-  if rfValidation in RegParam.Flags then
+  if HintForReg and (rfValidation in RegParam.Flags) then
   begin
     Context.RegQueryValue(RegID, RegValue);
     AHintParam.AddrVA := RegValue.QwordValue;
@@ -2891,6 +2928,8 @@ begin
   Header.Columns := [ctOpcode];
   Header.Visible := False;
   SeparateGroupByColor := False;
+  HintForReg := True;
+  HintForFlag := True;
   if Assigned(Context) then
     Context.InitDefault;
 end;

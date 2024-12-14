@@ -194,13 +194,13 @@ type
     EncodeType: TCharEncoderType;
     EncodingName: string;
     FontHeight: Double;
-    AddrValidation: Boolean;
+    AddrValidation: array [TAddrValidationType] of Boolean;
     Hints: Boolean;
   end;
 
   TStackSettings = record
     FontHeight: Double;
-    AddrValidation: Boolean;
+    AddrValidation: array [TAddrValidationType] of Boolean;
     Hints: Boolean;
   end;
 
@@ -259,14 +259,18 @@ type
     FUseCrashDump: Boolean;
     FUseAddrValidation: Boolean;
     function GetColor(const Index: string): TColor;
+    function GetDumpValidation(Index: TAddrValidationType): Boolean;
     function GetHintInRegForFlag: Boolean;
     function GetHintInRegForReg: Boolean;
     function GetShotCut(Index: TShortCutType): TCpuViewShortCut;
+    function GetStackValidation(Index: TAddrValidationType): Boolean;
     function GetValidationReg(Index: TAddrValidationType): Boolean;
     procedure SetColor(const Index: string; Value: TColor);
+    procedure SetDumpValidation(Index: TAddrValidationType; AValue: Boolean);
     procedure SetHintInRegForFlag(AValue: Boolean);
     procedure SetHintInRegForReg(AValue: Boolean);
     procedure SetShotCut(Index: TShortCutType; const AValue: TCpuViewShortCut);
+    procedure SeStackValidation(Index: TAddrValidationType; AValue: Boolean);
     procedure SetValidationReg(Index: TAddrValidationType; AValue: Boolean);
   private
     function DpiToDouble(AValue: Integer; AView: TFWCustomHexView): Double;
@@ -361,9 +365,9 @@ type
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
     property UseAddrValidation: Boolean read FUseAddrValidation write FUseAddrValidation;
-    property ValidationDump: Boolean read FDumpSettings.AddrValidation write FDumpSettings.AddrValidation;
+    property ValidationDump[Index: TAddrValidationType]: Boolean read GetDumpValidation write SetDumpValidation;
     property ValidationReg[Index: TAddrValidationType]: Boolean read GetValidationReg write SetValidationReg;
-    property ValidationStack: Boolean read FStackSettings.AddrValidation write FStackSettings.AddrValidation;
+    property ValidationStack[Index: TAddrValidationType]: Boolean read GetStackValidation write SeStackValidation;
   end;
 
   function KeyShiftToText(Key: Word; Shift: TShiftState): string;
@@ -480,6 +484,17 @@ function TCpuViewSettins.DoubleToDpi(AValue: Double;
   AView: TFWCustomHexView): Integer;
 begin
   Result := Round(AValue * AView.CurrentPPI / 96);
+end;
+
+function TCpuViewSettins.GetDumpValidation(Index: TAddrValidationType): Boolean;
+begin
+  Result := FDumpSettings.AddrValidation[Index];
+end;
+
+function TCpuViewSettins.GetStackValidation(Index: TAddrValidationType
+  ): Boolean;
+begin
+  Result := FStackSettings.AddrValidation[Index];
 end;
 
 function TCpuViewSettins.GetValidationReg(Index: TAddrValidationType): Boolean;
@@ -646,7 +661,9 @@ begin
 
   FDumpSettings := Default(TDumpSettings);
   FDumpSettings.FontHeight := DefaultFontHeight;
-  FDumpSettings.AddrValidation := True;
+  FDumpSettings.AddrValidation[avtExecutable] := True;
+  FDumpSettings.AddrValidation[avtReadable] := True;
+  FDumpSettings.AddrValidation[avtStack] := True;
   FDumpSettings.Hints := True;
 
   {$IFDEF MSWINDOWS}
@@ -663,7 +680,9 @@ begin
   FSaveViewersSession := True;
 
   FStackSettings.FontHeight := DefaultFontHeight;
-  FStackSettings.AddrValidation := True;
+  FStackSettings.AddrValidation[avtExecutable] := True;
+  FStackSettings.AddrValidation[avtReadable] := True;
+  FStackSettings.AddrValidation[avtStack] := True;
   FStackSettings.Hints := True;
 
   FUseDebugInfo := True;
@@ -866,7 +885,9 @@ begin
   FDumpSettings.EncodingName := GetNodeAttr(Node, xmlEncoderName);
   FDumpSettings.CodePage := GetNodeAttr(Node, xmlEncoderCP);
   FDumpSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
-  FDumpSettings.AddrValidation := GetNodeAttr(Root, xmlValidation);
+  FDumpSettings.AddrValidation[avtExecutable] := GetNodeAttr(Root, xmlAddrValidateE);
+  FDumpSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
+  FDumpSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
   FDumpSettings.Hints := GetNodeAttr(Root, xmlHint);
 end;
 
@@ -929,7 +950,9 @@ end;
 procedure TCpuViewSettins.LoadFromXML_StackSettings(Root: IXMLNode);
 begin
   FStackSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
-  FStackSettings.AddrValidation := GetNodeAttr(Root, xmlValidation);
+  FStackSettings.AddrValidation[avtExecutable] := GetNodeAttr(Root, xmlAddrValidateE);
+  FStackSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
+  FStackSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
   FStackSettings.Hints := GetNodeAttr(Root, xmlHint);
 end;
 
@@ -1166,7 +1189,9 @@ begin
     GetEnumName(TypeInfo(TCharEncoderType), Integer(FDumpSettings.EncodeType)));
   SetNodeAttr(Encoder, xmlEncoderName, FDumpSettings.EncodingName);
   SetNodeAttr(Encoder, xmlEncoderCP, FDumpSettings.CodePage);
-  SetNodeAttr(Root, xmlValidation, FDumpSettings.AddrValidation);
+  SetNodeAttr(Root, xmlAddrValidateE, FDumpSettings.AddrValidation[avtExecutable]);
+  SetNodeAttr(Root, xmlAddrValidateR, FDumpSettings.AddrValidation[avtReadable]);
+  SetNodeAttr(Root, xmlAddrValidateS, FDumpSettings.AddrValidation[avtStack]);
   SetNodeAttr(Root, xmlHint, FDumpSettings.Hints);
 end;
 
@@ -1223,8 +1248,22 @@ end;
 procedure TCpuViewSettins.SaveToXML_StackSettings(Root: IXMLNode);
 begin
   XMLWriteDouble(Root, xmlFontSize, FStackSettings.FontHeight);
-  SetNodeAttr(Root, xmlValidation, FStackSettings.AddrValidation);
+  SetNodeAttr(Root, xmlAddrValidateE, FStackSettings.AddrValidation[avtExecutable]);
+  SetNodeAttr(Root, xmlAddrValidateR, FStackSettings.AddrValidation[avtReadable]);
+  SetNodeAttr(Root, xmlAddrValidateS, FStackSettings.AddrValidation[avtStack]);
   SetNodeAttr(Root, xmlHint, FStackSettings.Hints);
+end;
+
+procedure TCpuViewSettins.SeStackValidation(Index: TAddrValidationType;
+  AValue: Boolean);
+begin
+  FStackSettings.AddrValidation[Index] := AValue;
+end;
+
+procedure TCpuViewSettins.SetDumpValidation(Index: TAddrValidationType;
+  AValue: Boolean);
+begin
+  FDumpSettings.AddrValidation[Index] := AValue;
 end;
 
 procedure TCpuViewSettins.SetValidationReg(Index: TAddrValidationType;
@@ -1370,7 +1409,10 @@ begin
   ADumpView.Encoder.EncodingName := FDumpSettings.EncodingName;
   // Without validation, the dump doesn't know about the addresses
   ADumpView.ShowHint := UseAddrValidation and HintInDump;
-  ADumpView.ValidateAddress := UseAddrValidation and ValidationDump;
+  ADumpView.ValidateAddress := UseAddrValidation;
+  ADumpView.ValidateType[avtExecutable] := ValidationDump[avtExecutable];
+  ADumpView.ValidateType[avtReadable] := ValidationDump[avtReadable];
+  ADumpView.ValidateType[avtStack] := ValidationDump[avtStack];
 end;
 
 procedure TCpuViewSettins.SetSettingsToRegView(ARegView: TRegView);
@@ -1380,7 +1422,12 @@ begin
   SaveToAddrHightLightColorMap(ARegView.ColorMap);
   SaveToRegColorMap(ARegView.ColorMap);
   ARegView.ShowHint := HintInRegForFlag or HintInRegForReg;
+  ARegView.HintForFlag := HintInRegForFlag;
+  ARegView.HintForReg := HintInRegForReg;
   ARegView.ValidateAddress := UseAddrValidation;
+  ARegView.ValidateType[avtExecutable] := ValidationReg[avtExecutable];
+  ARegView.ValidateType[avtReadable] := ValidationReg[avtReadable];
+  ARegView.ValidateType[avtStack] := ValidationReg[avtStack];
 end;
 
 procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);
@@ -1388,7 +1435,10 @@ begin
   RestoreViewDefSettings(AStackView);
   AStackView.Font.Height := DoubleToDpi(FStackSettings.FontHeight, AStackView);
   AStackView.ShowHint := HintInStack;
-  AStackView.ValidateAddress := UseAddrValidation and ValidationStack;
+  AStackView.ValidateAddress := UseAddrValidation;
+  AStackView.ValidateType[avtExecutable] := ValidationStack[avtExecutable];
+  AStackView.ValidateType[avtReadable] := ValidationStack[avtReadable];
+  AStackView.ValidateType[avtStack] := ValidationStack[avtStack];
   // ValidateAddress is involved in the calculation of column widths,
   // so you need to call recalculation
   AStackView.FitColumnsToBestSize;

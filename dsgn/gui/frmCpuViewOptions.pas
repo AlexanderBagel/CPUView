@@ -22,7 +22,7 @@ unit frmCpuViewOptions;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, Graphics,
+  LMessages, Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, Graphics,
   IDEOptEditorIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList;
 
 type
@@ -33,6 +33,11 @@ type
   protected
     procedure AdjustImageBorder(AImages: TCustomImageList; ABidiMode: TBidiMode;
       VAlign: Integer; var R: TRect; var ImageInfo: TVTImageInfo); override;
+    procedure AutoScale; override;
+    procedure DoTextDrawing(var PaintInfo: TVTPaintInfo; const AText: string;
+      CellRect: TRect; DrawFormat: Cardinal); override;
+    procedure PaintCheckImage(ACanvas: TCanvas; const ImageInfo: TVTImageInfo;
+      {%H-}ASelected: Boolean); override;
   end;
 
   TTVCheckStyle = (tvcsNone, tvcsChecked, tvcsUnchecked);
@@ -67,6 +72,7 @@ type
       ACheckStyle: TTVCheckStyle): PVirtualNode;
     procedure FillImageList;
     procedure FillSettingsView;
+    procedure SaveExpandedState;
     procedure tvSettingsGetImageIndex(Sender: TBaseVirtualTree;
       Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex;
       var Ghosted: Boolean; var ImageIndex: Integer);
@@ -80,6 +86,7 @@ type
     procedure DoReadSettings; override;
     procedure DoWriteSettings; override;
     function IsMainFrame: Boolean; override;
+    procedure CMFontChanged(var Message: TLMessage); message CM_FONTCHANGED;
   public
     function GetTitle: string; override;
     procedure Setup({%H-}ADialog: TAbstractOptionsEditorDialog); override;
@@ -89,9 +96,15 @@ implementation
 
 uses
   LCLIntf, Math, Themes,
+  {$IFDEF MSWINDOWS}
+  Win32Themes, UxTheme,
+  {$ENDIF}
   FWHexView,
   CpuView.Common,
   CpuView.Settings;
+
+var
+  TreeExpandState: array [0..3] of Boolean;
 
 {$R *.lfm}
 
@@ -101,17 +114,69 @@ procedure TSettingsVST.AdjustImageBorder(AImages: TCustomImageList;
   ABidiMode: TBidiMode; VAlign: Integer; var R: TRect;
   var ImageInfo: TVTImageInfo);
 var
+  {$IFDEF MSWINDOWS}
   Details: TThemedElementDetails;
+  {$ENDIF}
   CheckSize: Integer;
 begin
   if ImageInfo.Images = Images then
     inherited
   else
   begin
-    Details := ThemeServices.GetElementDetails(tbCheckBoxCheckedNormal);
-    CheckSize := ThemeServices.GetDetailSizeForPPI(Details, Font.PixelsPerInch).CY;
-    inherited AdjustImageBorder(AImages.Width, checkSize, ABidiMode, VAlign, R, ImageInfo);
+    {$IFDEF MSWINDOWS}
+    if ThemeServices.ThemesAvailable then
+    begin
+      Details := ThemeServices.GetElementDetails(tbCheckBoxCheckedNormal);
+      CheckSize := ThemeServices.GetDetailSizeForPPI(Details, Font.PixelsPerInch).CY;
+    end
+    else
+    {$ENDIF}
+      CheckSize := AImages.Height;
+    inherited AdjustImageBorder(AImages.Width, CheckSize, ABidiMode, VAlign, R, ImageInfo);
   end;
+end;
+
+procedure TSettingsVST.AutoScale;
+var
+  Enum: TVTVirtualNodeEnumerator;
+begin
+  Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
+  inherited AutoScale;
+  DefaultNodeHeight := Scale96ToFont(DEFAULT_NODE_HEIGHT);
+  Enum := Nodes.GetEnumerator;
+  while Enum.MoveNext do
+    NodeHeight[Enum.Current] := DefaultNodeHeight;
+end;
+
+procedure TSettingsVST.DoTextDrawing(var PaintInfo: TVTPaintInfo;
+  const AText: string; CellRect: TRect; DrawFormat: Cardinal);
+begin
+  PaintInfo.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
+  inherited DoTextDrawing(PaintInfo, AText, CellRect, DrawFormat);
+end;
+
+procedure TSettingsVST.PaintCheckImage(ACanvas: TCanvas;
+  const ImageInfo: TVTImageInfo; ASelected: Boolean);
+{$IFDEF MSWINDOWS}
+var
+  Details: TThemedElementDetails;
+  CheckSize: Integer;
+  R: TRect;
+{$ENDIF}
+begin
+  {$IFDEF MSWINDOWS}
+  if ThemeServices.ThemesAvailable then
+  begin
+    Details := ThemeServices.GetElementDetails(tbCheckBoxCheckedNormal);
+    CheckSize := ThemeServices.GetDetailSizeForPPI(Details, Font.PixelsPerInch).CX;
+    R := Bounds(ImageInfo.XPos, ImageInfo.YPos, CheckSize, CheckSize);
+    DrawThemeBackground(
+      TWin32ThemeServices(ThemeServices).ThemeForPPI[teButton, Font.PixelsPerInch],
+      ACanvas.Handle, BP_CHECKBOX, ImageInfo.Index - 8, R, nil);
+  end
+  else
+  {$ENDIF}
+    inherited;
 end;
 
 { TCpuViewMainOptionsFrame }
@@ -125,6 +190,7 @@ end;
 
 procedure TCpuViewMainOptionsFrame.btnResetClick(Sender: TObject);
 begin
+  SaveExpandedState;
   Settings.Reset(spSession);
   UpdateFrameControl;
 end;
@@ -152,19 +218,15 @@ procedure TCpuViewMainOptionsFrame.FillImageList;
   procedure AddColorRect(AColor: TColor);
   var
     Img: TBitmap;
-    AFontHeight, Offsets: Integer;
+    Offsets: Integer;
     R: TRect;
   begin
     Img := TBitmap.Create;
     try
       Img.SetSize(ilSettings.Width, ilSettings.Height);
       Img.Canvas.Brush.Color := clMaroon;
-      Img.Canvas.FillRect(Rect(0, 0, ilSettings.Width, ilSettings.Height));
-      Img.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
-      Img.Canvas.Font.Name := Settings.FontName;
-      Img.Canvas.Font.Height := Font.Height;
-      AFontHeight := Min(Img.Canvas.TextHeight('J'), ilSettings.Height);
-      R := Rect(0, 0, AFontHeight, AFontHeight);
+      R := Rect(0, 0, ilSettings.Width, ilSettings.Height);
+      Img.Canvas.FillRect(R);
       Offsets := -Ceil(R.Height / 5);
       InflateRect(R, Offsets, Offsets);
       Img.Canvas.Brush.Style := bsSolid;
@@ -178,6 +240,8 @@ procedure TCpuViewMainOptionsFrame.FillImageList;
 
 begin
   ilSettings.Clear;
+  ilSettings.Width := tvSettings.DefaultNodeHeight;
+  ilSettings.Height := tvSettings.DefaultNodeHeight;
   AddColorRect(Settings.Color[xmlAddrValidateE]);
   AddColorRect(Settings.Color[xmlAddrValidateR]);
   AddColorRect(clGray);
@@ -205,12 +269,14 @@ begin
   Add(ANode, 104, BoolToTVCheckStyle(Settings.ShowFullAddress));
   Add(ANode, 105, BoolToTVCheckStyle(Settings.ShowCallFuncName));
   Add(ANode, 106, BoolToTVCheckStyle(Settings.HintInAsm));
+  tvSettings.Expanded[ANode] := TreeExpandState[0];
 
   ANode := Add(nil, 200, tvcsNone);
-  Add(ANode, 201, tvcsUnchecked);
-  Add(ANode, 202, tvcsUnchecked);
-  Add(ANode, 203, tvcsUnchecked);
-  Add(ANode, 204, tvcsUnchecked);
+  Add(ANode, 201, BoolToTVCheckStyle(Settings.ValidationDump[avtExecutable]));
+  Add(ANode, 202, BoolToTVCheckStyle(Settings.ValidationDump[avtReadable]));
+  Add(ANode, 203, BoolToTVCheckStyle(Settings.ValidationDump[avtStack]));
+  Add(ANode, 204, BoolToTVCheckStyle(Settings.HintInDump));
+  tvSettings.Expanded[ANode] := TreeExpandState[1];
 
   ANode := Add(nil, 300, tvcsNone);
   Add(ANode, 301, BoolToTVCheckStyle(Settings.ValidationReg[avtExecutable]));
@@ -218,12 +284,30 @@ begin
   Add(ANode, 303, BoolToTVCheckStyle(Settings.ValidationReg[avtStack]));
   Add(ANode, 304, BoolToTVCheckStyle(Settings.HintInRegForReg));
   Add(ANode, 305, BoolToTVCheckStyle(Settings.HintInRegForFlag));
+  tvSettings.Expanded[ANode] := TreeExpandState[2];
 
   ANode := Add(nil, 400, tvcsNone);
-  Add(ANode, 401, tvcsUnchecked);
-  Add(ANode, 402, tvcsUnchecked);
-  Add(ANode, 403, tvcsUnchecked);
-  Add(ANode, 404, tvcsUnchecked);
+  Add(ANode, 401, BoolToTVCheckStyle(Settings.ValidationStack[avtExecutable]));
+  Add(ANode, 402, BoolToTVCheckStyle(Settings.ValidationStack[avtReadable]));
+  Add(ANode, 403, BoolToTVCheckStyle(Settings.ValidationStack[avtStack]));
+  Add(ANode, 404, BoolToTVCheckStyle(Settings.HintInStack));
+  tvSettings.Expanded[ANode] := TreeExpandState[3];
+end;
+
+procedure TCpuViewMainOptionsFrame.SaveExpandedState;
+var
+  Enum: TVTVirtualNodeEnumerator;
+begin
+  Enum := tvSettings.Nodes.GetEnumerator;
+  while Enum.MoveNext do
+  begin
+    case PInteger(tvSettings.GetNodeData(Enum.Current))^ of
+      100: TreeExpandState[0] := tvSettings.Expanded[Enum.Current];
+      200: TreeExpandState[1] := tvSettings.Expanded[Enum.Current];
+      300: TreeExpandState[2] := tvSettings.Expanded[Enum.Current];
+      400: TreeExpandState[3] := tvSettings.Expanded[Enum.Current];
+    end;
+  end;
 end;
 
 procedure TCpuViewMainOptionsFrame.tvSettingsGetImageIndex(
@@ -319,6 +403,9 @@ begin
 end;
 
 procedure TCpuViewMainOptionsFrame.DoWriteSettings;
+var
+  Enum: TVTVirtualNodeEnumerator;
+  Checked: Boolean;
 begin
   Settings.FontName := cbFont.Text;
   Settings.UseAddrValidation := cbAddrValidation.Checked;
@@ -330,11 +417,47 @@ begin
   Settings.InDeepDbgInfo := cbForceFindSymbols.Checked;
   Settings.StackChains := cbStackChains.Checked;
   Settings.DisassemblyInHint := cbDasmPreview.Checked;
+  Enum := tvSettings.Nodes.GetEnumerator;
+  while Enum.MoveNext do
+  begin
+    Checked := tvSettings.CheckState[Enum.Current] = csCheckedNormal;
+    case PInteger(tvSettings.GetNodeData(Enum.Current))^ of
+      100: TreeExpandState[0] := tvSettings.Expanded[Enum.Current];
+      101: Settings.ShowJumps := Checked;
+      102: Settings.ShowOpcodes := Checked;
+      103: Settings.ShowSourceLines := Checked;
+      104: Settings.ShowFullAddress := Checked;
+      105: Settings.ShowCallFuncName := Checked;
+      106: Settings.HintInAsm := Checked;
+      200: TreeExpandState[1] := tvSettings.Expanded[Enum.Current];
+      201: Settings.ValidationDump[avtExecutable] := Checked;
+      202: Settings.ValidationDump[avtReadable] := Checked;
+      203: Settings.ValidationDump[avtStack] := Checked;
+      204: Settings.HintInDump := Checked;
+      300: TreeExpandState[2] := tvSettings.Expanded[Enum.Current];
+      301: Settings.ValidationReg[avtExecutable] := Checked;
+      302: Settings.ValidationReg[avtReadable] := Checked;
+      303: Settings.ValidationReg[avtStack] := Checked;
+      304: Settings.HintInRegForReg := Checked;
+      305: Settings.HintInRegForFlag := Checked;
+      400: TreeExpandState[3] := tvSettings.Expanded[Enum.Current];
+      401: Settings.ValidationStack[avtExecutable] := Checked;
+      402: Settings.ValidationStack[avtReadable] := Checked;
+      403: Settings.ValidationStack[avtStack] := Checked;
+      404: Settings.HintInStack := Checked;
+    end;
+  end;
 end;
 
 function TCpuViewMainOptionsFrame.IsMainFrame: Boolean;
 begin
   Result := True;
+end;
+
+procedure TCpuViewMainOptionsFrame.CMFontChanged(var Message: TLMessage);
+begin
+  if Assigned(ilSettings) then
+    FillImageList;
 end;
 
 function TCpuViewMainOptionsFrame.GetTitle: string;
