@@ -1,6 +1,8 @@
 inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   Height = 700
+  Width = 735
   ClientHeight = 700
+  ClientWidth = 735
   Constraints.MinHeight = 700
   DesignLeft = 492
   DesignTop = 232
@@ -8,7 +10,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Left = 67
     Height = 33
     Top = 8
-    Width = 657
+    Width = 610
     Anchors = [akTop, akLeft, akRight]
     ItemHeight = 25
     Style = csDropDownList
@@ -22,7 +24,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Caption = 'Font:'
   end
   object btnFontBrowse: TButton[2]
-    Left = 726
+    Left = 679
     Height = 33
     Top = 8
     Width = 33
@@ -31,84 +33,69 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     TabOrder = 1
     OnClick = btnFontBrowseClick
   end
-  object gbAsmView: TGroupBox[3]
+  object gbPerformance: TGroupBox[3]
     Left = 10
-    Height = 264
+    Height = 200
     Top = 56
-    Width = 749
+    Width = 702
     Anchors = [akTop, akLeft, akRight]
-    Caption = 'Display viewer parts:'
-    ClientHeight = 234
-    ClientWidth = 745
+    Caption = 'Performance settings:'
+    ClientHeight = 170
+    ClientWidth = 698
     TabOrder = 2
-    object cbDisplayFuncName: TCheckBox
-      Left = 32
-      Height = 29
-      Top = 104
-      Width = 301
-      Caption = 'Function name instead call address'
-      TabOrder = 0
-    end
-    object cbShowOpcodes: TCheckBox
-      Left = 10
-      Height = 29
-      Top = 8
-      Width = 183
-      Caption = 'Instruction opcodes'
-      TabOrder = 1
-    end
-    object cbShowSourceLines: TCheckBox
-      Left = 32
-      Height = 29
-      Top = 72
-      Width = 119
-      Caption = 'Source lines'
-      TabOrder = 2
-    end
     object cbSymbols: TCheckBox
       Left = 10
       Height = 29
-      Top = 40
-      Width = 151
-      Caption = 'Debug symbols'
-      TabOrder = 3
+      Top = 8
+      Width = 187
+      Caption = 'Use Debug Symbols'
+      TabOrder = 0
       OnClick = cbSymbolsClick
     end
     object cbForceFindSymbols: TCheckBox
       Left = 32
       Height = 29
-      Top = 136
+      Top = 40
       Width = 368
       Caption = 'In-depth search for debugging information'
-      TabOrder = 4
+      TabOrder = 1
       OnClick = cbSymbolsClick
     end
     object cbStackChains: TCheckBox
       Left = 32
       Height = 29
-      Top = 168
+      Top = 72
       Width = 244
       Caption = 'Collect stack address chains'
-      TabOrder = 5
+      TabOrder = 2
     end
     object cbDasmPreview: TCheckBox
       Left = 10
       Height = 29
-      Top = 200
+      Top = 104
       Width = 252
       Caption = 'Disassembly preview in hints'
-      TabOrder = 6
+      TabOrder = 3
+    end
+    object cbAddrValidation: TCheckBox
+      Left = 10
+      Height = 29
+      Top = 136
+      Width = 203
+      Caption = 'Use address validation'
+      TabOrder = 4
+      OnClick = cbSymbolsClick
     end
   end
   object gbSessions: TGroupBox[4]
     Left = 10
     Height = 104
     Top = 512
-    Width = 749
-    Anchors = [akTop, akLeft, akRight]
+    Width = 702
+    Anchors = [akLeft, akRight, akBottom]
     Caption = 'Session settings:'
     ClientHeight = 74
-    ClientWidth = 745
+    ClientWidth = 698
     TabOrder = 3
     object cbForm: TCheckBox
       Left = 10
@@ -132,6 +119,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Height = 29
     Top = 624
     Width = 213
+    Anchors = [akLeft, akBottom]
     Caption = '(DEBUG) Use debug log'
     TabOrder = 4
   end
@@ -140,91 +128,37 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Height = 29
     Top = 656
     Width = 265
+    Anchors = [akLeft, akBottom]
     Caption = '(DEBUG) Generate crash dump'
     TabOrder = 5
   end
   object btnReset: TButton[7]
-    Left = 592
+    Left = 545
     Height = 38
     Top = 624
     Width = 164
-    Anchors = [akTop, akRight]
+    Anchors = [akRight, akBottom]
     Caption = 'Reset to Default'
     TabOrder = 6
     OnClick = btnResetClick
   end
-  object gbAddressValidation: TGroupBox[8]
+  object gbViewersSetting: TGroupBox[8]
     Left = 10
-    Height = 176
-    Top = 328
-    Width = 749
-    Anchors = [akTop, akLeft, akRight]
-    Caption = 'Address validation:'
-    ClientHeight = 146
-    ClientWidth = 745
+    Height = 240
+    Top = 264
+    Width = 702
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    Caption = 'Viewers customization:'
     TabOrder = 7
-    object cbAddrValidation: TCheckBox
-      Left = 10
-      Height = 29
-      Top = 8
-      Width = 203
-      Caption = 'Use address validation'
-      TabOrder = 0
-      OnClick = cbSymbolsClick
-    end
-    object cbDumpColorMarks: TCheckBox
-      Left = 32
-      Height = 29
-      Top = 40
-      Width = 256
-      Caption = 'Highlight addresses in Dump'
-      TabOrder = 1
-    end
-    object cbDumpHints: TCheckBox
-      Left = 320
-      Height = 29
-      Top = 40
-      Width = 140
-      Caption = 'Hints in Dump'
-      TabOrder = 2
-    end
-    object cbRegColorMarks: TCheckBox
-      Left = 32
-      Height = 29
-      Top = 72
-      Width = 278
-      Caption = 'Highlight addresses in Registers'
-      TabOrder = 3
-    end
-    object cbRegHints: TCheckBox
-      Left = 320
-      Height = 29
-      Top = 72
-      Width = 162
-      Caption = 'Hints in Registers'
-      TabOrder = 4
-    end
-    object cbStackColorMarks: TCheckBox
-      Left = 32
-      Height = 29
-      Top = 104
-      Width = 248
-      Caption = 'Highlight addresses in Stack'
-      TabOrder = 5
-    end
-    object cbStackHints: TCheckBox
-      Left = 320
-      Height = 29
-      Top = 104
-      Width = 132
-      Caption = 'Hints in Stack'
-      TabOrder = 6
-    end
   end
   object FontDialog: TFontDialog[9]
     MinFontSize = 0
     MaxFontSize = 0
     Left = 496
+    Top = 88
+  end
+  object ilSettings: TImageList[10]
+    Left = 584
     Top = 88
   end
 end

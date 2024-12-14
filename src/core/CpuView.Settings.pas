@@ -85,7 +85,9 @@ const
   xmlSplitter = 'splitters';
   xmlSaveFormSession = 'sessionForm';
   xmlSaveViewersSession = 'sessionView';
+  xmlShowFullAddress = 'showFullAddress';
   xmlShowFuncName = 'showFuncName';
+  xmlShowJumps = 'showJumps';
   xmlShowOpcodes = 'showOpcodes';
   xmlShowSrc = 'showSrc';
   xmlUseDebugInfo = 'useDbgInfo';
@@ -165,6 +167,7 @@ const
 
   xmlValidation = 'useValidation';
   xmlHint = 'hint';
+  xmlHintFlag = 'hintFlag';
   xmlInDeepDbgInfo = 'useInDeepDbgInfo';
   xmlStackChains = 'useStackChains';
   xmlDisassemblyInHint = 'useDasmInHint';
@@ -177,6 +180,8 @@ type
   TAsmSettings = record
     ColumnWidth: array [TColumnType] of Double;
     DisplayFunc: Boolean;
+    ShowFullAddress: Boolean;
+    ShowJumps: Boolean;
     ShowOpcodes: Boolean;
     ShowSourceLines: Boolean;
     FontHeight: Double;
@@ -254,13 +259,15 @@ type
     FUseCrashDump: Boolean;
     FUseAddrValidation: Boolean;
     function GetColor(const Index: string): TColor;
-    function GetHintInReg: Boolean;
+    function GetHintInRegForFlag: Boolean;
+    function GetHintInRegForReg: Boolean;
     function GetShotCut(Index: TShortCutType): TCpuViewShortCut;
-    function GetValidationReg: Boolean;
+    function GetValidationReg(Index: TAddrValidationType): Boolean;
     procedure SetColor(const Index: string; Value: TColor);
-    procedure SetHintInReg(AValue: Boolean);
+    procedure SetHintInRegForFlag(AValue: Boolean);
+    procedure SetHintInRegForReg(AValue: Boolean);
     procedure SetShotCut(Index: TShortCutType; const AValue: TCpuViewShortCut);
-    procedure SetValidationReg(AValue: Boolean);
+    procedure SetValidationReg(Index: TAddrValidationType; AValue: Boolean);
   private
     function DpiToDouble(AValue: Integer; AView: TFWCustomHexView): Double;
     function DoubleToDpi(AValue: Double; AView: TFWCustomHexView): Integer;
@@ -336,7 +343,8 @@ type
     property InDeepDbgInfo: Boolean read FInDeepDbgInfo write FInDeepDbgInfo;
     property HintInAsm: Boolean read FAsmSettings.Hints write FAsmSettings.Hints;
     property HintInDump: Boolean read FDumpSettings.Hints write FDumpSettings.Hints;
-    property HintInReg: Boolean read GetHintInReg write SetHintInReg;
+    property HintInRegForReg: Boolean read GetHintInRegForReg write SetHintInRegForReg;
+    property HintInRegForFlag: Boolean read GetHintInRegForFlag write SetHintInRegForFlag;
     property HintInStack: Boolean read FStackSettings.Hints write FStackSettings.Hints;
     property FontName: string read FFontName write FFontName;
     property SaveFormSession: Boolean read FSaveFormSession write FSaveFormSession;
@@ -344,6 +352,8 @@ type
     property ShotCutMode: TShortCutMode read FShotCutMode write FShotCutMode;
     property ShotCut[Index: TShortCutType]: TCpuViewShortCut read GetShotCut write SetShotCut;
     property ShowCallFuncName: Boolean read FAsmSettings.DisplayFunc write FAsmSettings.DisplayFunc;
+    property ShowFullAddress: Boolean read FAsmSettings.ShowFullAddress write FAsmSettings.ShowFullAddress;
+    property ShowJumps: Boolean read FAsmSettings.ShowJumps write FAsmSettings.ShowJumps;
     property ShowOpcodes: Boolean read FAsmSettings.ShowOpcodes write FAsmSettings.ShowOpcodes;
     property ShowSourceLines: Boolean read FAsmSettings.ShowSourceLines write FAsmSettings.ShowSourceLines;
     property StackChains: Boolean read FStackChains write FStackChains;
@@ -352,7 +362,7 @@ type
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
     property UseAddrValidation: Boolean read FUseAddrValidation write FUseAddrValidation;
     property ValidationDump: Boolean read FDumpSettings.AddrValidation write FDumpSettings.AddrValidation;
-    property ValidationReg: Boolean read GetValidationReg write SetValidationReg;
+    property ValidationReg[Index: TAddrValidationType]: Boolean read GetValidationReg write SetValidationReg;
     property ValidationStack: Boolean read FStackSettings.AddrValidation write FStackSettings.AddrValidation;
   end;
 
@@ -472,14 +482,19 @@ begin
   Result := Round(AValue * AView.CurrentPPI / 96);
 end;
 
-function TCpuViewSettins.GetHintInReg: Boolean;
+function TCpuViewSettins.GetValidationReg(Index: TAddrValidationType): Boolean;
 begin
-  Result := FRegSettings.Hints;
+  Result := FRegSettings.AddrValidation[Index];
 end;
 
-function TCpuViewSettins.GetValidationReg: Boolean;
+function TCpuViewSettins.GetHintInRegForFlag: Boolean;
 begin
-  Result := FRegSettings.AddrValidation;
+  Result := FRegSettings.HintForFlag;
+end;
+
+function TCpuViewSettins.GetHintInRegForReg: Boolean;
+begin
+  Result := FRegSettings.HintForReg;
 end;
 
 procedure TCpuViewSettins.LoadFromAddrHightLightColorMap(
@@ -617,6 +632,8 @@ begin
   FAsmSettings.ColumnWidth[ctDescription] := 250;
   FAsmSettings.ColumnWidth[ctComment] := 440;
   FAsmSettings.DisplayFunc := True;
+  FAsmSettings.ShowFullAddress := True;
+  FAsmSettings.ShowJumps := True;
   FAsmSettings.ShowOpcodes := True;
   FAsmSettings.ShowSourceLines := True;
   FAsmSettings.FontHeight := DefaultFontHeight;
@@ -640,8 +657,6 @@ begin
   {$ENDIF}
 
   FRegSettings.FontHeight := DefaultFontHeight;
-  FRegSettings.AddrValidation := True;
-  FRegSettings.Hints := True;
   FRegSettings.InitDefault;
 
   FSaveFormSession := True;
@@ -768,6 +783,8 @@ var
 begin
   FAsmSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
   FAsmSettings.DisplayFunc := GetNodeAttr(Root, xmlShowFuncName);
+  FAsmSettings.ShowJumps := GetNodeAttr(Root, xmlShowJumps);
+  FAsmSettings.ShowFullAddress := GetNodeAttr(Root, xmlShowFullAddress);
   FAsmSettings.ShowOpcodes := GetNodeAttr(Root, xmlShowOpcodes);
   FAsmSettings.ShowSourceLines := GetNodeAttr(Root, xmlShowSrc);
   FAsmSettings.Hints := GetNodeAttr(Root, xmlHint);
@@ -883,8 +900,11 @@ end;
 procedure TCpuViewSettins.LoadFromXML_RegSettings(Root: IXMLNode);
 begin
   FRegSettings.FontHeight := XMLReadDouble(Root, xmlFontSize);
-  FRegSettings.AddrValidation := GetNodeAttr(Root, xmlValidation);
-  FRegSettings.Hints := GetNodeAttr(Root, xmlHint);
+  FRegSettings.AddrValidation[avtExecutable] := GetNodeAttr(Root, xmlAddrValidateE);
+  FRegSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
+  FRegSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
+  FRegSettings.HintForReg := GetNodeAttr(Root, xmlHint);
+  FRegSettings.HintForFlag := GetNodeAttr(Root, xmlHintFlag);
   FRegSettings.LoadFromXML(Root);
 end;
 
@@ -1069,12 +1089,16 @@ var
 begin
   XMLWriteDouble(Root, xmlFontSize, FAsmSettings.FontHeight);
   SetNodeAttr(Root, xmlShowFuncName, FAsmSettings.DisplayFunc);
+  SetNodeAttr(Root, xmlShowJumps, FAsmSettings.ShowJumps);
+  SetNodeAttr(Root, xmlShowFullAddress, FAsmSettings.ShowFullAddress);
   SetNodeAttr(Root, xmlShowOpcodes, FAsmSettings.ShowOpcodes);
   SetNodeAttr(Root, xmlShowSrc, FAsmSettings.ShowSourceLines);
   SetNodeAttr(Root, xmlHint, FDumpSettings.Hints);
 
   ColNode := NewChild(Root, xmlColumns);
   Columns := [ctWorkSpace..ctComment];
+  if not FAsmSettings.ShowJumps then
+    Exclude(Columns, ctJmpLine);
   if not FAsmSettings.ShowOpcodes then
     Exclude(Columns, ctOpcode);
   for I := Low(TColumnType) to High(TColumnType) do
@@ -1170,8 +1194,11 @@ end;
 procedure TCpuViewSettins.SaveToXML_RegSettings(Root: IXMLNode);
 begin
   XMLWriteDouble(Root, xmlFontSize, FRegSettings.FontHeight);
-  SetNodeAttr(Root, xmlValidation, FRegSettings.AddrValidation);
-  SetNodeAttr(Root, xmlHint, FRegSettings.Hints);
+  SetNodeAttr(Root, xmlAddrValidateE, FRegSettings.AddrValidation[avtExecutable]);
+  SetNodeAttr(Root, xmlAddrValidateR, FRegSettings.AddrValidation[avtReadable]);
+  SetNodeAttr(Root, xmlAddrValidateS, FRegSettings.AddrValidation[avtStack]);
+  SetNodeAttr(Root, xmlHint, FRegSettings.HintForReg);
+  SetNodeAttr(Root, xmlHintFlag, FRegSettings.HintForFlag);
   FRegSettings.SaveToXML(Root);
 end;
 
@@ -1200,14 +1227,20 @@ begin
   SetNodeAttr(Root, xmlHint, FStackSettings.Hints);
 end;
 
-procedure TCpuViewSettins.SetHintInReg(AValue: Boolean);
+procedure TCpuViewSettins.SetValidationReg(Index: TAddrValidationType;
+  AValue: Boolean);
 begin
-  FRegSettings.Hints := AValue;
+  FRegSettings.AddrValidation[Index] := AValue;
 end;
 
-procedure TCpuViewSettins.SetValidationReg(AValue: Boolean);
+procedure TCpuViewSettins.SetHintInRegForFlag(AValue: Boolean);
 begin
-  FRegSettings.AddrValidation := AValue;
+  FRegSettings.HintForFlag := AValue;
+end;
+
+procedure TCpuViewSettins.SetHintInRegForReg(AValue: Boolean);
+begin
+  FRegSettings.HintForReg := AValue;
 end;
 
 procedure TCpuViewSettins.SetShotCut(Index: TShortCutType;
@@ -1314,6 +1347,8 @@ begin
   for I := Low(TColumnType) to High(TColumnType) do
     if I in AAsmView.Header.Columns then
       FAsmSettings.ColumnWidth[I] := DoubleToDpi(AAsmView.Header.ColumnWidth[I], AAsmView);
+  if not FAsmSettings.ShowJumps then
+    AAsmView.Header.Columns := AAsmView.Header.Columns - [ctJmpLine];
   if not FAsmSettings.ShowOpcodes then
     AAsmView.Header.Columns := AAsmView.Header.Columns - [ctOpcode];
   AAsmView.ShowHint := HintInAsm;
@@ -1344,8 +1379,8 @@ begin
   ARegView.Font.Height := DoubleToDpi(FRegSettings.FontHeight, ARegView);
   SaveToAddrHightLightColorMap(ARegView.ColorMap);
   SaveToRegColorMap(ARegView.ColorMap);
-  ARegView.ShowHint := HintInReg;
-  ARegView.ValidateAddress := UseAddrValidation and ValidationReg;
+  ARegView.ShowHint := HintInRegForFlag or HintInRegForReg;
+  ARegView.ValidateAddress := UseAddrValidation;
 end;
 
 procedure TCpuViewSettins.SetSettingsToStackView(AStackView: TStackView);

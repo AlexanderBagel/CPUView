@@ -125,22 +125,25 @@ type
 
   TContextAbstractSettings = class
   private
-    FAddrValidation: Boolean;
-    FHints: Boolean;
+    FAddrValidation: array [TAddrValidationType] of Boolean;
+    FHintsReg, FHintFlag: Boolean;
     FFontHeight: Double;
+    function GetValidation(Index: TAddrValidationType): Boolean;
+    procedure SetValidation(Index: TAddrValidationType; AValue: Boolean);
   protected
     function GetContextName: string; virtual; abstract;
     procedure InternalLoadFromXML(Root: IXMLNode); virtual; abstract;
     procedure InternalSaveToXML(Root: IXMLNode); virtual; abstract;
   public
     constructor Create; virtual;
-    procedure InitDefault; virtual; abstract;
+    procedure InitDefault; virtual;
     procedure LoadFromContext(ACtx: TAbstractCPUContext); virtual; abstract;
     procedure SaveToContext(ACtx: TAbstractCPUContext); virtual; abstract;
     procedure LoadFromXML(Root: IXMLNode);
     procedure SaveToXML(Root: IXMLNode);
-    property AddrValidation: Boolean read FAddrValidation write FAddrValidation;
-    property Hints: Boolean read FHints write FHints;
+    property AddrValidation[Index: TAddrValidationType]: Boolean read GetValidation write SetValidation;
+    property HintForReg: Boolean read FHintsReg write FHintsReg;
+    property HintForFlag: Boolean read FHintFlag write FHintFlag;
     property FontHeight: Double read FFontHeight write FFontHeight;
   end;
 
@@ -329,9 +332,30 @@ end;
 
 { TContextAbstractSettings }
 
+function TContextAbstractSettings.GetValidation(Index: TAddrValidationType
+  ): Boolean;
+begin
+  Result := FAddrValidation[Index];
+end;
+
+procedure TContextAbstractSettings.SetValidation(Index: TAddrValidationType;
+  AValue: Boolean);
+begin
+  FAddrValidation[Index] := AValue;
+end;
+
 constructor TContextAbstractSettings.Create;
 begin
   // do nothing...
+end;
+
+procedure TContextAbstractSettings.InitDefault;
+begin
+  FHintFlag := True;
+  FHintsReg := True;
+  FAddrValidation[avtExecutable] := True;
+  FAddrValidation[avtReadable] := True;
+  FAddrValidation[avtStack] := True;
 end;
 
 procedure TContextAbstractSettings.LoadFromXML(Root: IXMLNode);

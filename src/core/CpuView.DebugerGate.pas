@@ -66,7 +66,7 @@ type
     FUtils: TCommonAbstractUtils;
     FChange: TNotifyEvent;
     FErrorMessage: string;
-    FShowSourceLines, FUseDebugInfo: Boolean;
+    FShowFullAddress, FShowSourceLines, FUseDebugInfo: Boolean;
     FBreakPointsChange, FCtxChange, FStateChange, FThreadChange: TNotifyEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
@@ -113,6 +113,7 @@ type
     property BreakPointList: TListEx<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
     property ErrorMessage: string read FErrorMessage;
+    property ShowFullAddress: Boolean read FShowFullAddress write FShowFullAddress;
     property ShowSourceLines: Boolean read FShowSourceLines write FShowSourceLines;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property Utils: TCommonAbstractUtils read FUtils;

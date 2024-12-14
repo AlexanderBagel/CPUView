@@ -779,11 +779,14 @@ begin
     if AnInfo.InstrType = itJump then
     begin
       Instruction.JmpTo := ExternalAddr;
-      SpaceIndex := Pos(' ', Instruction.AsString);
-      if SpaceIndex > 0 then
+      if ShowFullAddress then
       begin
-        SetLength(Instruction.AsString, SpaceIndex);
-        Instruction.AsString := Instruction.AsString + '0x' + IntToHex(ExternalAddr, 1);
+        SpaceIndex := Pos(' ', Instruction.AsString);
+        if SpaceIndex > 0 then
+        begin
+          SetLength(Instruction.AsString, SpaceIndex);
+          Instruction.AsString := Instruction.AsString + '0x' + IntToHex(ExternalAddr, 1);
+        end;
       end;
     end
     else

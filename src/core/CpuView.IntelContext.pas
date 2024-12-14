@@ -226,6 +226,7 @@ procedure TIntelCtxSettings.InitDefault;
 var
   I: Integer;
 begin
+  inherited;
   FMapMode := icmDetailed;
   FFPUMode := fpuST;
   FShowDebug := True;
@@ -1166,6 +1167,7 @@ var
 begin
   AValue := Default(TRegValue);
   AValue.IntValue := RegID;
+  Result := '';
   DoQueryExternalRegHint(AValue, ertRegID, Result);
   if Result <> '' then
     Result := StringReplace(Result, '/n', sLineBreak, [rfReplaceAll]);

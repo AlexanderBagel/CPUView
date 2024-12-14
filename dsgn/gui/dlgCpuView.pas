@@ -655,12 +655,14 @@ begin
   if (Core.ShowCallFuncName <> Settings.ShowCallFuncName) or
     (Core.UseInDeepDbgInfo <> Settings.InDeepDbgInfo) or
     (Core.UseStackChains <> Settings.StackChains) or
+    (DbgGate.ShowFullAddress <> Settings.ShowFullAddress) or
     (DbgGate.ShowSourceLines <> Settings.ShowSourceLines) or
     (DbgGate.UseDebugInfo <> Settings.UseDebugInfo) then
   begin
     Core.ShowCallFuncName := Settings.ShowCallFuncName;
     Core.UseInDeepDbgInfo := Settings.InDeepDbgInfo;
     Core.UseStackChains := Settings.StackChains;
+    DbgGate.ShowFullAddress := Settings.ShowFullAddress;
     DbgGate.ShowSourceLines := Settings.ShowSourceLines;
     DbgGate.UseDebugInfo := Settings.UseDebugInfo;
     Core.UpdateAfterSettingsChange;

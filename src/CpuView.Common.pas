@@ -24,6 +24,8 @@ unit CpuView.Common;
 interface
 
 type
+  TAddrValidationType = (avtExecutable, avtReadable, avtStack);
+
   TRegViewMode = (
     rvmHex, rvmHexW, rvmHexD, rvmHexQ,
     rvmOct, rvmBin, rvmIntB, rvmUIntB,
