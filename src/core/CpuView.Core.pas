@@ -44,12 +44,14 @@ uses
   {$ELSE}
   Windows,
   {$ENDIF}
+  Messages,
   Classes,
   Math,
   SysUtils,
   Controls,
   Generics.Collections,
   Menus,
+  Forms,
   FWHexView.Common,
   FWHexView,
   FWHexView.MappedView,
@@ -86,7 +88,9 @@ type
     Region: TRegionData;
     Symbol: string;
     InDeepSymbol: Boolean; // Flag means that the character for the address was calculated by recursive analysis
+    ExtendedDataPresent: Boolean;
     AsmLines, HintLines: string;
+    PointerValue: array [0..9] of Byte;
   end;
 
   TCpuViewCore = class;
@@ -128,6 +132,43 @@ type
     property OnUpdated: TOnCacheUpdated read FOnUpdated write SetOnUpdated;
   end;
 
+  PExtendedHintData = ^TExtendedHintData;
+  TExtendedHintData = record
+    AddressType: TAddrType;
+    AddrVA: Int64;
+    Core: TCpuViewCore;
+  end;
+
+  {$IFDEF FPC}
+  TCustomData = Pointer;
+  {$ENDIF}
+
+  TExtendedHintWindow = class(THintWindow)
+  private const
+  {$IFDEF FPC}
+    NcBorderWidth = 4;
+  {$ELSE}
+    NcBorderWidth = 2;
+  {$ENDIF}
+  private
+    FAddrItem: TAddrCacheItem;
+    FAddrStr: string;
+    FAsm, FHints: TStringList;
+    FLastLine: string;
+    FExtendedRect: TRect;
+    FBorder, FTextHeight, FTextMargine: Integer;
+    function CalculateExecute(MaxWidth: Integer; pData: PExtendedHintData): TRect;
+    function CalculatePointerValue(MaxWidth: Integer; pData: PExtendedHintData): TRect;
+  protected
+    procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
+    procedure Paint; override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    function CalcHintRect(MaxWidth: Integer; const AHint: string;
+      AData: TCustomData): TRect; override;
+  end;
+
   { TCpuViewCore }
 
   TCpuViewCore = class
@@ -143,6 +184,7 @@ type
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
+    FExtendedHintData: TExtendedHintData;
     FInDeepDbgInfo: Boolean;
     FInvalidReg: TRegionData;
     FLastStackLimit: TStackLimit;
@@ -186,6 +228,8 @@ type
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure OnThreadChange(Sender: TObject);
     function QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
+    function QueryDisasmAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
+    function QueryPointerValueAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     procedure SetAsmView(const Value: TAsmView);
     procedure SetRegView(const Value: TRegView);
     procedure SetStackView(const Value: TStackView);
@@ -421,6 +465,119 @@ begin
   end;
 end;
 
+{ TExtendedHintWindow }
+
+function TExtendedHintWindow.CalcHintRect(MaxWidth: Integer;
+  const AHint: string; AData: TCustomData): TRect;
+var
+  pData: PExtendedHintData;
+begin
+  if Screen.ActiveCustomForm <> nil then
+  begin
+    Canvas.Font := Screen.HintFont;
+    {$IFNDEF FPC}
+    Canvas.Font.Height := Muldiv(Canvas.Font.Height, Screen.ActiveCustomForm.CurrentPPI, Screen.PixelsPerInch);
+    {$ENDIF}
+  end;
+
+  pData := PExtendedHintData(AData);
+  FBorder := pData.Core.AsmView.SplitMargin;
+  FTextHeight := Canvas.TextHeight('J');
+  FTextMargine := pData.Core.AsmView.TextMargin;
+
+  case pData.AddressType of
+    atExecute: pData.Core.QueryDisasmAtAddr(pData.AddrVA, FAddrItem);
+    atRead: pData.Core.QueryPointerValueAtAddr(pData.AddrVA, FAddrItem);
+  else
+    Result := inherited;
+    Exit;
+  end;
+
+  FHints.Text := AHint;
+  if FHints.Count > 1 then
+    FLastLine := FHints[FHints.Count - 1]
+  else
+    FLastLine := '';
+  FAddrStr := Format('Addr: 0x%x (%s)',
+    [pData.AddrVA, pData.Core.FormatAccessString(FAddrItem.Region)]);
+
+  case pData.AddressType of
+    atExecute: Result := CalculateExecute(MaxWidth, PExtendedHintData(AData));
+    atRead: Result := CalculatePointerValue(MaxWidth, PExtendedHintData(AData));
+  end;
+end;
+
+function TExtendedHintWindow.CalculateExecute(MaxWidth: Integer;
+  pData: PExtendedHintData): TRect;
+var
+  TmpHint: string;
+  TopCount: Integer;
+begin
+  TmpHint := FAddrStr;
+  TopCount := 1;
+  if FAddrItem.Symbol <> '' then
+  begin
+    TmpHint := TmpHint + sLineBreak + FAddrItem.Symbol;
+    Inc(TopCount);
+  end;
+  if FLastLine <> '' then
+    TmpHint := TmpHint + sLineBreak + FLastLine;
+  Result := inherited CalcHintRect(MaxWidth, TmpHint, nil); // for font setup
+  FExtendedRect := Bounds(0, NcBorderWidth + TopCount * FTextHeight, 0, 0);
+  if not FAddrItem.ExtendedDataPresent then Exit;
+end;
+
+function TExtendedHintWindow.CalculatePointerValue(MaxWidth: Integer;
+  pData: PExtendedHintData): TRect;
+begin
+  Result := ClientRect.Empty;
+end;
+
+procedure TExtendedHintWindow.CMTextChanged(var Message: TMessage);
+begin
+  // lock ClientRect update
+end;
+
+constructor TExtendedHintWindow.Create(AOwner: TComponent);
+begin
+  inherited;
+  FAsm := TStringList.Create;
+  FHints := TStringList.Create;
+end;
+
+destructor TExtendedHintWindow.Destroy;
+begin
+  FAsm.Free;
+  FHints.Free;
+  inherited;
+end;
+
+procedure TExtendedHintWindow.Paint;
+var
+  R: TRect;
+begin
+  // Fill default background without text
+  Caption := '';
+  inherited;
+
+  R := Bounds(NcBorderWidth, NcBorderWidth, ClientWidth - NcBorderWidth shl 1, FTextHeight);
+  DrawText(Canvas, FAddrStr, -1, R, DT_LEFT or DT_NOPREFIX or DT_SINGLELINE);
+  OffsetRect(R, 0, FTextHeight);
+  if FAddrItem.Symbol <> '' then
+  begin
+    DrawText(Canvas, FAddrItem.Symbol, -1, R, DT_LEFT or DT_NOPREFIX or DT_SINGLELINE);
+    OffsetRect(R, 0, FTextHeight);
+  end;
+
+  if FLastLine <> '' then
+  begin
+    R.Top := FExtendedRect.Bottom;
+    R.Height := FTextHeight;
+    DrawText(Canvas, FLastLine, -1, R, DT_LEFT or DT_NOPREFIX or DT_SINGLELINE);
+    OffsetRect(R, 0, FTextHeight);
+  end;
+end;
+
 { TCpuViewCore }
 
 function TCpuViewCore.AddrInStack(AddrVA: Int64): Boolean;
@@ -457,6 +614,20 @@ end;
 function TCpuViewCore.QueryModuleName(AddrVA: Int64): string;
 begin
   FUtils.QueryModuleName(AddrVA, Result);
+end;
+
+function TCpuViewCore.QueryPointerValueAtAddr(AddrVA: Int64;
+  out AItem: TAddrCacheItem): Boolean;
+begin
+  AItem := Default(TAddrCacheItem);
+  Result := QueryCacheItem(AddrVA, AItem) and (raRead in AItem.Region.Access);
+  if not Result then Exit;
+  if not AItem.ExtendedDataPresent then
+  begin
+    Debugger.ReadMemory(AddrVA, AItem.PointerValue[0], SizeOf(AItem.PointerValue));
+    AItem.ExtendedDataPresent := True;
+    FSessionCache.AddOrSetValue(AddrVA, AItem);
+  end;
 end;
 
 function TCpuViewCore.QueryRegion(AddrVA: Int64; out RegionData: TRegionData
@@ -933,9 +1104,21 @@ begin
   begin
     AddressType := QueryAddressType(Param.AddrVA);
     if AddressType = atNone then Exit;
-    AccessStr := QueryAccessStr(Param.AddrVA);
-    Symbol := QuerySymbolAtAddr(Param.AddrVA);
-    Hint := Format('Addr: 0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
+
+    if AddressType in [atRead, atStack] then
+    begin
+      AccessStr := QueryAccessStr(Param.AddrVA);
+      Symbol := QuerySymbolAtAddr(Param.AddrVA);
+      Hint := Format('Addr: 0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
+      Exit;
+    end;
+
+    Hint := 'External hint...';
+    Param.HintInfo.HintWindowClass := TExtendedHintWindow;
+    FExtendedHintData.AddressType := AddressType;
+    FExtendedHintData.AddrVA := Param.AddrVA;
+    FExtendedHintData.Core := Self;
+    Param.HintInfo.HintData := @FExtendedHintData;
   end;
 end;
 
@@ -998,10 +1181,6 @@ function TCpuViewCore.QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem
 var
   AddrPtr: Int64;
   AddrPtrItem: TAddrCacheItem;
-  Buff: array of Byte;
-  List: TList<TInstruction>;
-  AsmLine: TAsmLine;
-  I: Integer;
   LockStackChains: Boolean;
 begin
   AItem := Default(TAddrCacheItem);
@@ -1040,28 +1219,44 @@ begin
       end;
     end;
 
-    if raExecute in AItem.Region.Access then
-    begin
-      // 10 instructions of maximum size (15)
-      SetLength(Buff, 150);
-      if Debugger.ReadMemory(AddrVA, Buff[0], 150) then
-      begin
-        List := Debugger.Disassembly(AddrVA, @Buff[0], 150, False);
-        try
-          for I := 0 to Min(9, List.Count - 1) do
-          begin
-            AsmLine := FormatInstructionToAsmLine(List[I]);
-            AItem.AsmLines := AItem.AsmLines + AsmLine.DecodedStr + sLineBreak;
-            AItem.HintLines := AItem.HintLines + AsmLine.HintStr + sLineBreak;
-          end;
-        finally
-          List.Free;
-        end;
-      end;
-    end;
-
   finally
     FSessionCache.AddOrSetValue(AddrVA, AItem);
+  end;
+end;
+
+function TCpuViewCore.QueryDisasmAtAddr(AddrVA: Int64;
+  out AItem: TAddrCacheItem): Boolean;
+const
+  BuffSize = 150; // 10 instructions of maximum size (15)
+var
+  Buff: array of Byte;
+  List: TList<TInstruction>;
+  AsmLine: TAsmLine;
+  I: Integer;
+begin
+  AItem := Default(TAddrCacheItem);
+  Result := QueryCacheItem(AddrVA, AItem) and (raExecute in AItem.Region.Access);
+  if not Result then Exit;
+  if not AItem.ExtendedDataPresent then
+  begin
+    SetLength(Buff, BuffSize);
+    if Debugger.ReadMemory(AddrVA, Buff[0], BuffSize) then
+    begin
+      List := Debugger.Disassembly(AddrVA, @Buff[0], BuffSize, False);
+      try
+        for I := 0 to Min(9, List.Count - 1) do
+        begin
+          AsmLine := FormatInstructionToAsmLine(List[I]);
+          AItem.AsmLines := AItem.AsmLines + AsmLine.DecodedStr + sLineBreak;
+          AItem.HintLines := AItem.HintLines + AsmLine.HintStr + sLineBreak;
+          if AsmLine.DecodedStr = 'RET' then Break;
+        end;
+      finally
+        List.Free;
+      end;
+      AItem.ExtendedDataPresent := True;
+      FSessionCache.AddOrSetValue(AddrVA, AItem);
+    end;
   end;
 end;
 
