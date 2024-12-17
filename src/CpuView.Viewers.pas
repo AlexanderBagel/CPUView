@@ -230,6 +230,7 @@ type
     property CurrentIPIsActiveJmp: Boolean read FCurrentIPIsActiveJmp write SetCurrentIPIsActiveJmp;
     property InstructionPoint: Int64 read FInstructionPoint write SetInstructionPoint;
     property HighlightReg: string read FHighlightReg write SetHighlightReg;
+    property Tokenizer: TAsmTokenizer read FTokenizer;
   protected
     property ColorMap: TAsmColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property OnCacheEnd: TNotifyEvent read FCacheEnd write FCacheEnd;

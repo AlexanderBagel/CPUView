@@ -52,9 +52,11 @@ uses
   Generics.Collections,
   Menus,
   Forms,
+  Graphics,
   FWHexView.Common,
   FWHexView,
   FWHexView.MappedView,
+  FWHexView.AsmTokenizer,
   CpuView.Common,
   CpuView.Viewers,
   CpuView.Stream,
@@ -90,7 +92,9 @@ type
     InDeepSymbol: Boolean; // Flag means that the character for the address was calculated by recursive analysis
     ExtendedDataPresent: Boolean;
     AsmLines, HintLines: string;
-    PointerValue: array [0..9] of Byte;
+    case Integer of
+      0: (PointerValue: array [0..9] of Byte);
+      1: (Linked: array [0..9] of Boolean);
   end;
 
   TCpuViewCore = class;
@@ -132,11 +136,23 @@ type
     property OnUpdated: TOnCacheUpdated read FOnUpdated write SetOnUpdated;
   end;
 
+  TFormatAccessString = function(const ARegionData: TRegionData): string of object;
+  TQueryDisasmAtAddr = function(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean of object;
+  TQueryPointerValueAtAddr =  function(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean of object;
+
   PExtendedHintData = ^TExtendedHintData;
   TExtendedHintData = record
     AddressType: TAddrType;
     AddrVA: Int64;
-    Core: TCpuViewCore;
+    BorderWidth: Integer;
+    CharWidth: Integer;
+    ColorMap: TAsmColorMap;
+    Font: TFont;
+    FormatAccessString: TFormatAccessString;
+    QueryDisasmAtAddr: TQueryDisasmAtAddr;
+    QueryPointerValueAtAddr: TQueryPointerValueAtAddr;
+    RowHeight: Integer;
+    Tokenizer: TAsmTokenizer;
   end;
 
   {$IFDEF FPC}
@@ -154,11 +170,12 @@ type
     FAddrItem: TAddrCacheItem;
     FAddrStr: string;
     FAsm, FHints: TStringList;
+    FData: TExtendedHintData;
     FLastLine: string;
     FExtendedRect: TRect;
-    FBorder, FTextHeight, FTextMargine: Integer;
-    function CalculateExecute(MaxWidth: Integer; pData: PExtendedHintData): TRect;
-    function CalculatePointerValue(MaxWidth: Integer; pData: PExtendedHintData): TRect;
+    FTextHeight, FMaxLine, FMaxHint: Integer;
+    function CalculateExecute(MaxWidth: Integer): TRect;
+    function CalculatePointerValue(MaxWidth: Integer): TRect;
   protected
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure Paint; override;
@@ -470,24 +487,27 @@ end;
 function TExtendedHintWindow.CalcHintRect(MaxWidth: Integer;
   const AHint: string; AData: TCustomData): TRect;
 var
-  pData: PExtendedHintData;
+  Mon: TMonitor;
 begin
   if Screen.ActiveCustomForm <> nil then
   begin
+    Mon := Screen.MonitorFromPoint(Point(Left, Top)); // don't use Monitor property - it returns wrong monitor for invisible windows.
+    if Mon = nil then
+      Mon := Screen.Monitors[0];
+    if Assigned(Mon) then
+      Canvas.Font.PixelsPerInch := Mon.PixelsPerInch;
     Canvas.Font := Screen.HintFont;
     {$IFNDEF FPC}
     Canvas.Font.Height := Muldiv(Canvas.Font.Height, Screen.ActiveCustomForm.CurrentPPI, Screen.PixelsPerInch);
     {$ENDIF}
   end;
 
-  pData := PExtendedHintData(AData);
-  FBorder := pData.Core.AsmView.SplitMargin;
+  FData := PExtendedHintData(AData)^;
   FTextHeight := Canvas.TextHeight('J');
-  FTextMargine := pData.Core.AsmView.TextMargin;
 
-  case pData.AddressType of
-    atExecute: pData.Core.QueryDisasmAtAddr(pData.AddrVA, FAddrItem);
-    atRead: pData.Core.QueryPointerValueAtAddr(pData.AddrVA, FAddrItem);
+  case FData.AddressType of
+    atExecute: FData.QueryDisasmAtAddr(FData.AddrVA, FAddrItem);
+    atRead: FData.QueryPointerValueAtAddr(FData.AddrVA, FAddrItem);
   else
     Result := inherited;
     Exit;
@@ -499,20 +519,20 @@ begin
   else
     FLastLine := '';
   FAddrStr := Format('Addr: 0x%x (%s)',
-    [pData.AddrVA, pData.Core.FormatAccessString(FAddrItem.Region)]);
+    [FData.AddrVA, FData.FormatAccessString(FAddrItem.Region)]);
 
-  case pData.AddressType of
-    atExecute: Result := CalculateExecute(MaxWidth, PExtendedHintData(AData));
-    atRead: Result := CalculatePointerValue(MaxWidth, PExtendedHintData(AData));
+  case FData.AddressType of
+    atExecute: Result := CalculateExecute(MaxWidth);
+    atRead: Result := CalculatePointerValue(MaxWidth);
   end;
 end;
 
-function TExtendedHintWindow.CalculateExecute(MaxWidth: Integer;
-  pData: PExtendedHintData): TRect;
+function TExtendedHintWindow.CalculateExecute(MaxWidth: Integer): TRect;
 var
   TmpHint: string;
-  TopCount: Integer;
+  I, TopCount: Integer;
 begin
+  // basic calculate
   TmpHint := FAddrStr;
   TopCount := 1;
   if FAddrItem.Symbol <> '' then
@@ -522,13 +542,45 @@ begin
   end;
   if FLastLine <> '' then
     TmpHint := TmpHint + sLineBreak + FLastLine;
+
   Result := inherited CalcHintRect(MaxWidth, TmpHint, nil); // for font setup
-  FExtendedRect := Bounds(0, NcBorderWidth + TopCount * FTextHeight, 0, 0);
-  if not FAddrItem.ExtendedDataPresent then Exit;
+
+  if not FAddrItem.ExtendedDataPresent then
+  begin
+    FExtendedRect := Bounds(0, NcBorderWidth + TopCount * FData.RowHeight, 0, 0);
+    Exit;
+  end;
+
+  // ExtendedRect calculate
+  FAsm.Text := FAddrItem.AsmLines;
+  FHints.Text := FAddrItem.HintLines;
+  FMaxLine := 0;
+  FMaxHint := 0;
+  for I := 0 to FAsm.Count - 1 do
+  begin
+    FMaxLine := Max(FMaxLine, Length(FAsm[I]));
+    FMaxHint := Max(FMaxHint, Length(FHints[I]));
+  end;
+
+  FExtendedRect := Bounds(
+    NcBorderWidth,
+    NcBorderWidth shl 1 + TopCount * FData.RowHeight,
+    FData.BorderWidth shl 1 + (FMaxLine + FMaxHint) * FData.CharWidth,
+    FData.BorderWidth shl 1 + FAsm.Count * FData.RowHeight);
+
+  if FMaxHint > 0 then
+    Inc(FExtendedRect.Right, FData.CharWidth);
+
+  Result := Rect(0, 0,
+    Max(Result.Width, FExtendedRect.Right + NcBorderWidth),
+    FExtendedRect.Bottom + NcBorderWidth);
+  FExtendedRect.Right := Result.Right - NcBorderWidth;
+
+  if FLastLine <> '' then
+    Inc(Result.Bottom, FTextHeight);
 end;
 
-function TExtendedHintWindow.CalculatePointerValue(MaxWidth: Integer;
-  pData: PExtendedHintData): TRect;
+function TExtendedHintWindow.CalculatePointerValue(MaxWidth: Integer): TRect;
 begin
   Result := ClientRect.Empty;
 end;
@@ -555,11 +607,18 @@ end;
 procedure TExtendedHintWindow.Paint;
 var
   R: TRect;
+  I, nTokenLength, nTokenSize, nSize, nLength: Integer;
+  Line: string;
+  pData: PChar;
+  Dx: array of Integer;
+  SavedFont: TFont;
+  DrawLinkStep: Byte;
 begin
   // Fill default background without text
   Caption := '';
   inherited;
 
+  Canvas.Brush.Style := bsClear;
   R := Bounds(NcBorderWidth, NcBorderWidth, ClientWidth - NcBorderWidth shl 1, FTextHeight);
   DrawText(Canvas, FAddrStr, -1, R, DT_LEFT or DT_NOPREFIX or DT_SINGLELINE);
   OffsetRect(R, 0, FTextHeight);
@@ -576,6 +635,99 @@ begin
     DrawText(Canvas, FLastLine, -1, R, DT_LEFT or DT_NOPREFIX or DT_SINGLELINE);
     OffsetRect(R, 0, FTextHeight);
   end;
+
+  if FExtendedRect.IsEmpty then Exit;
+
+  SavedFont := TFont.Create;
+  try
+    SavedFont.Assign(Canvas.Font);
+    Canvas.Font := FData.Font;
+    Canvas.Pen.Color := clWindowFrame;
+    Canvas.Brush.Color := FData.ColorMap.BackgroundColor;
+    Canvas.Brush.Style := bsSolid;
+    Canvas.Rectangle(FExtendedRect);
+    if FMaxHint > 0 then
+    begin
+      Canvas.Brush.Color := FData.ColorMap.HeaderColumnSeparatorColor;
+      PatBlt(Canvas, FExtendedRect.Left + FData.BorderWidth +
+        FMaxLine * FData.CharWidth + FData.CharWidth shr 1,
+        FExtendedRect.Top + 1, 1, FExtendedRect.Height - 2, PATCOPY);
+    end;
+    Canvas.Brush.Style := bsClear;
+
+    SetLength(Dx, Max(FMaxLine, FMaxHint));
+    for I := 0 to Length(Dx) - 1 do
+      Dx[I] := FData.CharWidth;
+
+    for I := 0 to FAsm.Count - 1 do
+    begin
+      Line := FAsm[I];
+      pData := PChar(@Line[1]);
+      nSize := Length(Line);
+      nLength := UTF8StringLength(Line);
+      R := Bounds(
+        FExtendedRect.Left + FData.BorderWidth,
+        FExtendedRect.Top + FData.BorderWidth + I * FData.RowHeight,
+        FMaxLine * FData.CharWidth, FData.RowHeight);
+      DrawLinkStep := 0;
+      while nSize > 0 do
+      begin
+        nTokenLength := nLength;
+        if DrawLinkStep = 1 then
+          Inc(DrawLinkStep)
+        else
+        begin
+          Canvas.Font.Style := [];
+          case FData.Tokenizer.GetToken(pData, nTokenLength) of
+            ttNumber: Canvas.Font.Color := FData.ColorMap.NumberColor;
+            ttInstruction: Canvas.Font.Color := FData.ColorMap.InstructionColor;
+            ttSize: Canvas.Font.Color := FData.ColorMap.SizePfxColor;
+            ttReg: Canvas.Font.Color := FData.ColorMap.RegColor;
+            ttPrefix: Canvas.Font.Color := FData.ColorMap.PrefixColor;
+            ttJmp:
+            begin
+              Canvas.Font.Color := FData.ColorMap.JmpColor;
+              if FAddrItem.Linked[I] then
+                Inc(DrawLinkStep);
+            end;
+            ttKernel: Canvas.Font.Color := FData.ColorMap.KernelColor;
+            ttNop: Canvas.Font.Color := FData.ColorMap.NopColor;
+          end;
+        end;
+        if nTokenLength > nLength then
+          nTokenLength := nLength;
+        nTokenSize := UTF8ByteCount(pData, nTokenLength);
+        if DrawLinkStep = 2 then
+        begin
+          // for a brighter color, first render with a normal color,
+          // then the alpha blending areas will be clearer
+          Canvas.Font.Color := FData.ColorMap.JmpMarkTextColor;
+          Canvas.Font.Style := [TFontStyle.fsUnderline];
+          ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, pData,
+            {$IFDEF LINUX}nTokenSize{$ELSE}nTokenLength{$ENDIF}, @Dx[0]);
+        end;
+        ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, pData,
+          {$IFDEF LINUX}nTokenSize{$ELSE}nTokenLength{$ENDIF}, @Dx[0]);
+        Inc(pData, nTokenSize);
+        Dec(nSize, nTokenSize);
+        Dec(nLength, nTokenLength);
+        Inc(R.Left, nTokenLength * FData.CharWidth);
+      end;
+      Line := FHints[I];
+      if Line = '' then Continue;
+      R.Left := FExtendedRect.Left + FData.BorderWidth +
+        (FMaxLine + 1) * FData.CharWidth;
+      R.Width := FMaxHint * FData.CharWidth;
+      Canvas.Font.Color := FData.ColorMap.TextCommentColor;
+      Canvas.Font.Style := [];
+      ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, @Line[1],
+        {$IFDEF LINUX}Length(Line){$ELSE}UTF8StringLength(Line){$ENDIF}, @Dx[0]);
+    end;
+    Canvas.Font.Assign(SavedFont);
+  finally
+    SavedFont.Free;
+  end;
+
 end;
 
 { TCpuViewCore }
@@ -1100,7 +1252,7 @@ var
   AddressType: TAddrType;
   AccessStr, Symbol: string;
 begin
-  if Param.AddrVA <> 0 then
+  if (Param.AddrVA <> 0) and Assigned(AsmView) then
   begin
     AddressType := QueryAddressType(Param.AddrVA);
     if AddressType = atNone then Exit;
@@ -1117,7 +1269,15 @@ begin
     Param.HintInfo.HintWindowClass := TExtendedHintWindow;
     FExtendedHintData.AddressType := AddressType;
     FExtendedHintData.AddrVA := Param.AddrVA;
-    FExtendedHintData.Core := Self;
+    FExtendedHintData.BorderWidth := AsmView.SplitMargin;
+    FExtendedHintData.CharWidth := AsmView.CharWidth;
+    FExtendedHintData.ColorMap := AsmView.ColorMap;
+    FExtendedHintData.Font := AsmView.Font;
+    FExtendedHintData.FormatAccessString := FormatAccessString;
+    FExtendedHintData.QueryDisasmAtAddr := QueryDisasmAtAddr;
+    FExtendedHintData.QueryPointerValueAtAddr := QueryPointerValueAtAddr;
+    FExtendedHintData.RowHeight := AsmView.RowHeight;
+    FExtendedHintData.Tokenizer := AsmView.Tokenizer;
     Param.HintInfo.HintData := @FExtendedHintData;
   end;
 end;
@@ -1249,7 +1409,8 @@ begin
           AsmLine := FormatInstructionToAsmLine(List[I]);
           AItem.AsmLines := AItem.AsmLines + AsmLine.DecodedStr + sLineBreak;
           AItem.HintLines := AItem.HintLines + AsmLine.HintStr + sLineBreak;
-          if AsmLine.DecodedStr = 'RET' then Break;
+          AItem.Linked[I] := AsmLine.JmpTo <> 0;
+          if Trim(AsmLine.DecodedStr) = 'RET' then Break;
         end;
       finally
         List.Free;
