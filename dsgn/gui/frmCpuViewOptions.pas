@@ -55,7 +55,6 @@ type
     cbDbgCrash: TCheckBox;
     cbAddrValidation: TCheckBox;
     cbForceFindSymbols: TCheckBox;
-    cbStackChains: TCheckBox;
     cbDasmPreview: TCheckBox;
     FontDialog: TFontDialog;
     gbPerformance: TGroupBox;
@@ -377,7 +376,6 @@ end;
 procedure TCpuViewMainOptionsFrame.UpdateDebugSymbolsIndepended;
 begin
   cbForceFindSymbols.Enabled := cbSymbols.Checked;
-  cbStackChains.Enabled := cbSymbols.Checked;
 end;
 
 procedure TCpuViewMainOptionsFrame.UpdateFrameControl;
@@ -389,8 +387,7 @@ begin
   cbViewers.Checked := Settings.SaveViewersSession;
   cbDbgLog.Checked := Settings.UseDebugLog;
   cbDbgCrash.Checked := Settings.UseCrashDump;
-  cbForceFindSymbols.Checked := Settings.InDeepDbgInfo;
-  cbStackChains.Checked := Settings.StackChains;
+  cbForceFindSymbols.Checked := Settings.ForceFindSymbols;
   cbDasmPreview.Checked := Settings.DisassemblyInHint;
   FillImageList;
   FillSettingsView;
@@ -414,8 +411,7 @@ begin
   Settings.SaveViewersSession := cbViewers.Checked;
   Settings.UseDebugLog := cbDbgLog.Checked;
   Settings.UseCrashDump := cbDbgCrash.Checked;
-  Settings.InDeepDbgInfo := cbForceFindSymbols.Checked;
-  Settings.StackChains := cbStackChains.Checked;
+  Settings.ForceFindSymbols := cbForceFindSymbols.Checked;
   Settings.DisassemblyInHint := cbDasmPreview.Checked;
   Enum := tvSettings.Nodes.GetEnumerator;
   while Enum.MoveNext do

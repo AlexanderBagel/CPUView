@@ -89,7 +89,7 @@ type
   TAddrCacheItem = record
     Region: TRegionData;
     Symbol: string;
-    InDeepSymbol: Boolean; // Flag means that the character for the address was calculated by recursive analysis
+    InDeepSymbol: string;
     ExtendedDataPresent: Boolean;
     AsmLines, HintLines: string;
     case Integer of
@@ -176,6 +176,7 @@ type
     FTextHeight, FMaxLine, FMaxHint: Integer;
     function CalculateExecute(MaxWidth: Integer): TRect;
     function CalculatePointerValue(MaxWidth: Integer): TRect;
+    procedure DrawExecuteExtendedRect;
   protected
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure Paint; override;
@@ -202,7 +203,7 @@ type
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
     FExtendedHintData: TExtendedHintData;
-    FInDeepDbgInfo: Boolean;
+    FForceFindSymbols: Boolean;
     FInvalidReg: TRegionData;
     FLastStackLimit: TStackLimit;
     FLockSelChange: Boolean;
@@ -211,7 +212,6 @@ type
     FRegView: TRegView;
     FSessionCache: TDictionary<Int64, TAddrCacheItem>;
     FShowCallFuncName: Boolean;
-    FStackChains: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
     FThreadChange: Boolean;
@@ -244,7 +244,8 @@ type
     procedure OnRegQueryExternalComment(Sender: TObject;
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure OnThreadChange(Sender: TObject);
-    function QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
+    function QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem;
+      InDeepCall: Boolean = False): Boolean;
     function QueryDisasmAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     function QueryPointerValueAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     procedure SetAsmView(const Value: TAsmView);
@@ -302,8 +303,7 @@ type
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
     property ShowCallFuncName: Boolean read FShowCallFuncName write FShowCallFuncName;
-    property UseInDeepDbgInfo: Boolean read FInDeepDbgInfo write FInDeepDbgInfo;
-    property UseStackChains: Boolean read FStackChains write FStackChains;
+    property ForceFindSymbols: Boolean read FForceFindSymbols write FForceFindSymbols;
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
 
@@ -486,16 +486,20 @@ end;
 
 function TExtendedHintWindow.CalcHintRect(MaxWidth: Integer;
   const AHint: string; AData: TCustomData): TRect;
+{$IFDEF FPC}
 var
   Mon: TMonitor;
+{$ENDIF}
 begin
   if Screen.ActiveCustomForm <> nil then
   begin
-    Mon := Screen.MonitorFromPoint(Point(Left, Top)); // don't use Monitor property - it returns wrong monitor for invisible windows.
+    {$IFDEF FPC}
+    Mon := Screen.MonitorFromPoint(Point(Left, Top));
     if Mon = nil then
       Mon := Screen.Monitors[0];
     if Assigned(Mon) then
       Canvas.Font.PixelsPerInch := Mon.PixelsPerInch;
+    {$ENDIF}
     Canvas.Font := Screen.HintFont;
     {$IFNDEF FPC}
     Canvas.Font.Height := Muldiv(Canvas.Font.Height, Screen.ActiveCustomForm.CurrentPPI, Screen.PixelsPerInch);
@@ -528,6 +532,8 @@ begin
 end;
 
 function TExtendedHintWindow.CalculateExecute(MaxWidth: Integer): TRect;
+const
+  CorrectRectWidth = NcBorderWidth {$IFNDEF FPC} shl 1{$ENDIF};
 var
   TmpHint: string;
   I, TopCount: Integer;
@@ -572,9 +578,9 @@ begin
     Inc(FExtendedRect.Right, FData.CharWidth);
 
   Result := Rect(0, 0,
-    Max(Result.Width, FExtendedRect.Right + NcBorderWidth),
-    FExtendedRect.Bottom + NcBorderWidth);
-  FExtendedRect.Right := Result.Right - NcBorderWidth;
+    Max(Result.Width, FExtendedRect.Right + CorrectRectWidth),
+    FExtendedRect.Bottom {$IFDEF FPC} + NcBorderWidth {$ENDIF});
+  FExtendedRect.Right := Result.Right - CorrectRectWidth;
 
   if FLastLine <> '' then
     Inc(Result.Bottom, FTextHeight);
@@ -604,15 +610,91 @@ begin
   inherited;
 end;
 
-procedure TExtendedHintWindow.Paint;
+procedure TExtendedHintWindow.DrawExecuteExtendedRect;
 var
   R: TRect;
   I, nTokenLength, nTokenSize, nSize, nLength: Integer;
   Line: string;
   pData: PChar;
   Dx: array of Integer;
-  SavedFont: TFont;
   DrawLinkStep: Byte;
+begin
+  SetLength(Dx, Max(FMaxLine, FMaxHint));
+  for I := 0 to Length(Dx) - 1 do
+    Dx[I] := FData.CharWidth;
+
+  for I := 0 to FAsm.Count - 1 do
+  begin
+    Line := FAsm[I];
+    pData := PChar(@Line[1]);
+    nSize := Length(Line);
+    nLength := UTF8StringLength(Line);
+    R := Bounds(
+      FExtendedRect.Left + FData.BorderWidth,
+      FExtendedRect.Top + FData.BorderWidth + I * FData.RowHeight,
+      FMaxLine * FData.CharWidth, FData.RowHeight);
+    DrawLinkStep := 0;
+    while nSize > 0 do
+    begin
+      nTokenLength := nLength;
+      if DrawLinkStep = 1 then
+        Inc(DrawLinkStep)
+      else
+      begin
+        Canvas.Font.Style := [];
+        case FData.Tokenizer.GetToken(pData, nTokenLength) of
+          ttNumber: Canvas.Font.Color := FData.ColorMap.NumberColor;
+          ttInstruction: Canvas.Font.Color := FData.ColorMap.InstructionColor;
+          ttSize: Canvas.Font.Color := FData.ColorMap.SizePfxColor;
+          ttReg: Canvas.Font.Color := FData.ColorMap.RegColor;
+          ttPrefix: Canvas.Font.Color := FData.ColorMap.PrefixColor;
+          ttJmp:
+          begin
+            Canvas.Font.Color := FData.ColorMap.JmpColor;
+            if FAddrItem.Linked[I] then
+              Inc(DrawLinkStep);
+          end;
+          ttKernel: Canvas.Font.Color := FData.ColorMap.KernelColor;
+          ttNop: Canvas.Font.Color := FData.ColorMap.NopColor;
+        else
+          Canvas.Font.Color := FData.ColorMap.TextColor;
+        end;
+      end;
+      if nTokenLength > nLength then
+        nTokenLength := nLength;
+      nTokenSize := UTF8ByteCount(pData, nTokenLength);
+      if DrawLinkStep = 2 then
+      begin
+        // for a brighter color, first render with a normal color,
+        // then the alpha blending areas will be clearer
+        Canvas.Font.Color := FData.ColorMap.JmpMarkTextColor;
+        Canvas.Font.Style := [TFontStyle.fsUnderline];
+        ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, pData,
+          {$IFDEF LINUX}nTokenSize{$ELSE}nTokenLength{$ENDIF}, @Dx[0]);
+      end;
+      ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, pData,
+        {$IFDEF LINUX}nTokenSize{$ELSE}nTokenLength{$ENDIF}, @Dx[0]);
+      Inc(pData, nTokenSize);
+      Dec(nSize, nTokenSize);
+      Dec(nLength, nTokenLength);
+      Inc(R.Left, nTokenLength * FData.CharWidth);
+    end;
+    Line := FHints[I];
+    if Line = '' then Continue;
+    R.Left := FExtendedRect.Left + FData.BorderWidth +
+      (FMaxLine + 1) * FData.CharWidth;
+    R.Width := FMaxHint * FData.CharWidth;
+    Canvas.Font.Color := FData.ColorMap.TextCommentColor;
+    Canvas.Font.Style := [];
+    ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, @Line[1],
+      {$IFDEF LINUX}Length(Line){$ELSE}UTF8StringLength(Line){$ENDIF}, @Dx[0]);
+  end;
+end;
+
+procedure TExtendedHintWindow.Paint;
+var
+  R: TRect;
+  SavedFont: TFont;
 begin
   // Fill default background without text
   Caption := '';
@@ -655,74 +737,11 @@ begin
     end;
     Canvas.Brush.Style := bsClear;
 
-    SetLength(Dx, Max(FMaxLine, FMaxHint));
-    for I := 0 to Length(Dx) - 1 do
-      Dx[I] := FData.CharWidth;
-
-    for I := 0 to FAsm.Count - 1 do
-    begin
-      Line := FAsm[I];
-      pData := PChar(@Line[1]);
-      nSize := Length(Line);
-      nLength := UTF8StringLength(Line);
-      R := Bounds(
-        FExtendedRect.Left + FData.BorderWidth,
-        FExtendedRect.Top + FData.BorderWidth + I * FData.RowHeight,
-        FMaxLine * FData.CharWidth, FData.RowHeight);
-      DrawLinkStep := 0;
-      while nSize > 0 do
-      begin
-        nTokenLength := nLength;
-        if DrawLinkStep = 1 then
-          Inc(DrawLinkStep)
-        else
-        begin
-          Canvas.Font.Style := [];
-          case FData.Tokenizer.GetToken(pData, nTokenLength) of
-            ttNumber: Canvas.Font.Color := FData.ColorMap.NumberColor;
-            ttInstruction: Canvas.Font.Color := FData.ColorMap.InstructionColor;
-            ttSize: Canvas.Font.Color := FData.ColorMap.SizePfxColor;
-            ttReg: Canvas.Font.Color := FData.ColorMap.RegColor;
-            ttPrefix: Canvas.Font.Color := FData.ColorMap.PrefixColor;
-            ttJmp:
-            begin
-              Canvas.Font.Color := FData.ColorMap.JmpColor;
-              if FAddrItem.Linked[I] then
-                Inc(DrawLinkStep);
-            end;
-            ttKernel: Canvas.Font.Color := FData.ColorMap.KernelColor;
-            ttNop: Canvas.Font.Color := FData.ColorMap.NopColor;
-          end;
-        end;
-        if nTokenLength > nLength then
-          nTokenLength := nLength;
-        nTokenSize := UTF8ByteCount(pData, nTokenLength);
-        if DrawLinkStep = 2 then
-        begin
-          // for a brighter color, first render with a normal color,
-          // then the alpha blending areas will be clearer
-          Canvas.Font.Color := FData.ColorMap.JmpMarkTextColor;
-          Canvas.Font.Style := [TFontStyle.fsUnderline];
-          ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, pData,
-            {$IFDEF LINUX}nTokenSize{$ELSE}nTokenLength{$ENDIF}, @Dx[0]);
-        end;
-        ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, pData,
-          {$IFDEF LINUX}nTokenSize{$ELSE}nTokenLength{$ENDIF}, @Dx[0]);
-        Inc(pData, nTokenSize);
-        Dec(nSize, nTokenSize);
-        Dec(nLength, nTokenLength);
-        Inc(R.Left, nTokenLength * FData.CharWidth);
-      end;
-      Line := FHints[I];
-      if Line = '' then Continue;
-      R.Left := FExtendedRect.Left + FData.BorderWidth +
-        (FMaxLine + 1) * FData.CharWidth;
-      R.Width := FMaxHint * FData.CharWidth;
-      Canvas.Font.Color := FData.ColorMap.TextCommentColor;
-      Canvas.Font.Style := [];
-      ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, @Line[1],
-        {$IFDEF LINUX}Length(Line){$ELSE}UTF8StringLength(Line){$ENDIF}, @Dx[0]);
+    case FData.AddressType of
+      atExecute: DrawExecuteExtendedRect;
+      atRead: ;
     end;
+
     Canvas.Font.Assign(SavedFont);
   finally
     SavedFont.Free;
@@ -799,8 +818,8 @@ var
 begin
   if QueryCacheItem(AddrVA, CacheItem) then
   begin
-    if CacheItem.InDeepSymbol and not IncludeInDeepSymbol then
-      Result := ''
+    if IncludeInDeepSymbol then
+      Result := CacheItem.InDeepSymbol
     else
       Result := CacheItem.Symbol;
   end
@@ -1336,12 +1355,11 @@ begin
   FThreadChange := True;
 end;
 
-function TCpuViewCore.QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem
-  ): Boolean;
+function TCpuViewCore.QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem;
+  InDeepCall: Boolean): Boolean;
 var
   AddrPtr: Int64;
   AddrPtrItem: TAddrCacheItem;
-  LockStackChains: Boolean;
 begin
   AItem := Default(TAddrCacheItem);
   Result := FSessionCache.TryGetValue(AddrVA, AItem);
@@ -1350,31 +1368,32 @@ begin
     Result := FUtils.QueryRegion(AddrVA, AItem.Region);
 
     // Blocking of possible recursion
-    if UseInDeepDbgInfo then
+    if ForceFindSymbols then
       FSessionCache.Add(AddrVA, AItem);
 
     if not Result then Exit;
+
     if raRead in AItem.Region.Access then
     begin
       AItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
-      if (AItem.Symbol = '') and not (raExecute in AItem.Region.Access) then
+      AItem.InDeepSymbol := AItem.Symbol;
+
+      // Lock in-deep search
+      if InDeepCall and not ForceFindSymbols then Exit;
+
+      // The task of deep search is to find executable code
+      if not (raExecute in AItem.Region.Access) then
       begin
         AddrPtr := 0;
         if Debugger.ReadMemory(AddrVA, AddrPtr, Debugger.PointerSize) then
         begin
-          // Lock stack chains
-          LockStackChains := AddrInStack(AddrVA) and not UseStackChains;
-          // Lock in-deep search
-          if UseInDeepDbgInfo and not LockStackChains then
+          AddrPtrItem := Default(TAddrCacheItem);
+          if ForceFindSymbols then
             QueryCacheItem(AddrPtr, AddrPtrItem)
           else
-            AddrPtrItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
-
-          if AddrPtrItem.Symbol <> '' then
-            AItem.Symbol := Format('[0x%x] -> %s', [AddrPtr, AddrPtrItem.Symbol])
-          else
-            AItem.Symbol := Format('[0x%x]', [AddrPtr]);
-          AItem.InDeepSymbol := True;
+            AddrPtrItem.InDeepSymbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
+          if AddrPtrItem.InDeepSymbol <> '' then
+            AItem.InDeepSymbol := Trim(Format('%s [0x%x] -> %s', [AItem.Symbol, AddrPtr, AddrPtrItem.InDeepSymbol]));
         end;
       end;
     end;

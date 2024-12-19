@@ -35,12 +35,12 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbPerformance: TGroupBox[3]
     Left = 10
-    Height = 200
+    Height = 168
     Top = 56
     Width = 702
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Performance settings:'
-    ClientHeight = 170
+    ClientHeight = 138
     ClientWidth = 698
     TabOrder = 2
     object cbSymbols: TCheckBox
@@ -61,29 +61,21 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 1
       OnClick = cbSymbolsClick
     end
-    object cbStackChains: TCheckBox
-      Left = 32
-      Height = 29
-      Top = 72
-      Width = 244
-      Caption = 'Collect stack address chains'
-      TabOrder = 2
-    end
     object cbDasmPreview: TCheckBox
       Left = 10
       Height = 29
-      Top = 104
+      Top = 72
       Width = 252
       Caption = 'Disassembly preview in hints'
-      TabOrder = 3
+      TabOrder = 2
     end
     object cbAddrValidation: TCheckBox
       Left = 10
       Height = 29
-      Top = 136
+      Top = 104
       Width = 203
       Caption = 'Use address validation'
-      TabOrder = 4
+      TabOrder = 3
       OnClick = cbSymbolsClick
     end
   end
@@ -144,8 +136,8 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbViewersSetting: TGroupBox[8]
     Left = 10
-    Height = 240
-    Top = 264
+    Height = 280
+    Top = 224
     Width = 702
     Anchors = [akTop, akLeft, akRight, akBottom]
     Caption = 'Viewers customization:'

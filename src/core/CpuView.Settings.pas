@@ -168,8 +168,7 @@ const
   xmlValidation = 'useValidation';
   xmlHint = 'hint';
   xmlHintFlag = 'hintFlag';
-  xmlInDeepDbgInfo = 'useInDeepDbgInfo';
-  xmlStackChains = 'useStackChains';
+  xmlForceFindSymbols = 'useForceFindSymbols';
   xmlDisassemblyInHint = 'useDasmInHint';
 
   // not used
@@ -245,14 +244,13 @@ type
     FCpuViewDlgSettings: TCpuViewDlgSettings;
     FDisassemblyInHint: Boolean;
     FDumpSettings: TDumpSettings;
-    FInDeepDbgInfo: Boolean;
+    FForceFindSymbols: Boolean;
     FFontName: string;
     FSaveFormSession: Boolean;
     FSaveViewersSession: Boolean;
     FShotCutMode: TShortCutMode;
     FShortCuts: array [TShortCutType] of TCpuViewShortCut;
     FStackSettings: TStackSettings;
-    FStackChains: Boolean;
     FRegSettings: TContextAbstractSettings;
     FUseDebugInfo: Boolean;
     FUseDebugLog: Boolean;
@@ -344,7 +342,7 @@ type
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
     property DisassemblyInHint: Boolean read FDisassemblyInHint write FDisassemblyInHint;
-    property InDeepDbgInfo: Boolean read FInDeepDbgInfo write FInDeepDbgInfo;
+    property ForceFindSymbols: Boolean read FForceFindSymbols write FForceFindSymbols;
     property HintInAsm: Boolean read FAsmSettings.Hints write FAsmSettings.Hints;
     property HintInDump: Boolean read FDumpSettings.Hints write FDumpSettings.Hints;
     property HintInRegForReg: Boolean read GetHintInRegForReg write SetHintInRegForReg;
@@ -360,7 +358,6 @@ type
     property ShowJumps: Boolean read FAsmSettings.ShowJumps write FAsmSettings.ShowJumps;
     property ShowOpcodes: Boolean read FAsmSettings.ShowOpcodes write FAsmSettings.ShowOpcodes;
     property ShowSourceLines: Boolean read FAsmSettings.ShowSourceLines write FAsmSettings.ShowSourceLines;
-    property StackChains: Boolean read FStackChains write FStackChains;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
@@ -689,8 +686,7 @@ begin
   FUseDebugLog := True;
   FUseCrashDump := True;
   FUseAddrValidation := True;
-  FInDeepDbgInfo := True;
-  FStackChains := True;
+  FForceFindSymbols := True;
   FDisassemblyInHint := True;
 end;
 
@@ -831,8 +827,7 @@ begin
   FUseAddrValidation := GetNodeAttr(Root, xmlValidation);
   FUseDebugLog := GetNodeAttr(Root, xmlDbgLog);
   FUseCrashDump := GetNodeAttr(Root, xmlDbgDump);
-  FInDeepDbgInfo := GetNodeAttr(Root, xmlInDeepDbgInfo);
-  FStackChains := GetNodeAttr(Root, xmlStackChains);
+  FForceFindSymbols := GetNodeAttr(Root, xmlForceFindSymbols);
   FDisassemblyInHint := GetNodeAttr(Root, xmlDisassemblyInHint);
   if FSaveFormSession then
   begin
@@ -1145,8 +1140,7 @@ begin
   SetNodeAttr(Root, xmlValidation, FUseAddrValidation);
   SetNodeAttr(Root, xmlDbgLog, FUseDebugLog);
   SetNodeAttr(Root, xmlDbgDump, FUseCrashDump);
-  SetNodeAttr(Root, xmlInDeepDbgInfo, FInDeepDbgInfo);
-  SetNodeAttr(Root, xmlStackChains, FStackChains);
+  SetNodeAttr(Root, xmlForceFindSymbols, FForceFindSymbols);
   SetNodeAttr(Root, xmlDisassemblyInHint, FDisassemblyInHint);
   if FSaveFormSession then
   begin
