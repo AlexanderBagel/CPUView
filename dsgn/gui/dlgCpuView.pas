@@ -851,6 +851,7 @@ begin
   NewDump.Align := alClient;
   NewDump.PopupMenu := pmDump;
   NewDump.OnSelectionChange := DumpViewSelectionChange;
+  Settings.SetSettingsToDumpView(NewDump);
   Core.DumpViewList.Add(NewDump);
   pcDumps.ActivePage := NewPage;
   Core.DumpViewList.ItemIndex := NewPage.PageIndex;
