@@ -90,6 +90,7 @@ type
     Region: TRegionData;
     Symbol: string;
     InDeepSymbol: string;
+    InDeepCount: Integer;
     ExtendedDataPresent: Boolean;
     AsmLines, HintLines: string;
     case Integer of
@@ -137,6 +138,7 @@ type
   end;
 
   TFormatAccessString = function(const ARegionData: TRegionData): string of object;
+  TQueryCacheItem = function(AddrVA: Int64; out AItem: TAddrCacheItem; InDeepCall: Boolean = False): Boolean of object;
   TQueryDisasmAtAddr = function(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean of object;
   TQueryPointerValueAtAddr =  function(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean of object;
 
@@ -145,10 +147,12 @@ type
     AddressType: TAddrType;
     AddrVA: Int64;
     BorderWidth: Integer;
+    ChainList: array of Int64;
     CharWidth: Integer;
     ColorMap: TAsmColorMap;
     Font: TFont;
     FormatAccessString: TFormatAccessString;
+    QueryCacheItem: TQueryCacheItem;
     QueryDisasmAtAddr: TQueryDisasmAtAddr;
     QueryPointerValueAtAddr: TQueryPointerValueAtAddr;
     RowHeight: Integer;
@@ -158,6 +162,8 @@ type
   {$IFDEF FPC}
   TCustomData = Pointer;
   {$ENDIF}
+
+  { TExtendedHintWindow }
 
   TExtendedHintWindow = class(THintWindow)
   private const
@@ -169,14 +175,19 @@ type
   private
     FAddrItem: TAddrCacheItem;
     FAddrStr: string;
+    FAddrChain: TList<Int64>;
     FAsm, FHints: TStringList;
     FData: TExtendedHintData;
     FLastLine: string;
     FExtendedRect: TRect;
     FTextHeight, FMaxLine, FMaxHint: Integer;
+    function CalculateAddrChain(MaxWidth: Integer): TRect;
     function CalculateExecute(MaxWidth: Integer): TRect;
     function CalculatePointerValue(MaxWidth: Integer): TRect;
+    procedure DrawAddrChain;
     procedure DrawExecuteExtendedRect;
+    procedure DrawReadMem;
+    function GetAddrString(AddrVA: Int64): string;
   protected
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure Paint; override;
@@ -253,6 +264,7 @@ type
     procedure SetStackView(const Value: TStackView);
     procedure SynhronizeViewersWithContext;
   protected
+    function AccessToAddrType(AddrVA: Int64; AAccess: TRegionAccessSet): TAddrType;
     procedure BuildAsmWindow(AAddress: Int64);
     function CacheVisibleRows: Integer;
     function FormatAccessString(const ARegionData: TRegionData): string;
@@ -513,8 +525,7 @@ begin
     atExecute: FData.QueryDisasmAtAddr(FData.AddrVA, FAddrItem);
     atRead: FData.QueryPointerValueAtAddr(FData.AddrVA, FAddrItem);
   else
-    Result := inherited;
-    Exit;
+    FData.QueryCacheItem(FData.AddrVA, FAddrItem);
   end;
 
   FHints.Text := AHint;
@@ -525,10 +536,37 @@ begin
   FAddrStr := Format('Addr: 0x%x (%s)',
     [FData.AddrVA, FData.FormatAccessString(FAddrItem.Region)]);
 
-  case FData.AddressType of
-    atExecute: Result := CalculateExecute(MaxWidth);
-    atRead: Result := CalculatePointerValue(MaxWidth);
+  if FData.AddressType = atExecute then
+    Result := CalculateExecute(MaxWidth)
+  else
+    if FAddrItem.InDeepCount > 0 then
+      Result := CalculateAddrChain(MaxWidth)
+    else
+      Result := CalculatePointerValue(MaxWidth);
+end;
+
+function TExtendedHintWindow.CalculateAddrChain(MaxWidth: Integer): TRect;
+var
+  TmpHint: string;
+  I: Integer;
+  AItem: TAddrCacheItem;
+begin
+  if FLastLine = '' then
+    TmpHint := ' '
+  else
+    TmpHint := FLastLine;
+  Result := inherited CalcHintRect(MaxWidth, ' ', nil); // for font setup
+  FHints.Clear;
+  MaxWidth := Canvas.TextWidth(GetAddrString(FData.AddrVA)) + FTextHeight;
+  if FLastLine <> '' then
+  begin
+    MaxWidth := Max(MaxWidth, Canvas.TextWidth(FLastLine));
+    Inc(Result.Bottom, FTextHeight);
   end;
+  for I := 0 to Length(FData.ChainList) - 1 do
+    MaxWidth := Max(MaxWidth, Canvas.TextWidth(GetAddrString(FData.ChainList[I])) + FTextHeight);
+  Inc(Result.Bottom, Length(FData.ChainList));
+  Inc(Result.Right, MaxWidth);
 end;
 
 function TExtendedHintWindow.CalculateExecute(MaxWidth: Integer): TRect;
@@ -591,6 +629,11 @@ begin
   Result := ClientRect.Empty;
 end;
 
+procedure TExtendedHintWindow.DrawAddrChain;
+begin
+
+end;
+
 procedure TExtendedHintWindow.CMTextChanged(var Message: TMessage);
 begin
   // lock ClientRect update
@@ -599,12 +642,14 @@ end;
 constructor TExtendedHintWindow.Create(AOwner: TComponent);
 begin
   inherited;
+  FAddrChain := TList<Int64>.Create;
   FAsm := TStringList.Create;
   FHints := TStringList.Create;
 end;
 
 destructor TExtendedHintWindow.Destroy;
 begin
+  FAddrChain.Free;;
   FAsm.Free;
   FHints.Free;
   inherited;
@@ -691,6 +736,22 @@ begin
   end;
 end;
 
+procedure TExtendedHintWindow.DrawReadMem;
+begin
+
+end;
+
+function TExtendedHintWindow.GetAddrString(AddrVA: Int64): string;
+var
+  AItem: TAddrCacheItem;
+begin
+  FData.QueryCacheItem(AddrVA, AItem);
+  if AItem.Symbol = '' then
+    Result := Format('[0x%x] (%s)', [AddrVA, FData.FormatAccessString(AItem.Region)])
+  else
+  Result := Format('[0x%x] (%s) -> %s', [AddrVA, FData.FormatAccessString(AItem.Region), AItem.Symbol]);
+end;
+
 procedure TExtendedHintWindow.Paint;
 var
   R: TRect;
@@ -737,10 +798,13 @@ begin
     end;
     Canvas.Brush.Style := bsClear;
 
-    case FData.AddressType of
-      atExecute: DrawExecuteExtendedRect;
-      atRead: ;
-    end;
+    if FData.AddressType = atExecute then
+      DrawExecuteExtendedRect
+    else
+      if FAddrItem.InDeepCount > 0 then
+        DrawAddrChain
+      else
+        DrawReadMem;
 
     Canvas.Font.Assign(SavedFont);
   finally
@@ -772,14 +836,10 @@ function TCpuViewCore.QueryAddressType(AddrVA: Int64): TAddrType;
 var
   CacheItem: TAddrCacheItem;
 begin
-  Result := atNone;
-  if not QueryCacheItem(AddrVA, CacheItem) then Exit;
-  if (raExecute in CacheItem.Region.Access) then
-    Exit(atExecute);
-  if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
-    Exit(atStack);
-  if (raRead in CacheItem.Region.Access) then
-    Result := atRead;
+  if QueryCacheItem(AddrVA, CacheItem) then
+    Result := AccessToAddrType(AddrVA, CacheItem.Region.Access)
+  else
+    Result := atNone;
 end;
 
 function TCpuViewCore.QueryModuleName(AddrVA: Int64): string;
@@ -1269,11 +1329,14 @@ procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
   var Hint: string);
 var
   AddressType: TAddrType;
+  AItem: TAddrCacheItem;
   AccessStr, Symbol: string;
+  I: Integer;
 begin
   if (Param.AddrVA <> 0) and Assigned(AsmView) then
   begin
-    AddressType := QueryAddressType(Param.AddrVA);
+    QueryCacheItem(Param.AddrVA, AItem);
+    AddressType := AccessToAddrType(Param.AddrVA, AItem.Region.Access);
     if AddressType = atNone then Exit;
 
     if AddressType in [atRead, atStack] then
@@ -1293,10 +1356,18 @@ begin
     FExtendedHintData.ColorMap := AsmView.ColorMap;
     FExtendedHintData.Font := AsmView.Font;
     FExtendedHintData.FormatAccessString := FormatAccessString;
+    FExtendedHintData.QueryCacheItem := QueryCacheItem;
     FExtendedHintData.QueryDisasmAtAddr := QueryDisasmAtAddr;
     FExtendedHintData.QueryPointerValueAtAddr := QueryPointerValueAtAddr;
     FExtendedHintData.RowHeight := AsmView.RowHeight;
     FExtendedHintData.Tokenizer := AsmView.Tokenizer;
+    SetLength(FExtendedHintData.ChainList, AItem.InDeepCount);
+    if AItem.InDeepCount > 0 then
+    begin
+      Debugger.ReadMemory(Param.AddrVA, FExtendedHintData.ChainList[0], Debugger.PointerSize);
+      for I := 1 to AItem.InDeepCount - 1 do
+        Debugger.ReadMemory(FExtendedHintData.ChainList[I - 1], FExtendedHintData.ChainList[I], Debugger.PointerSize);
+    end;
     Param.HintInfo.HintData := @FExtendedHintData;
   end;
 end;
@@ -1393,7 +1464,10 @@ begin
           else
             AddrPtrItem.InDeepSymbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
           if AddrPtrItem.InDeepSymbol <> '' then
+          begin
             AItem.InDeepSymbol := Trim(Format('%s [0x%x] -> %s', [AItem.Symbol, AddrPtr, AddrPtrItem.InDeepSymbol]));
+            AItem.InDeepCount := AddrPtrItem.InDeepCount + 1;
+          end;
         end;
       end;
     end;
@@ -1564,6 +1638,18 @@ begin
   end;
   if Assigned(FStackView) then
     FStackView.Invalidate;
+end;
+
+function TCpuViewCore.AccessToAddrType(AddrVA: Int64;
+  AAccess: TRegionAccessSet): TAddrType;
+begin
+  Result := atNone;
+  if (raExecute in AAccess) then
+    Exit(atExecute);
+  if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
+    Exit(atStack);
+  if (raRead in AAccess) then
+    Result := atRead;
 end;
 
 procedure TCpuViewCore.ShowDisasmAtAddr(AddrVA: Int64; PushToJmpStack: Boolean);
