@@ -37,10 +37,11 @@ interface
 {$message 'Highlighting of identical selected values in the dump window'}
 {$message 'Run to user code'}
 {$message 'Display strings in hint with disassembly for executable AddrVA and in addr validation (blue color)'}
+{$message 'In dump addresses not leading to debugging information should be underlined instead of solid line.'}
 
 uses
   {$IFDEF FPC}
-  LCLType, LCLProc,
+  LCLType, LCLIntf, LCLProc,
   {$ELSE}
   Windows,
   {$ENDIF}
@@ -137,6 +138,7 @@ type
     property OnUpdated: TOnCacheUpdated read FOnUpdated write SetOnUpdated;
   end;
 
+  TAccessToAddrType = function(AddrVA: Int64; AAccess: TRegionAccessSet): TAddrType of object;
   TFormatAccessString = function(const ARegionData: TRegionData): string of object;
   TQueryCacheItem = function(AddrVA: Int64; out AItem: TAddrCacheItem; InDeepCall: Boolean = False): Boolean of object;
   TQueryDisasmAtAddr = function(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean of object;
@@ -150,7 +152,9 @@ type
     ChainList: array of Int64;
     CharWidth: Integer;
     ColorMap: TAsmColorMap;
+    Colors: array [TAddrType] of TColor;
     Font: TFont;
+    AccessToAddrType: TAccessToAddrType;
     FormatAccessString: TFormatAccessString;
     QueryCacheItem: TQueryCacheItem;
     QueryDisasmAtAddr: TQueryDisasmAtAddr;
@@ -557,16 +561,16 @@ begin
     TmpHint := FLastLine;
   Result := inherited CalcHintRect(MaxWidth, ' ', nil); // for font setup
   FHints.Clear;
-  MaxWidth := Canvas.TextWidth(GetAddrString(FData.AddrVA)) + FTextHeight;
+  FMaxLine := Canvas.TextWidth(GetAddrString(FData.AddrVA));
   if FLastLine <> '' then
   begin
-    MaxWidth := Max(MaxWidth, Canvas.TextWidth(FLastLine));
+    FMaxLine := Max(FMaxLine, Canvas.TextWidth(FLastLine));
     Inc(Result.Bottom, FTextHeight);
   end;
   for I := 0 to Length(FData.ChainList) - 1 do
-    MaxWidth := Max(MaxWidth, Canvas.TextWidth(GetAddrString(FData.ChainList[I])) + FTextHeight);
-  Inc(Result.Bottom, Length(FData.ChainList));
-  Inc(Result.Right, MaxWidth);
+    FMaxLine := Max(FMaxLine, Canvas.TextWidth(GetAddrString(FData.ChainList[I])));
+  Inc(Result.Bottom, Length(FData.ChainList) * FTextHeight);
+  Inc(Result.Right, FMaxLine + FTextHeight);
 end;
 
 function TExtendedHintWindow.CalculateExecute(MaxWidth: Integer): TRect;
@@ -629,11 +633,6 @@ begin
   Result := ClientRect.Empty;
 end;
 
-procedure TExtendedHintWindow.DrawAddrChain;
-begin
-
-end;
-
 procedure TExtendedHintWindow.CMTextChanged(var Message: TMessage);
 begin
   // lock ClientRect update
@@ -649,10 +648,58 @@ end;
 
 destructor TExtendedHintWindow.Destroy;
 begin
-  FAddrChain.Free;;
+  FAddrChain.Free;
   FAsm.Free;
   FHints.Free;
   inherited;
+end;
+
+procedure TExtendedHintWindow.DrawAddrChain;
+var
+  TextPos: TPoint;
+  MarkR, LineR: TRect;
+
+  procedure DrawLine(AddrVA: Int64; WithLine: Boolean);
+  var
+    AItem: TAddrCacheItem;
+    ArrowSize, Tripple: Integer;
+  begin
+    FData.QueryCacheItem(AddrVA, AItem);
+    Canvas.Brush.Color := FData.Colors[FData.AccessToAddrType(AddrVA, AItem.Region.Access)];
+    Canvas.Brush.Style := bsSolid;
+    Canvas.RoundRect(MarkR, 2, 2);
+    Canvas.Brush.Style := bsClear;
+    Canvas.TextOut(TextPos.X, TextPos.Y, GetAddrString(AddrVA));
+    if WithLine then
+    begin
+      Canvas.Brush.Color := FData.ColorMap.ArrowDownSelectedColor;
+      Canvas.Brush.Style := bsSolid;
+      PatBlt(Canvas, LineR.Left, LineR.Top, LineR.Width, 1, PATCOPY);
+      PatBlt(Canvas, LineR.Left, LineR.Top, 1, LineR.Height, PATCOPY);
+      PatBlt(Canvas, LineR.Left, LineR.Bottom, LineR.Width, 1, PATCOPY);
+      Canvas.Brush.Style := bsClear;
+    end;
+    OffsetRect(MarkR, 0, FTextHeight);
+    OffsetRect(LineR, 0, FTextHeight);
+    Inc(TextPos.Y, FTextHeight);
+  end;
+
+var
+  I, Offsets: Integer;
+begin
+  MarkR := Bounds(NcBorderWidth, NcBorderWidth, FTextHeight, FTextHeight);
+  Offsets := -Ceil(MarkR.Height / 5);
+  InflateRect(MarkR, Offsets, Offsets);
+  LineR := MarkR;
+  OffsetRect(LineR, -FTextHeight shr 1, -FTextHeight shr 1);
+  LineR.Right := MarkR.Left - 1;
+  LineR.Left := NcBorderWidth;
+  TextPos := Point(FTextHeight + NcBorderWidth, NcBorderWidth);
+  DrawLine(FData.AddrVA, False);
+  for I := 0 to Length(FData.ChainList) - 1 do
+    DrawLine(FData.ChainList[I], True);
+  if FLastLine <> '' then
+    Canvas.TextOut(NcBorderWidth, TextPos.Y, FLastLine);
 end;
 
 procedure TExtendedHintWindow.DrawExecuteExtendedRect;
@@ -749,7 +796,7 @@ begin
   if AItem.Symbol = '' then
     Result := Format('[0x%x] (%s)', [AddrVA, FData.FormatAccessString(AItem.Region)])
   else
-  Result := Format('[0x%x] (%s) -> %s', [AddrVA, FData.FormatAccessString(AItem.Region), AItem.Symbol]);
+    Result := Format('[0x%x] (%s) -> %s', [AddrVA, FData.FormatAccessString(AItem.Region), AItem.Symbol]);
 end;
 
 procedure TExtendedHintWindow.Paint;
@@ -760,6 +807,12 @@ begin
   // Fill default background without text
   Caption := '';
   inherited;
+
+  if (FData.AddressType <> atExecute) and (FAddrItem.InDeepCount > 0) then
+  begin
+    DrawAddrChain;
+    Exit;
+  end;
 
   Canvas.Brush.Style := bsClear;
   R := Bounds(NcBorderWidth, NcBorderWidth, ClientWidth - NcBorderWidth shl 1, FTextHeight);
@@ -801,10 +854,7 @@ begin
     if FData.AddressType = atExecute then
       DrawExecuteExtendedRect
     else
-      if FAddrItem.InDeepCount > 0 then
-        DrawAddrChain
-      else
-        DrawReadMem;
+      DrawReadMem;
 
     Canvas.Font.Assign(SavedFont);
   finally
@@ -1332,20 +1382,21 @@ var
   AItem: TAddrCacheItem;
   AccessStr, Symbol: string;
   I: Integer;
+  P: TPoint;
 begin
-  if (Param.AddrVA <> 0) and Assigned(AsmView) then
+  if (Param.AddrVA <> 0) and Assigned(AsmView) and Assigned(RegView) then
   begin
     QueryCacheItem(Param.AddrVA, AItem);
     AddressType := AccessToAddrType(Param.AddrVA, AItem.Region.Access);
     if AddressType = atNone then Exit;
 
-    if AddressType in [atRead, atStack] then
-    begin
-      AccessStr := QueryAccessStr(Param.AddrVA);
-      Symbol := QuerySymbolAtAddr(Param.AddrVA);
-      Hint := Format('Addr: 0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
-      Exit;
-    end;
+    //if AddressType in [atRead, atStack] then
+    //begin
+    //  AccessStr := QueryAccessStr(Param.AddrVA);
+    //  Symbol := QuerySymbolAtAddr(Param.AddrVA);
+    //  Hint := Format('Addr: 0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
+    //  Exit;
+    //end;
 
     Hint := 'External hint...';
     Param.HintInfo.HintWindowClass := TExtendedHintWindow;
@@ -1354,7 +1405,11 @@ begin
     FExtendedHintData.BorderWidth := AsmView.SplitMargin;
     FExtendedHintData.CharWidth := AsmView.CharWidth;
     FExtendedHintData.ColorMap := AsmView.ColorMap;
+    FExtendedHintData.Colors[atExecute] := RegView.ColorMap.AddrExecuteColor;
+    FExtendedHintData.Colors[atRead] := RegView.ColorMap.AddrReadColor;
+    FExtendedHintData.Colors[atStack] := RegView.ColorMap.AddrStackColor;
     FExtendedHintData.Font := AsmView.Font;
+    FExtendedHintData.AccessToAddrType := AccessToAddrType;
     FExtendedHintData.FormatAccessString := FormatAccessString;
     FExtendedHintData.QueryCacheItem := QueryCacheItem;
     FExtendedHintData.QueryDisasmAtAddr := QueryDisasmAtAddr;
@@ -1369,6 +1424,8 @@ begin
         Debugger.ReadMemory(FExtendedHintData.ChainList[I - 1], FExtendedHintData.ChainList[I], Debugger.PointerSize);
     end;
     Param.HintInfo.HintData := @FExtendedHintData;
+    if GetCursorPos(P) then
+      Param.HintInfo.HintPos.Y := P.Y + GetSystemMetrics(SM_CYCURSOR) shr 1;
   end;
 end;
 
