@@ -59,6 +59,18 @@ type
     LastError, LastStatus: Cardinal;
   end;
 
+  TAddrCacheItem = record
+    Region: TRegionData;
+    Symbol: string;
+    InDeepSymbol: string;
+    InDeepCount: Integer;
+    ExtendedDataPresent: Boolean;
+    AsmLines, HintLines: string;
+    case Integer of
+      0: (PointerValue: array [0..9] of Byte);
+      1: (Linked: array [0..9] of Boolean);
+  end;
+
   { TCommonAbstractUtils }
 
   TCommonAbstractUtils = class

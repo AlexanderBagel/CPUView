@@ -36,6 +36,7 @@ interface
   CpuView.Settings,
   CpuView.ScriptExecutor,
   CpuView.Stream,
+  CpuView.ExtendedHint,
 
   {$IFDEF LINUX}
   CpuView.Linux,

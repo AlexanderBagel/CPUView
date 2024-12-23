@@ -70,6 +70,10 @@ if TargetCPU = &apos;arm&apos; then
         <UnitName Value="CpuView.DebugerGate"/>
       </Item>
       <Item>
+        <Filename Value="src\core\CpuView.ExtendedHint.pas"/>
+        <UnitName Value="CpuView.ExtendedHint"/>
+      </Item>	  
+      <Item>
         <Filename Value="src\core\CpuView.FpDebug.pas"/>
         <UnitName Value="CpuView.FpDebug"/>
       </Item>

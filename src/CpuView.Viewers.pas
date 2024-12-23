@@ -172,7 +172,7 @@ type
     property Visible default False;
   end;
 
-  TAddrType = (atNone, atExecute, atRead, atStack);
+  TAddrType = (atNone, atExecute, atRead, atStack, atString);
   TOnQueryAddrType = procedure(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType) of object;
 
   { TCustomAsmView }
@@ -1835,7 +1835,8 @@ const
     '',
     'in Assembly.',
     'in the Dump.',
-    'on the Stack'
+    'on the Stack.',
+    'in the Dump.'
   );
 var
   Painter: TAbstractPrimaryRowPainter;
