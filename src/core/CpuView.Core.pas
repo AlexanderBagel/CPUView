@@ -194,7 +194,6 @@ type
     function AccessToAddrType(AddrVA: Int64; AAccess: TRegionAccessSet): TAddrType;
     procedure BuildAsmWindow(AAddress: Int64);
     function CacheVisibleRows: Integer;
-    function FormatAccessString(const ARegionData: TRegionData): string;
     function GenerateCache(AAddress: Int64): Integer;
     procedure LoadFromCache(AIndex: Integer);
     procedure OnQueryAddressType(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType);
@@ -437,7 +436,7 @@ var
 begin
   Result := 'No access';
   if QueryCacheItem(AddrVA, CacheItem) then
-    Result := FormatAccessString(CacheItem.Region);
+    Result := CacheItem.Region.ToString;
 end;
 
 function TCpuViewCore.QueryAddressType(AddrVA: Int64): TAddrType;
@@ -538,22 +537,6 @@ begin
     Result := AsmView.VisibleRowCount shl 1
   else
     Result := 0;
-end;
-
-function TCpuViewCore.FormatAccessString(const ARegionData: TRegionData
-  ): string;
-begin
-  Result := 'No access';
-  if (ARegionData.Access <> []) and not (raProtect in ARegionData.Access) then
-  begin
-    Result := '...';
-    if raRead in ARegionData.Access then
-      Result[1] := 'R';
-    if raWrite in ARegionData.Access then
-      Result[2] := 'W';
-    if raExecute in ARegionData.Access then
-      Result[3] := 'E';
-  end;
 end;
 
 constructor TCpuViewCore.Create(ADebuggerClass: TAbstractDebuggerClass);
@@ -935,8 +918,22 @@ end;
 
 procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
   var Hint: string);
+
+  procedure FillCacheItem(Index: Integer; AddrVA: Int64);
+  var
+    AItem: TAddrCacheItem;
+  begin
+    QueryCacheItem(AddrVA, AItem);
+    case AccessToAddrType(AddrVA, AItem.Region.Access) of
+      atExecute: QueryDisasmAtAddr(AddrVA, AItem);
+      atRead: QueryPointerValueAtAddr(AddrVA, AItem);
+    end;
+    FExtendedHintData.AddrChain[Index] := AItem;
+  end;
+
 var
   AddressType: TAddrType;
+  ChainAddrVA: Int64;
   AItem: TAddrCacheItem;
   AccessStr, Symbol: string;
   I: Integer;
@@ -958,8 +955,17 @@ begin
 
     Hint := 'External hint...';
     Param.HintInfo.HintWindowClass := TExtendedHintWindow;
-    FExtendedHintData.AddressType := AddressType;
-    FExtendedHintData.AddrVA := Param.AddrVA;
+    SetLength(FExtendedHintData.AddrChain, 1 + AItem.InDeepCount);
+    FillCacheItem(0, Param.AddrVA);
+    if AItem.InDeepCount > 0 then
+    begin
+      ChainAddrVA := Param.AddrVA;
+      for I := 0 to AItem.InDeepCount - 1 do
+      begin
+        Debugger.ReadMemory(ChainAddrVA, ChainAddrVA, Debugger.PointerSize);
+        FillCacheItem(I + 1, ChainAddrVA);
+      end;
+    end;
     FExtendedHintData.BorderWidth := AsmView.SplitMargin;
     FExtendedHintData.CharWidth := AsmView.CharWidth;
     FExtendedHintData.ColorMap := AsmView.ColorMap;
@@ -967,20 +973,8 @@ begin
     FExtendedHintData.Colors[atRead] := RegView.ColorMap.AddrReadColor;
     FExtendedHintData.Colors[atStack] := RegView.ColorMap.AddrStackColor;
     FExtendedHintData.Font := AsmView.Font;
-    FExtendedHintData.AccessToAddrType := AccessToAddrType;
-    FExtendedHintData.FormatAccessString := FormatAccessString;
-    FExtendedHintData.QueryCacheItem := QueryCacheItem;
-    FExtendedHintData.QueryDisasmAtAddr := QueryDisasmAtAddr;
-    FExtendedHintData.QueryPointerValueAtAddr := QueryPointerValueAtAddr;
     FExtendedHintData.RowHeight := AsmView.RowHeight;
     FExtendedHintData.Tokenizer := AsmView.Tokenizer;
-    SetLength(FExtendedHintData.ChainList, AItem.InDeepCount);
-    if AItem.InDeepCount > 0 then
-    begin
-      Debugger.ReadMemory(Param.AddrVA, FExtendedHintData.ChainList[0], Debugger.PointerSize);
-      for I := 1 to AItem.InDeepCount - 1 do
-        Debugger.ReadMemory(FExtendedHintData.ChainList[I - 1], FExtendedHintData.ChainList[I], Debugger.PointerSize);
-    end;
     Param.HintInfo.HintData := @FExtendedHintData;
     if GetCursorPos(P) then
       Param.HintInfo.HintPos.Y := P.Y + GetSystemMetrics(SM_CYCURSOR) shr 1;
@@ -1051,6 +1045,7 @@ begin
   Result := FSessionCache.TryGetValue(AddrVA, AItem);
   if not Result then
   try
+    AItem.AddrVA := AddrVA;
     Result := FUtils.QueryRegion(AddrVA, AItem.Region);
 
     // Blocking of possible recursion
@@ -1058,6 +1053,8 @@ begin
       FSessionCache.Add(AddrVA, AItem);
 
     if not Result then Exit;
+
+    AItem.AddrType := AccessToAddrType(AddrVA, AItem.Region.Access);
 
     if raRead in AItem.Region.Access then
     begin

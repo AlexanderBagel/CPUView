@@ -47,11 +47,14 @@ type
   TRegionAccess = (raRead, raWrite, raExecute, raProtect);
   TRegionAccessSet = set of TRegionAccess;
 
+  { TRegionData }
+
   TRegionData = record
     AllocationBase,
     BaseAddr,
     RegionSize: Int64;
     Access: TRegionAccessSet;
+    function ToString: string;
   end;
 
   // Extended thread information (if present)
@@ -59,7 +62,11 @@ type
     LastError, LastStatus: Cardinal;
   end;
 
+  TAddrType = (atNone, atExecute, atRead, atStack, atString);
+
   TAddrCacheItem = record
+    AddrType: TAddrType;
+    AddrVA: Int64;
     Region: TRegionData;
     Symbol: string;
     InDeepSymbol: string;
@@ -93,6 +100,23 @@ type
   TCommonAbstractUtilsClass = class of TCommonAbstractUtils;
 
 implementation
+
+{ TRegionData }
+
+function TRegionData.ToString: string;
+begin
+  Result := 'No access';
+  if (Self.Access <> []) and not (raProtect in Self.Access) then
+  begin
+    Result := '...';
+    if raRead in Self.Access then
+      Result[1] := 'R';
+    if raWrite in Self.Access then
+      Result[2] := 'W';
+    if raExecute in Self.Access then
+      Result[3] := 'E';
+  end;
+end;
 
 { TCommonAbstractUtils }
 

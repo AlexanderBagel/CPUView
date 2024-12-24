@@ -172,7 +172,6 @@ type
     property Visible default False;
   end;
 
-  TAddrType = (atNone, atExecute, atRead, atStack, atString);
   TOnQueryAddrType = procedure(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType) of object;
 
   { TCustomAsmView }
