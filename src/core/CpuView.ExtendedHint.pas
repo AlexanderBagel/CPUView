@@ -44,6 +44,18 @@ uses
   CpuView.Viewers;
 
 type
+  TPointerValue = bvmHex64..bvmFloat80;
+  TPointerValues = set of TPointerValue;
+
+  {$IFNDEF FPC}
+  PInt8 = PShortInt;
+  PInt16 = PSmallint;
+  PInt32 = PLongint;
+  PUInt8 = PByte;
+  PUInt16 = PWord;
+  PUInt32 = PDWord;
+  {$ENDIF}
+
   PExtendedHintData = ^TExtendedHintData;
   TExtendedHintData = record
     AddrChain: array of TAddrCacheItem;
@@ -76,11 +88,12 @@ type
     FDisplayedItem: TAddrCacheItem;
     FTextHeight, FMaxChainLine, FMaxLine, FMaxHint: Integer;
     procedure CalculateExecute(MaxWidth: Integer);
-    function CalculatePointerValue(MaxWidth: Integer): TRect;
+    procedure CalculatePointerValue(MaxWidth: Integer);
     procedure DrawAddrChain;
-    procedure DrawExecuteExtendedRect;
-    procedure DrawReadMem;
+    procedure DrawExecuteData;
+    procedure DrawPointerValue;
     function GetAddrString(const AItem: TAddrCacheItem): string;
+    function GetPointerValue(APointerValue: TPointerValue): string;
   protected
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure Paint; override;
@@ -155,7 +168,7 @@ begin
 
   FExtendedRect := Bounds(
     NcBorderWidth,
-    NcBorderWidth shl 1 + ChainLength * FData.RowHeight,
+    NcBorderWidth shl 1 + ChainLength * FTextHeight,
     FMaxChainLine, 0);
 
   case FDisplayedItem.AddrType of
@@ -192,9 +205,22 @@ begin
     FAsm.Count * FData.RowHeight + FData.BorderWidth shl 1);
 end;
 
-function TExtendedHintWindow.CalculatePointerValue(MaxWidth: Integer): TRect;
+procedure TExtendedHintWindow.CalculatePointerValue(MaxWidth: Integer);
+var
+  I: TPointerValue;
+  S: string;
 begin
-  Result := ClientRect.Empty;
+  for I := Low(TPointerValue) to High(TPointerValue) do
+  begin
+    S := GetPointerValue(I);
+    FMaxLine := Max(FMaxLine, Length(S) * FData.CharWidth);
+    FHints.Add(S);
+  end;
+  FExtendedRect := Bounds(
+    FExtendedRect.Left,
+    FExtendedRect.Top,
+    Max(FMaxChainLine, FMaxLine) + FData.BorderWidth shl 1,
+    FHints.Count * FData.RowHeight + FData.BorderWidth shl 1);
 end;
 
 procedure TExtendedHintWindow.CMTextChanged(var Message: TMessage);
@@ -224,8 +250,6 @@ var
   MarkR, LineR: TRect;
 
   procedure DrawLine(const AItem: TAddrCacheItem; WithLine: Boolean);
-  var
-    ArrowSize, Tripple: Integer;
   begin
     Canvas.Brush.Color := FData.Colors[AItem.AddrType];
     Canvas.Brush.Style := bsSolid;
@@ -262,7 +286,7 @@ begin
     DrawLine(FData.AddrChain[I], True);
 end;
 
-procedure TExtendedHintWindow.DrawExecuteExtendedRect;
+procedure TExtendedHintWindow.DrawExecuteData;
 var
   R: TRect;
   I, nTokenLength, nTokenSize, nSize, nLength: Integer;
@@ -271,7 +295,7 @@ var
   Dx: array of Integer;
   DrawLinkStep: Byte;
 begin
-  SetLength(Dx, Max(FMaxLine, FMaxHint));
+  SetLength(Dx, Max(FMaxLine, FMaxHint) div FData.CharWidth);
   for I := 0 to Length(Dx) - 1 do
     Dx[I] := FData.CharWidth;
 
@@ -284,7 +308,7 @@ begin
     R := Bounds(
       FExtendedRect.Left + FData.BorderWidth,
       FExtendedRect.Top + FData.BorderWidth + I * FData.RowHeight,
-      FMaxLine * FData.CharWidth, FData.RowHeight);
+      FMaxLine, FData.RowHeight);
     DrawLinkStep := 0;
     while nSize > 0 do
     begin
@@ -342,9 +366,31 @@ begin
   end;
 end;
 
-procedure TExtendedHintWindow.DrawReadMem;
+procedure TExtendedHintWindow.DrawPointerValue;
+var
+  I: Integer;
+  Dx: array of Integer;
+  R: TRect;
+  Line: string;
 begin
+  SetLength(Dx, Max(FMaxLine, FMaxHint) div FData.CharWidth);
+  for I := 0 to Length(Dx) - 1 do
+    Dx[I] := FData.CharWidth;
 
+  R := Bounds(
+    FExtendedRect.Left + FData.BorderWidth,
+    FExtendedRect.Top + FData.BorderWidth,
+    FMaxLine, FData.RowHeight);
+  Canvas.Font.Color := FData.ColorMap.TextCommentColor;
+  Canvas.Font.Style := [];
+
+  for I := 0 to FHints.Count - 1 do
+  begin
+    Line := FHints[I];
+    ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, @Line[1],
+      {$IFDEF LINUX}Length(Line){$ELSE}UTF8StringLength(Line){$ENDIF}, @Dx[0]);
+    OffsetRect(R, 0, FData.RowHeight);
+  end;
 end;
 
 function TExtendedHintWindow.GetAddrString(const AItem: TAddrCacheItem): string;
@@ -353,6 +399,25 @@ begin
     Result := Format('[0x%x] (%s)', [AItem.AddrVA, AItem.Region.ToString])
   else
     Result := Format('[0x%x] (%s) -> %s', [AItem.AddrVA, AItem.Region.ToString, AItem.Symbol]);
+end;
+
+function TExtendedHintWindow.GetPointerValue(APointerValue: TPointerValue
+  ): string;
+begin
+  case APointerValue of
+    bvmHex64: Result := 'Hex64: 0x' + IntToHex(PUInt64(@FDisplayedItem.PointerValue[0])^, 1);
+    bvmInt8: Result := 'Int8: ' + IntToStr(PInt8(@FDisplayedItem.PointerValue[0])^);
+    bvmInt16: Result := 'Int16: ' + IntToStr(PInt16(@FDisplayedItem.PointerValue[0])^);
+    bvmInt32: Result := 'Int32: ' + IntToStr(PInt32(@FDisplayedItem.PointerValue[0])^);
+    bvmInt64: Result := 'Int64: ' + IntToStr(PInt64(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt8: Result := 'UInt8: ' + UIntToStr(PUInt8(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt16: Result := 'UInt16: ' + UIntToStr(PUInt16(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt32: Result := 'UInt32: ' + UIntToStr(PUInt32(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt64: Result := 'UInt64: ' + UIntToStr(PUInt64(@FDisplayedItem.PointerValue[0])^);
+    bvmFloat32: Result := 'Float32: ' + FloatToStr(PSingle(@FDisplayedItem.PointerValue[0])^);
+    bvmFloat64: Result := 'Float64: ' + FloatToStr(PDouble(@FDisplayedItem.PointerValue[0])^);
+    bvmFloat80: Result := 'Float80: ' + ExtractExtended80Fmt(PExtended80Support(@FDisplayedItem.PointerValue[0])^);
+  end;
 end;
 
 procedure TExtendedHintWindow.Paint;
@@ -398,9 +463,9 @@ begin
     Canvas.Brush.Style := bsClear;
 
     if FDisplayedItem.AddrType = atExecute then
-      DrawExecuteExtendedRect
+      DrawExecuteData
     else
-      DrawReadMem;
+      DrawPointerValue;
 
     Canvas.Font.Assign(SavedFont);
   finally
