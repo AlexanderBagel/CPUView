@@ -4,8 +4,8 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   ClientHeight = 700
   ClientWidth = 735
   Constraints.MinHeight = 700
-  DesignLeft = 492
-  DesignTop = 232
+  DesignLeft = 609
+  DesignTop = 221
   object cbFont: TComboBox[0]
     Left = 67
     Height = 33
@@ -61,12 +61,12 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 1
       OnClick = cbSymbolsClick
     end
-    object cbDasmPreview: TCheckBox
+    object cbExtendedHints: TCheckBox
       Left = 10
       Height = 29
       Top = 72
-      Width = 252
-      Caption = 'Disassembly preview in hints'
+      Width = 501
+      Caption = 'Extended hints (Disassembly/Pointer values/Address Chains)'
       TabOrder = 2
     end
     object cbAddrValidation: TCheckBox

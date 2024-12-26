@@ -582,7 +582,10 @@ begin
   if Map.CheckRegIndex(ARowIndex, AColIndex) then
     Result := RegInfo(Map[ARowIndex][AColIndex].RegID)
   else
+  begin
     Result := Default(TRegister);
+    Result.RegID := -1;
+  end;
 end;
 
 function TCommonCpuContext.RegParam(ARegID: TRegID;

@@ -51,7 +51,8 @@ uses
   CpuView.Viewers,
   CpuView.CPUContext,
   CpuView.IntelContext,
-  CpuView.XML;
+  CpuView.XML,
+  CpuView.ExtendedHint;
 
 {$IFDEF FPC}
 type
@@ -169,7 +170,8 @@ const
   xmlHint = 'hint';
   xmlHintFlag = 'hintFlag';
   xmlForceFindSymbols = 'useForceFindSymbols';
-  xmlDisassemblyInHint = 'useDasmInHint';
+  xmlExtendedHints = 'useExtendedHints';
+  xmlHintPointerValues = 'useHintPointerValues';
 
   // not used
   xmlContext = 'ctx';
@@ -242,10 +244,11 @@ type
     FColors: TDictionary<string, TColor>;
     FColorsMap: TList<TColorMapItem>;
     FCpuViewDlgSettings: TCpuViewDlgSettings;
-    FDisassemblyInHint: Boolean;
     FDumpSettings: TDumpSettings;
+    FExtendedHints: Boolean;
     FForceFindSymbols: Boolean;
     FFontName: string;
+    FPointerValues: TPointerValues;
     FSaveFormSession: Boolean;
     FSaveViewersSession: Boolean;
     FShotCutMode: TShortCutMode;
@@ -341,7 +344,8 @@ type
     property ColorMode: TColorMode read FColorMode write FColorMode;
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
-    property DisassemblyInHint: Boolean read FDisassemblyInHint write FDisassemblyInHint;
+    property ExtendedHints: Boolean read FExtendedHints write FExtendedHints;
+    property ExtendedHintPointerValues: TPointerValues read FPointerValues write FPointerValues;
     property ForceFindSymbols: Boolean read FForceFindSymbols write FForceFindSymbols;
     property HintInAsm: Boolean read FAsmSettings.Hints write FAsmSettings.Hints;
     property HintInDump: Boolean read FDumpSettings.Hints write FDumpSettings.Hints;
@@ -687,7 +691,8 @@ begin
   FUseCrashDump := True;
   FUseAddrValidation := True;
   FForceFindSymbols := True;
-  FDisassemblyInHint := True;
+  FExtendedHints := True;
+  FPointerValues := [bvmHex64..bvmFloat80];
 end;
 
 procedure TCpuViewSettins.InitDefaultShortCuts;
@@ -816,7 +821,7 @@ end;
 
 procedure TCpuViewSettins.LoadFromXML_BasicSettings(Root: IXMLNode);
 var
-  I: Integer;
+  I, APointerValues: Integer;
   SplittersNode, ItemNode: IXMLNode;
   Splitter: TSplitters;
 begin
@@ -828,7 +833,9 @@ begin
   FUseDebugLog := GetNodeAttr(Root, xmlDbgLog);
   FUseCrashDump := GetNodeAttr(Root, xmlDbgDump);
   FForceFindSymbols := GetNodeAttr(Root, xmlForceFindSymbols);
-  FDisassemblyInHint := GetNodeAttr(Root, xmlDisassemblyInHint);
+  FExtendedHints := GetNodeAttr(Root, xmlExtendedHints);
+  APointerValues := GetNodeAttr(Root, xmlHintPointerValues);
+  FPointerValues := PPointerValues(@APointerValues)^;
   if FSaveFormSession then
   begin
     FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
@@ -1141,7 +1148,8 @@ begin
   SetNodeAttr(Root, xmlDbgLog, FUseDebugLog);
   SetNodeAttr(Root, xmlDbgDump, FUseCrashDump);
   SetNodeAttr(Root, xmlForceFindSymbols, FForceFindSymbols);
-  SetNodeAttr(Root, xmlDisassemblyInHint, FDisassemblyInHint);
+  SetNodeAttr(Root, xmlExtendedHints, FExtendedHints);
+  SetNodeAttr(Root, xmlHintPointerValues, PInteger(@FPointerValues)^);
   if FSaveFormSession then
   begin
     SetNodeAttr(Root, xmlLeft, FCpuViewDlgSettings.BoundsRect.Left);

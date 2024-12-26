@@ -652,6 +652,9 @@ begin
   pnDumps.Height := Round(Settings.CpuViewDlgSettings.SplitterPos[spCenterVert] * (ClientHeight / 100));
   pnDebug.Top := pnDumps.Top + pnDumps.Height;
 
+  Core.ExtendedHints := Settings.ExtendedHints;
+  Core.ExtendedHintPointerValues := Settings.ExtendedHintPointerValues;
+
   if (Core.ShowCallFuncName <> Settings.ShowCallFuncName) or
     (Core.ForceFindSymbols <> Settings.ForceFindSymbols) or
     (DbgGate.ShowFullAddress <> Settings.ShowFullAddress) or

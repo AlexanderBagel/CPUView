@@ -62,7 +62,7 @@ type
     LastError, LastStatus: Cardinal;
   end;
 
-  TAddrType = (atNone, atExecute, atRead, atStack, atString);
+  TAddrType = (atNone, atExecute, atRead, atReadLinked, atStack, atString);
 
   TAddrCacheItem = record
     AddrType: TAddrType;

@@ -55,7 +55,7 @@ type
     cbDbgCrash: TCheckBox;
     cbAddrValidation: TCheckBox;
     cbForceFindSymbols: TCheckBox;
-    cbDasmPreview: TCheckBox;
+    cbExtendedHints: TCheckBox;
     FontDialog: TFontDialog;
     gbPerformance: TGroupBox;
     gbSessions: TGroupBox;
@@ -388,7 +388,7 @@ begin
   cbDbgLog.Checked := Settings.UseDebugLog;
   cbDbgCrash.Checked := Settings.UseCrashDump;
   cbForceFindSymbols.Checked := Settings.ForceFindSymbols;
-  cbDasmPreview.Checked := Settings.DisassemblyInHint;
+  cbExtendedHints.Checked := Settings.ExtendedHints;
   FillImageList;
   FillSettingsView;
   UpdateDebugSymbolsIndepended;
@@ -412,7 +412,7 @@ begin
   Settings.UseDebugLog := cbDbgLog.Checked;
   Settings.UseCrashDump := cbDbgCrash.Checked;
   Settings.ForceFindSymbols := cbForceFindSymbols.Checked;
-  Settings.DisassemblyInHint := cbDasmPreview.Checked;
+  Settings.ExtendedHints := cbExtendedHints.Checked;
   Enum := tvSettings.Nodes.GetEnumerator;
   while Enum.MoveNext do
   begin

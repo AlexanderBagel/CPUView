@@ -1676,7 +1676,7 @@ begin
   case AAddrType of
     atNone: Result := False;
     atExecute: Result := ValidateType[avtExecutable];
-    atRead: Result := ValidateType[avtReadable];
+    atRead, atReadLinked: Result := ValidateType[avtReadable];
     atStack: Result := ValidateType[avtStack];
   end;
 end;
@@ -1787,12 +1787,20 @@ begin
     begin
       case AddrType of
         atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
-        atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
+        atRead, atReadLinked: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
         atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
       end;
       ABounds := GetBounds(I);
-      PatBlt(ACanvas, ARect.Left + ABounds.LeftOffset,
-        ARect.Bottom - 2, ABounds.Width, 2, PATCOPY);
+      if AddrType = atRead then
+      begin
+        ACanvas.Pen.Style := psDot;
+        ACanvas.MoveTo(ARect.Left + ABounds.LeftOffset, ARect.Bottom - 2);
+        ACanvas.LineTo(ARect.Left + ABounds.LeftOffset + ABounds.Width, ARect.Bottom - 2);
+        ACanvas.Pen.Style := psSolid;
+      end
+      else
+        PatBlt(ACanvas, ARect.Left + ABounds.LeftOffset,
+          ARect.Bottom - 2, ABounds.Width, 2, PATCOPY);
     end;
   end;
 end;
@@ -1833,6 +1841,7 @@ const
   PostFix: array [TAddrType] of string = (
     '',
     'in Assembly.',
+    'in the Dump.',
     'in the Dump.',
     'on the Stack.',
     'in the Dump.'
@@ -2154,7 +2163,7 @@ begin
   begin
     case AddrType of
       atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
-      atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
+      atRead, atReadLinked: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
       atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
     end;
     ValidateRect := ARect;
@@ -2267,19 +2276,14 @@ begin
       AHintParam.MouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
     AHintParam.HintInfo.CursorRect.Width := ABounds.Width + RowHeight;
     if not PtInRect(AHintParam.HintInfo.CursorRect, AHintParam.MouseHitInfo.CursorPos) then Exit;
-
     AHintParam.AddrVA := TAddressViewPainter(Painter).GetAddrAtIndex(0);
     if AHintParam.AddrVA <> 0 then
     begin
-      DoQueryAddrType(AHintParam.AddrVA, AddrType{%H-});
-      if AddrType = atNone then
-      begin
-        FLastInvalidAddrRect := AHintParam.HintInfo.CursorRect;
-        Exit;
-      end;
       FLastInvalidAddrRect := TRect.Empty;
       inherited;
-    end;
+    end
+    else
+      FLastInvalidAddrRect := AHintParam.HintInfo.CursorRect;
   end;
 end;
 
@@ -2500,7 +2504,7 @@ begin
         if not View.CanDrawValidation(AddrType) then Continue;
         case AddrType of
           atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
-          atRead: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
+          atRead, atReadLinked: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
           atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
         end;
         ValidateRect := DrawR;

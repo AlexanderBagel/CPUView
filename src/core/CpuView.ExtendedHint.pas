@@ -46,6 +46,7 @@ uses
 type
   TPointerValue = bvmHex64..bvmFloat80;
   TPointerValues = set of TPointerValue;
+  PPointerValues = ^TPointerValues;
 
   {$IFNDEF FPC}
   PInt8 = PShortInt;
@@ -66,6 +67,7 @@ type
     Font: TFont;
     RowHeight: Integer;
     Tokenizer: TAsmTokenizer;
+    PointerValues: TPointerValues;
   end;
 
   {$IFDEF FPC}
@@ -191,17 +193,17 @@ begin
   FHints.Text := FDisplayedItem.HintLines;
   for I := 0 to FAsm.Count - 1 do
   begin
-    FMaxLine := Max(FMaxLine, Length(FAsm[I]) * FData.CharWidth);
-    FMaxHint := Max(FMaxHint, Length(FHints[I]) * FData.CharWidth);
+    FMaxLine := Max(FMaxLine, Length(FAsm[I]));
+    FMaxHint := Max(FMaxHint, Length(FHints[I]));
   end;
   if FMaxHint > 0 then
-    SeparatorWidth := FData.CharWidth
+    SeparatorWidth := 1
   else
     SeparatorWidth := 0;
   FExtendedRect := Bounds(
     FExtendedRect.Left,
     FExtendedRect.Top,
-    Max(FMaxChainLine, FMaxLine + SeparatorWidth + FMaxHint) + FData.BorderWidth shl 1,
+    Max(FMaxChainLine, (FMaxLine + SeparatorWidth + FMaxHint) * FData.CharWidth) + FData.BorderWidth shl 1,
     FAsm.Count * FData.RowHeight + FData.BorderWidth shl 1);
 end;
 
@@ -212,14 +214,15 @@ var
 begin
   for I := Low(TPointerValue) to High(TPointerValue) do
   begin
+    if not (I in FData.PointerValues) then Continue;
     S := GetPointerValue(I);
-    FMaxLine := Max(FMaxLine, Length(S) * FData.CharWidth);
+    FMaxLine := Max(FMaxLine, Length(S));
     FHints.Add(S);
   end;
   FExtendedRect := Bounds(
     FExtendedRect.Left,
     FExtendedRect.Top,
-    Max(FMaxChainLine, FMaxLine) + FData.BorderWidth shl 1,
+    Max(FMaxChainLine, FMaxLine * FData.CharWidth) + FData.BorderWidth shl 1,
     FHints.Count * FData.RowHeight + FData.BorderWidth shl 1);
 end;
 
@@ -295,7 +298,7 @@ var
   Dx: array of Integer;
   DrawLinkStep: Byte;
 begin
-  SetLength(Dx, Max(FMaxLine, FMaxHint) div FData.CharWidth);
+  SetLength(Dx, Max(FMaxLine, FMaxHint));
   for I := 0 to Length(Dx) - 1 do
     Dx[I] := FData.CharWidth;
 
@@ -308,7 +311,7 @@ begin
     R := Bounds(
       FExtendedRect.Left + FData.BorderWidth,
       FExtendedRect.Top + FData.BorderWidth + I * FData.RowHeight,
-      FMaxLine, FData.RowHeight);
+      FMaxLine * FData.CharWidth, FData.RowHeight);
     DrawLinkStep := 0;
     while nSize > 0 do
     begin
@@ -357,8 +360,8 @@ begin
     end;
     Line := FHints[I];
     if Line = '' then Continue;
-    R.Left := FExtendedRect.Left + FData.BorderWidth + FMaxLine + FData.CharWidth;
-    R.Width := FMaxHint;
+    R.Left := FExtendedRect.Left + FData.BorderWidth + FMaxLine * FData.CharWidth + FData.CharWidth;
+    R.Width := FMaxHint * FData.CharWidth;
     Canvas.Font.Color := FData.ColorMap.TextCommentColor;
     Canvas.Font.Style := [];
     ExtTextOut(Canvas, R.Left, R.Top, ETO_CLIPPED, @R, @Line[1],
@@ -373,14 +376,14 @@ var
   R: TRect;
   Line: string;
 begin
-  SetLength(Dx, Max(FMaxLine, FMaxHint) div FData.CharWidth);
+  SetLength(Dx, Max(FMaxLine, FMaxHint));
   for I := 0 to Length(Dx) - 1 do
     Dx[I] := FData.CharWidth;
 
   R := Bounds(
     FExtendedRect.Left + FData.BorderWidth,
     FExtendedRect.Top + FData.BorderWidth,
-    FMaxLine, FData.RowHeight);
+    FMaxLine * FData.CharWidth, FData.RowHeight);
   Canvas.Font.Color := FData.ColorMap.TextCommentColor;
   Canvas.Font.Style := [];
 
@@ -396,7 +399,12 @@ end;
 function TExtendedHintWindow.GetAddrString(const AItem: TAddrCacheItem): string;
 begin
   if AItem.Symbol = '' then
-    Result := Format('[0x%x] (%s)', [AItem.AddrVA, AItem.Region.ToString])
+  begin
+    if AItem.AddrType = atNone then
+      Result := Format('0x%x', [AItem.AddrVA])
+    else
+      Result := Format('[0x%x] (%s)', [AItem.AddrVA, AItem.Region.ToString])
+  end
   else
     Result := Format('[0x%x] (%s) -> %s', [AItem.AddrVA, AItem.Region.ToString, AItem.Symbol]);
 end;
@@ -405,15 +413,15 @@ function TExtendedHintWindow.GetPointerValue(APointerValue: TPointerValue
   ): string;
 begin
   case APointerValue of
-    bvmHex64: Result := 'Hex64: 0x' + IntToHex(PUInt64(@FDisplayedItem.PointerValue[0])^, 1);
-    bvmInt8: Result := 'Int8: ' + IntToStr(PInt8(@FDisplayedItem.PointerValue[0])^);
-    bvmInt16: Result := 'Int16: ' + IntToStr(PInt16(@FDisplayedItem.PointerValue[0])^);
-    bvmInt32: Result := 'Int32: ' + IntToStr(PInt32(@FDisplayedItem.PointerValue[0])^);
-    bvmInt64: Result := 'Int64: ' + IntToStr(PInt64(@FDisplayedItem.PointerValue[0])^);
-    bvmUInt8: Result := 'UInt8: ' + UIntToStr(PUInt8(@FDisplayedItem.PointerValue[0])^);
-    bvmUInt16: Result := 'UInt16: ' + UIntToStr(PUInt16(@FDisplayedItem.PointerValue[0])^);
-    bvmUInt32: Result := 'UInt32: ' + UIntToStr(PUInt32(@FDisplayedItem.PointerValue[0])^);
-    bvmUInt64: Result := 'UInt64: ' + UIntToStr(PUInt64(@FDisplayedItem.PointerValue[0])^);
+    bvmHex64: Result   := 'Hex64:   0x' + IntToHex(PUInt64(@FDisplayedItem.PointerValue[0])^, 1);
+    bvmInt8: Result    := 'Int8:    ' + IntToStr(PInt8(@FDisplayedItem.PointerValue[0])^);
+    bvmInt16: Result   := 'Int16:   ' + IntToStr(PInt16(@FDisplayedItem.PointerValue[0])^);
+    bvmInt32: Result   := 'Int32:   ' + IntToStr(PInt32(@FDisplayedItem.PointerValue[0])^);
+    bvmInt64: Result   := 'Int64:   ' + IntToStr(PInt64(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt8: Result   := 'UInt8:   ' + UIntToStr(PUInt8(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt16: Result  := 'UInt16:  ' + UIntToStr(PUInt16(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt32: Result  := 'UInt32:  ' + UIntToStr(PUInt32(@FDisplayedItem.PointerValue[0])^);
+    bvmUInt64: Result  := 'UInt64:  ' + UIntToStr(PUInt64(@FDisplayedItem.PointerValue[0])^);
     bvmFloat32: Result := 'Float32: ' + FloatToStr(PSingle(@FDisplayedItem.PointerValue[0])^);
     bvmFloat64: Result := 'Float64: ' + FloatToStr(PDouble(@FDisplayedItem.PointerValue[0])^);
     bvmFloat80: Result := 'Float80: ' + ExtractExtended80Fmt(PExtended80Support(@FDisplayedItem.PointerValue[0])^);
@@ -457,7 +465,7 @@ begin
     begin
       Canvas.Brush.Color := FData.ColorMap.HeaderColumnSeparatorColor;
       PatBlt(Canvas, FExtendedRect.Left + FData.BorderWidth +
-        FMaxLine + FData.CharWidth shr 1,
+        FMaxLine * FData.CharWidth + FData.CharWidth shr 1,
         FExtendedRect.Top + 1, 1, FExtendedRect.Height - 2, PATCOPY);
     end;
     Canvas.Brush.Style := bsClear;

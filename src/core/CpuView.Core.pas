@@ -141,12 +141,14 @@ type
     FDisassemblyStream: TBufferedROStream;
     FDumpViewList: TDumpViewList;
     FExtendedHintData: TExtendedHintData;
+    FExtendedHints: Boolean;
     FForceFindSymbols: Boolean;
     FInvalidReg: TRegionData;
     FLastStackLimit: TStackLimit;
     FLockSelChange: Boolean;
     FLastCachedAddrVA: Int64;
     FLastCtx: TCommonCpuContext;
+    FPointerValues: TPointerValues;
     FRegView: TRegView;
     FSessionCache: TDictionary<Int64, TAddrCacheItem>;
     FShowCallFuncName: Boolean;
@@ -191,7 +193,7 @@ type
     procedure SetStackView(const Value: TStackView);
     procedure SynhronizeViewersWithContext;
   protected
-    function AccessToAddrType(AddrVA: Int64; AAccess: TRegionAccessSet): TAddrType;
+    function AccessToAddrType(const AItem: TAddrCacheItem): TAddrType;
     procedure BuildAsmWindow(AAddress: Int64);
     function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
@@ -231,6 +233,8 @@ type
     property Debugger: TAbstractDebugger read FDebugger;
     property DBase: TCpuViewDBase read FDBase;
     property DumpViewList: TDumpViewList read FDumpViewList;
+    property ExtendedHints: Boolean read FExtendedHints write FExtendedHints;
+    property ExtendedHintPointerValues: TPointerValues read FPointerValues write FPointerValues;
     // Адрес от которого был построен последний кэш.
     // Необходим для правильного выполнения операций Undo/Redo в кэше переходов.
     // -------------------------------------------------------------------------
@@ -444,7 +448,7 @@ var
   CacheItem: TAddrCacheItem;
 begin
   if QueryCacheItem(AddrVA, CacheItem) then
-    Result := AccessToAddrType(AddrVA, CacheItem.Region.Access)
+    Result := AccessToAddrType(CacheItem)
   else
     Result := atNone;
 end;
@@ -924,7 +928,7 @@ procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
     AItem: TAddrCacheItem;
   begin
     QueryCacheItem(AddrVA, AItem);
-    case AccessToAddrType(AddrVA, AItem.Region.Access) of
+    case AccessToAddrType(AItem) of
       atExecute: QueryDisasmAtAddr(AddrVA, AItem);
       atRead: QueryPointerValueAtAddr(AddrVA, AItem);
     end;
@@ -932,7 +936,6 @@ procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
   end;
 
 var
-  AddressType: TAddrType;
   ChainAddrVA: Int64;
   AItem: TAddrCacheItem;
   AccessStr, Symbol: string;
@@ -941,20 +944,21 @@ var
 begin
   if (Param.AddrVA <> 0) and Assigned(AsmView) and Assigned(RegView) then
   begin
-    QueryCacheItem(Param.AddrVA, AItem);
-    AddressType := AccessToAddrType(Param.AddrVA, AItem.Region.Access);
-    if AddressType = atNone then Exit;
 
-    //if AddressType in [atRead, atStack] then
-    //begin
-    //  AccessStr := QueryAccessStr(Param.AddrVA);
-    //  Symbol := QuerySymbolAtAddr(Param.AddrVA);
-    //  Hint := Format('Addr: 0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
-    //  Exit;
-    //end;
+    if not ExtendedHints then
+    begin
+      AccessStr := QueryAccessStr(Param.AddrVA);
+      Symbol := QuerySymbolAtAddr(Param.AddrVA);
+      Hint := Format('Addr: 0x%x (%s) %s', [Param.AddrVA, AccessStr, Symbol]);
+      Exit;
+    end;
+
+    Finalize(FExtendedHintData);
+    FExtendedHintData := Default(TExtendedHintData);
 
     Hint := 'External hint...';
     Param.HintInfo.HintWindowClass := TExtendedHintWindow;
+    QueryCacheItem(Param.AddrVA, AItem);
     SetLength(FExtendedHintData.AddrChain, 1 + AItem.InDeepCount);
     FillCacheItem(0, Param.AddrVA);
     if AItem.InDeepCount > 0 then
@@ -975,6 +979,18 @@ begin
     FExtendedHintData.Font := AsmView.Font;
     FExtendedHintData.RowHeight := AsmView.RowHeight;
     FExtendedHintData.Tokenizer := AsmView.Tokenizer;
+    FExtendedHintData.PointerValues := ExtendedHintPointerValues;
+    if FExtendedHintData.AddrChain[0].AddrType = atNone then
+    begin
+      Move(Param.AddrVA, FExtendedHintData.AddrChain[0].PointerValue[0], FDebugger.PointerSize);
+      Exclude(FExtendedHintData.PointerValues, bvmHex64);
+      if FDebugger.PointerSize = 4 then
+      begin
+        Exclude(FExtendedHintData.PointerValues, bvmInt64);
+        Exclude(FExtendedHintData.PointerValues, bvmUInt64);
+        Exclude(FExtendedHintData.PointerValues, bvmFloat64);
+      end;
+    end;
     Param.HintInfo.HintData := @FExtendedHintData;
     if GetCursorPos(P) then
       Param.HintInfo.HintPos.Y := P.Y + GetSystemMetrics(SM_CYCURSOR) shr 1;
@@ -993,7 +1009,7 @@ begin
       OnQueryAddressType(Sender, AJmpAddr, AddrType);
       case AddrType of
         atExecute: ShowDisasmAtAddr(AJmpAddr);
-        atRead: ShowDumpAtAddr(AJmpAddr);
+        atRead, atReadLinked: ShowDumpAtAddr(AJmpAddr);
         atStack: ShowStackAtAddr(AJmpAddr);
       end;
       Handled := AddrType <> atNone;
@@ -1054,7 +1070,7 @@ begin
 
     if not Result then Exit;
 
-    AItem.AddrType := AccessToAddrType(AddrVA, AItem.Region.Access);
+    AItem.AddrType := AccessToAddrType(AItem);
 
     if raRead in AItem.Region.Access then
     begin
@@ -1252,16 +1268,20 @@ begin
     FStackView.Invalidate;
 end;
 
-function TCpuViewCore.AccessToAddrType(AddrVA: Int64;
-  AAccess: TRegionAccessSet): TAddrType;
+function TCpuViewCore.AccessToAddrType(const AItem: TAddrCacheItem): TAddrType;
 begin
   Result := atNone;
-  if (raExecute in AAccess) then
+  if (raExecute in AItem.Region.Access) then
     Exit(atExecute);
-  if (AddrVA <= LastStackLimit.Base) and (AddrVA >= LastStackLimit.Limit) then
+  if (AItem.AddrVA <= LastStackLimit.Base) and (AItem.AddrVA >= LastStackLimit.Limit) then
     Exit(atStack);
-  if (raRead in AAccess) then
-    Result := atRead;
+  if (raRead in AItem.Region.Access) then
+  begin
+    if AItem.InDeepCount > 0 then
+      Result := atReadLinked
+    else
+      Result := atRead;
+  end;
 end;
 
 procedure TCpuViewCore.ShowDisasmAtAddr(AddrVA: Int64; PushToJmpStack: Boolean);
