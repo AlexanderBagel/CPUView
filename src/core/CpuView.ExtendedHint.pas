@@ -181,8 +181,9 @@ begin
   end;
 
   Result := Rect(0, 0,
-    FExtendedRect.Right + NcBorderWidth,
-    FExtendedRect.Bottom + NcBorderWidth + FBottomHint.Count * FTextHeight);
+    FExtendedRect.Right + CorrectRectWidth,
+    FExtendedRect.Bottom + FBottomHint.Count * FTextHeight
+    {$IFDEF FPC} + NcBorderWidth{$ENDIF});
 end;
 
 procedure TExtendedHintWindow.CalculateExecute(MaxWidth: Integer);
