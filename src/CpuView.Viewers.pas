@@ -535,6 +535,7 @@ type
     function ByteViewModeCommandEnabled(Value: TByteViewMode; var AChecked: Boolean): Boolean; override;
     function CopyCommandEnabled(Value: TCopyStyle): Boolean; override;
     procedure DoChange(ChangeCode: Integer); override;
+    procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
     procedure DoGetHint(var AHintParam: THintParam; var AHint: string); override;
     function GetDefaultCaretChangeMode: TCaretChangeMode; override;
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
@@ -2259,6 +2260,18 @@ begin
     UpdateFrameDescriptions;
 end;
 
+procedure TCustomStackView.DoContextPopup(MousePos: TPoint;
+  var Handled: Boolean);
+var
+  HitInfo: TMouseHitInfo;
+begin
+  HitInfo := GetHitInfo(MousePos.X, MousePos.Y, SavedShift);
+  if (HitInfo.SelectPoint.ValueOffset >= 0) and
+    not (keSelection in HitInfo.Elements) then
+    UpdateSelection(HitInfo.SelectPoint, HitInfo.SelectPoint);
+  inherited;
+end;
+
 procedure TCustomStackView.DoGetHint(var AHintParam: THintParam;
   var AHint: string);
 var
@@ -2796,7 +2809,7 @@ begin
   if Context = nil then Exit;
   HitInfo := GetHitInfo(MousePos.X, MousePos.Y, SavedShift);
   if (HitInfo.SelectPoint.ValueOffset >= 0) and
-    not CheckSelected(HitInfo.SelectPoint) then
+    not (keSelection in HitInfo.Elements) then
     UpdateSelection(HitInfo.SelectPoint, HitInfo.SelectPoint);
   RegID := Context.RegInfo(HitInfo.SelectPoint.RowIndex,
     HitInfo.SelectPoint.ValueOffset).RegID;
