@@ -369,6 +369,7 @@ type
     function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo;
       var AddrIndex: Integer): Int64;
     function GetBounds(AIndex: Integer): TBoundaries;
+    function GetSelBounds: TBoundaries;
     function View: TCustomAddressView;
   end;
 
@@ -1736,6 +1737,43 @@ begin
   Result.Width := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
 end;
 
+function TAddressViewPainter.GetSelBounds: TBoundaries;
+var
+  ASelData: TSelectData;
+  ASelStart, ASelEnd: Integer;
+begin
+  ASelData := GetSelectData(RowIndex);
+  case ASelData.SelectStyle of
+    ssAllSelected:
+    begin
+      ASelStart := 0;
+      ASelEnd := RawData[RowIndex].RawLength - 1;
+    end;
+    ssLeftSelected:
+    begin
+      ASelStart := 0;
+      ASelEnd := ASelData.FirstSelectIndex;
+    end;
+    ssCenterSelected:
+    begin
+      ASelStart := ASelData.FirstSelectIndex;
+      ASelEnd := ASelData.SecondSelectIndex;
+    end;
+    ssRightSelected:
+    begin
+      ASelStart := ASelData.FirstSelectIndex;
+      ASelEnd := RawData[RowIndex].RawLength - 1;
+    end;
+  else
+    Result := Default(TBoundaries);
+    Exit;
+  end;
+  ASelStart := ASelStart shl 1;
+  ASelEnd := ASelEnd shl 1;
+  Result.LeftOffset := TextMetric.CharLength(ctOpcode, 0, ASelStart) - CharWidth;
+  Result.Width := TextMetric.CharLength(ctOpcode, ASelStart, ASelEnd) + CharWidth;
+end;
+
 function TAddressViewPainter.QueryAddrType(AIndex: Integer): TAddrType;
 begin
   if FCacheAddrIndex <> AIndex then
@@ -1860,6 +1898,19 @@ begin
   Painter := GetRowPainter(AHintParam.MouseHitInfo.SelectPoint.RowIndex);
   if Assigned(Painter) then
   begin
+    if keSelection in AHintParam.MouseHitInfo.Elements then
+    begin
+      AHintParam.AddrVA := 0;
+      ReadDataAtSelStart(AHintParam.AddrVA, SizeOf(AHintParam.AddrVA));
+      ABounds := TAddressViewPainter(Painter).GetSelBounds;
+      AHintParam.HintInfo.CursorRect.Left :=
+        AHintParam.MouseHitInfo.ColumnStart + TextMargin + ABounds.LeftOffset;
+      AHintParam.HintInfo.CursorRect.Width := ABounds.Width;
+      if not PtInRect(AHintParam.HintInfo.CursorRect, AHintParam.MouseHitInfo.CursorPos) then Exit;
+      FLastInvalidAddrRect := TRect.Empty;
+      inherited;
+      Exit;
+    end;
     AHintParam.AddrVA := TAddressViewPainter(Painter).GetAddressAtCursor(
       AHintParam.MouseHitInfo, AddrIndex{%H-});
     if (AddrIndex >= 0) and (AHintParam.AddrVA <> 0) then
