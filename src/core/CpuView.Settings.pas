@@ -165,6 +165,7 @@ const
   xmlAddrValidateE = 'addrExec';
   xmlAddrValidateR = 'addrRead';
   xmlAddrValidateS = 'addrStack';
+  xmlAddrDuplicate = 'addrDuplicate';
 
   xmlValidation = 'useValidation';
   xmlHint = 'hint';
@@ -519,6 +520,7 @@ begin
   FColors.Add(xmlAddrValidateE, Value.AddrExecuteColor);
   FColors.Add(xmlAddrValidateR, Value.AddrReadColor);
   FColors.Add(xmlAddrValidateS, Value.AddrStackColor);
+  FColors.Add(xmlAddrDuplicate, Value.DuplicateColor);
 end;
 
 function TCpuViewSettins.GetShotCut(Index: TShortCutType): TCpuViewShortCut;
@@ -987,6 +989,7 @@ begin
   Value.AddrExecuteColor := Color[xmlAddrValidateE];
   Value.AddrReadColor := Color[xmlAddrValidateR];
   Value.AddrStackColor := Color[xmlAddrValidateS];
+  Value.DuplicateColor := Color[xmlAddrDuplicate];
 end;
 
 procedure TCpuViewSettins.Save(const FilePath: string);
@@ -1368,9 +1371,10 @@ begin
   Add(xmlStackPointColor, 'Stack: Stack Point');
   Add(xmlStackPointFontColor, 'Stack: Stack Point Font');
 
-  Add(xmlAddrValidateE, 'Dump/Stack: Address is Executable');
-  Add(xmlAddrValidateR, 'Dump/Stack: Address is Readable');
-  Add(xmlAddrValidateS, 'Dump/Stack: Address is in Stack');
+  Add(xmlAddrValidateE, 'Validation: Address is Executable');
+  Add(xmlAddrValidateR, 'Validation: Address is Readable');
+  Add(xmlAddrValidateS, 'Validation: Address is in Stack');
+  Add(xmlAddrDuplicate, 'Dump/Stack: The data matches the highlighted block');
 end;
 
 procedure TCpuViewSettins.SetColor(const Index: string; Value: TColor);

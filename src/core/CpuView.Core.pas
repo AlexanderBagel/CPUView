@@ -31,13 +31,11 @@ interface
 
 {$message 'Min/Max col width to FWHexView for each coltype'}
 {$message 'Connect all 10 bookmarks on AsmView'}
-{$message 'Add a selection option to the dump so that you can keep track of multiple adjacent buffers'}
 {$message 'The x87/SIMD registers are not editable'}
 {$message 'View for Call param'}
-{$message 'Highlighting of identical selected values in the dump window'}
 {$message 'Run to user code'}
 {$message 'Display strings in hint with disassembly for executable AddrVA and in addr validation (blue color)'}
-{$message 'In dump addresses not leading to debugging information should be underlined instead of solid line.'}
+{$message 'The dump should not reset the selection during a debug step'}
 
 uses
   {$IFDEF FPC}

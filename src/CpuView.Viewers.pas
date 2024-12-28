@@ -310,9 +310,11 @@ type
     FExecuteColor: TColor;
     FReadColor: TColor;
     FStackColor: TColor;
+    FDuplicateColor: TColor;
     procedure SetExecuteColor(AValue: TColor);
     procedure SetReadColor(AValue: TColor);
     procedure SetStackColor(AValue: TColor);
+    procedure SetDuplicateColor(const Value: TColor);
   protected
     procedure AssignTo(Dest: TPersistent); override;
     procedure InitLightMode; override;
@@ -321,12 +323,14 @@ type
     property AddrExecuteColor: TColor read FExecuteColor write SetExecuteColor stored IsColorStored;
     property AddrReadColor: TColor read FReadColor write SetReadColor stored IsColorStored;
     property AddrStackColor: TColor read FStackColor write SetStackColor stored IsColorStored;
+    property DuplicateColor: TColor read FDuplicateColor write SetDuplicateColor stored IsColorStored;
   end;
 
   { TCustomAddressView }
 
   TCustomAddressView = class(TFWCustomHexView)
   private
+    FHightLightSelected: Boolean;
     FLastInvalidAddrRect: TRect;
     FOnQueryAddr: TOnQueryAddrType;
     FValidateAddress: Boolean;
@@ -336,16 +340,22 @@ type
     procedure SetColorMap(AValue: TAddressViewColorMap);
     procedure SetValidateAddress(AValue: Boolean);
     procedure SetValidateType(Index: TAddrValidationType; AValue: Boolean);
+    procedure SetHightLightSelected(const Value: Boolean);
+    procedure UpdateSelectionList;
   protected
     function CanDrawValidation(AAddrType: TAddrType): Boolean;
     procedure DoChange(ChangeCode: Integer); override;
+    procedure DoSelectionChage(AStartAddr, AEndAddr: Int64); override;
     procedure DoQueryAddrType(AddrVA: Int64; out AddrType: TAddrType);
     procedure InitDefault; override;
     procedure InitPainters; override;
     function GetColorMapClass: THexViewColorMapClass; override;
     procedure RestoreViewParam; override;
+    procedure UpdateDataMap; override;
+    procedure UpdateVerticalScrollPos; override;
   protected
     property ColorMap: TAddressViewColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
+    property HightLightSelected: Boolean read FHightLightSelected write SetHightLightSelected;
     property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
   public
@@ -425,6 +435,7 @@ type
     property Font;
     property Header;
     property HideSelection;
+    property HightLightSelected;
     property NoDataText;
     property ParentFont;
     property ParentShowHint;
@@ -579,6 +590,7 @@ type
     property Encoder;
     property Font;
     property HideSelection;
+    property HightLightSelected;
     property NoDataText;
     property ParentFont;
     property ParentShowHint;
@@ -1544,6 +1556,15 @@ end;
 
 { TAddressViewColorMap }
 
+procedure TAddressViewColorMap.SetDuplicateColor(const Value: TColor);
+begin
+  if DuplicateColor <> Value then
+  begin
+    FDuplicateColor := Value;
+    DoChange;
+  end;
+end;
+
 procedure TAddressViewColorMap.SetExecuteColor(AValue: TColor);
 begin
   if FExecuteColor <> AValue then
@@ -1585,6 +1606,7 @@ end;
 procedure TAddressViewColorMap.InitLightMode;
 begin
   inherited;
+  FDuplicateColor := $82D5FF;
   FExecuteColor := $CC33FF;
   FReadColor := $CC66;
   FStackColor := $2197FF;
@@ -1593,6 +1615,7 @@ end;
 procedure TAddressViewColorMap.InitDarkMode;
 begin
   inherited;
+  FDuplicateColor := $005B69;
   FExecuteColor := $CC33FF;
   FReadColor := $CC66;
   FStackColor := $2197FF;
@@ -1626,9 +1649,17 @@ begin
     FOnQueryAddr(Self, AddrVA, AddrType);
 end;
 
+procedure TCustomAddressView.DoSelectionChage(AStartAddr, AEndAddr: Int64);
+begin
+  inherited;
+  if HightLightSelected then
+    UpdateSelectionList;
+end;
+
 procedure TCustomAddressView.InitDefault;
 begin
   inherited;
+  FHightLightSelected := True;
   FValidateAddress := True;
   FValidateType[avtExecutable] := True;
   FValidateType[avtReadable] := True;
@@ -1658,6 +1689,15 @@ begin
   ColorMap.Assign(AValue);
 end;
 
+procedure TCustomAddressView.SetHightLightSelected(const Value: Boolean);
+begin
+  if HightLightSelected <> Value then
+  begin
+    FHightLightSelected := Value;
+    UpdateSelectionList;
+  end;
+end;
+
 procedure TCustomAddressView.SetValidateAddress(AValue: Boolean);
 begin
   if ValidateAddress <> AValue then
@@ -1673,12 +1713,73 @@ begin
   FValidateType[Index] := AValue;
 end;
 
+procedure TCustomAddressView.UpdateDataMap;
+begin
+  inherited;
+  if HightLightSelected then
+    UpdateSelectionList;
+end;
+
+procedure TCustomAddressView.UpdateSelectionList;
+var
+  SelBuf, CheckBuff, DisplayBuff: array of Byte;
+  ASelStart, ASelEnd, ASelLength, ADisplayStart, ADisplayLength: Int64;
+  I: Integer;
+  CheckWindowAddrVA: Int64;
+begin
+  Selections.DropSelectionsAtTag(1);
+  ASelStart := Min(SelStart, SelEnd);
+  ASelEnd := Max(SelStart, SelEnd);
+  ASelLength := ASelEnd - ASelStart + 1;
+  SetLength(SelBuf, ASelLength);
+  ASelLength := ReadDataAtSelStart(SelBuf[0], ASelLength);
+  if ASelLength = 0 then Exit;
+  SetLength(CheckBuff, ASelLength);
+  if CompareMem(@CheckBuff[0], @SelBuf[0], ASelLength) then Exit;
+  SetLength(SelBuf, ASelLength);
+  SetLength(DisplayBuff, (VisibleRowCount + 1) * BytesInRow);
+  if DataStream = nil then Exit;
+  ADisplayStart := RowToAddress(CurrentVisibleRow, 0);
+  DataStream.Position := ADisplayStart - StartAddress;
+  ADisplayLength := DataStream.Read(DisplayBuff[0], Length(DisplayBuff));
+  I := 0;
+  while I < ADisplayLength - ASelLength do
+  begin
+    CheckWindowAddrVA := ADisplayStart + I;
+    if (CheckWindowAddrVA >= ASelStart) and (CheckWindowAddrVA <= ASelEnd) then
+    begin
+      Inc(I);
+      Continue;
+    end;
+    Inc(CheckWindowAddrVA, ASelLength - 1);
+    if (CheckWindowAddrVA >= ASelStart) and (CheckWindowAddrVA <= ASelEnd) then
+    begin
+      Inc(I);
+      Continue;
+    end;
+    if CompareMem(@DisplayBuff[I], @SelBuf[0], ASelLength) then
+    begin
+      Selections.Add(1, ADisplayStart + I, ADisplayStart + I + ASelLength - 1, ColorMap.DuplicateColor);
+      Inc(I, ASelLength);
+      Continue;
+    end;
+    Inc(I);
+  end;
+end;
+
+procedure TCustomAddressView.UpdateVerticalScrollPos;
+begin
+  inherited;
+  if HightLightSelected then
+    UpdateSelectionList;
+end;
+
 function TCustomAddressView.CanDrawValidation(AAddrType: TAddrType): Boolean;
 begin
   case AAddrType of
     atNone: Result := False;
     atExecute: Result := ValidateType[avtExecutable];
-    atRead, atReadLinked: Result := ValidateType[avtReadable];
+    atRead, atReadLinked, atString: Result := ValidateType[avtReadable];
     atStack: Result := ValidateType[avtStack];
   end;
 end;
@@ -2226,6 +2327,7 @@ begin
     if ValidateRect.IsEmpty then Exit;
     Offsets := -Ceil(ARect.Height / 5);
     InflateRect(ValidateRect, Offsets, Offsets);
+    ACanvas.Pen.Color := ColorMap.TextColor;
     ACanvas.Brush.Style := bsSolid;
     ACanvas.RoundRect(ValidateRect, 2, 2);
   end;
@@ -2577,6 +2679,7 @@ begin
         InflateRect(ValidateRect, Offsets, Offsets);
         OffsetRect(ValidateRect, -1 -
           TextMetric.CharLength(AColumn, 1, Info.ValueSeparatorSize), 0);
+        ACanvas.Pen.Color := ColorMap.TextColor;
         ACanvas.Brush.Style := bsSolid;
         ACanvas.RoundRect(ValidateRect, 2, 2);
       end;
@@ -2996,6 +3099,7 @@ begin
   BytesInRow := 200;
   Header.Columns := [ctOpcode];
   Header.Visible := False;
+  HightLightSelected := False;
   SeparateGroupByColor := False;
   HintForReg := True;
   HintForFlag := True;
