@@ -23,7 +23,7 @@ interface
 
 uses
   LMessages, Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, Graphics,
-  IDEOptEditorIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList;
+  IDEOptEditorIntf, IDEImagesIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList;
 
 type
 
@@ -99,11 +99,13 @@ uses
   Win32Themes, UxTheme,
   {$ENDIF}
   FWHexView,
+  FWHexView.Common,
   CpuView.Common,
-  CpuView.Settings;
+  CpuView.Settings,
+  CpuView.ExtendedHint;
 
 var
-  TreeExpandState: array [0..3] of Boolean;
+  TreeExpandState: array [0..4] of Boolean;
 
 {$R *.lfm}
 
@@ -237,6 +239,9 @@ procedure TCpuViewMainOptionsFrame.FillImageList;
     end;
   end;
 
+var
+  Idx: Integer;
+  Ico: TIcon;
 begin
   ilSettings.Clear;
   ilSettings.Width := tvSettings.DefaultNodeHeight;
@@ -245,6 +250,14 @@ begin
   AddColorRect(Settings.Color[xmlAddrValidateR]);
   AddColorRect(clGray);
   AddColorRect(Settings.Color[xmlAddrValidateS]);
+  Idx := IDEImages.LoadImage('menu_view_todo');
+  Ico := TIcon.Create;
+  try
+    IDEImages.Images_16.GetIcon(Idx, Ico);
+    ilSettings.AddIcon(Ico);
+  finally
+    Ico.Free;
+  end;
 end;
 
 procedure TCpuViewMainOptionsFrame.FillSettingsView;
@@ -259,6 +272,7 @@ procedure TCpuViewMainOptionsFrame.FillSettingsView;
 
 var
   ANode: PVirtualNode;
+  I: TPointerValue;
 begin
   tvSettings.Clear;
   ANode := Add(nil, 100, tvcsNone);
@@ -275,6 +289,7 @@ begin
   Add(ANode, 202, BoolToTVCheckStyle(Settings.ValidationDump[avtReadable]));
   Add(ANode, 203, BoolToTVCheckStyle(Settings.ValidationDump[avtStack]));
   Add(ANode, 204, BoolToTVCheckStyle(Settings.HintInDump));
+  Add(ANode, 205, BoolToTVCheckStyle(Settings.DuplicatesDump));
   tvSettings.Expanded[ANode] := TreeExpandState[1];
 
   ANode := Add(nil, 300, tvcsNone);
@@ -290,7 +305,13 @@ begin
   Add(ANode, 402, BoolToTVCheckStyle(Settings.ValidationStack[avtReadable]));
   Add(ANode, 403, BoolToTVCheckStyle(Settings.ValidationStack[avtStack]));
   Add(ANode, 404, BoolToTVCheckStyle(Settings.HintInStack));
+  Add(ANode, 405, BoolToTVCheckStyle(Settings.DuplicatesStack));
   tvSettings.Expanded[ANode] := TreeExpandState[3];
+
+  ANode := Add(nil, 500, tvcsNone);
+  for I := Low(TPointerValue) to High(TPointerValue) do
+    Add(ANode, 501 + Byte(I) - Byte(bvmHex64), BoolToTVCheckStyle(I in Settings.ExtendedHintPointerValues));
+  tvSettings.Expanded[ANode] := TreeExpandState[4];
 end;
 
 procedure TCpuViewMainOptionsFrame.SaveExpandedState;
@@ -305,6 +326,7 @@ begin
       200: TreeExpandState[1] := tvSettings.Expanded[Enum.Current];
       300: TreeExpandState[2] := tvSettings.Expanded[Enum.Current];
       400: TreeExpandState[3] := tvSettings.Expanded[Enum.Current];
+      500: TreeExpandState[4] := tvSettings.Expanded[Enum.Current];
     end;
   end;
 end;
@@ -318,6 +340,7 @@ begin
     200: ImageIndex := 1;
     300: ImageIndex := 2;
     400: ImageIndex := 3;
+    500: ImageIndex := 4;
   else
     ImageIndex := -1;
   end;
@@ -331,6 +354,7 @@ const
   stExecutebleAddr = 'Mark the Executable Address';
   stReadableAddr = 'Mark the Readable Address';
   stStackAddr = 'Mark the Stack Address';
+  stDuplicates = 'Highlighting of identical selected values';
 begin
   case PInteger(tvSettings.GetNodeData(Node))^ of
     // Disassembly
@@ -347,6 +371,7 @@ begin
     202: CellText := stReadableAddr;
     203: CellText := stStackAddr;
     204: CellText := stShowHint;
+    205: CellText := stDuplicates;
     // Register
     300: CellText := 'Register View';
     301: CellText := stExecutebleAddr;
@@ -360,6 +385,21 @@ begin
     402: CellText := stReadableAddr;
     403: CellText := stStackAddr;
     404: CellText := stShowHint;
+    405: CellText := stDuplicates;
+    // Extended hint
+    500: CellText := 'Extended hint';
+    501: CellText := 'Hex data';
+    502: CellText := 'Signed Byte (8-bit) data';
+    503: CellText := 'Signed Short (16-bit) data';
+    504: CellText := 'Signed Long (32-bit) data';
+    505: CellText := 'Signed Long Long (64-bit) data';
+    506: CellText := 'Unsigned Byte (8-bit) data';
+    507: CellText := 'Unsigned Short (16-bit) data';
+    508: CellText := 'Unsigned Long (32-bit) data';
+    509: CellText := 'Unsigned Long Long (64-bit) data';
+    510: CellText := 'Float (32-bit) data';
+    511: CellText := 'Double (64-bit) data';
+    512: CellText := 'Long Double (80-bit) data';
   end;
 end;
 
@@ -403,6 +443,8 @@ procedure TCpuViewMainOptionsFrame.DoWriteSettings;
 var
   Enum: TVTVirtualNodeEnumerator;
   Checked: Boolean;
+  Idx: Integer;
+  APointerValues: TPointerValues;
 begin
   Settings.FontName := cbFont.Text;
   Settings.UseAddrValidation := cbAddrValidation.Checked;
@@ -413,11 +455,13 @@ begin
   Settings.UseCrashDump := cbDbgCrash.Checked;
   Settings.ForceFindSymbols := cbForceFindSymbols.Checked;
   Settings.ExtendedHints := cbExtendedHints.Checked;
+  APointerValues := [];
   Enum := tvSettings.Nodes.GetEnumerator;
   while Enum.MoveNext do
   begin
     Checked := tvSettings.CheckState[Enum.Current] = csCheckedNormal;
-    case PInteger(tvSettings.GetNodeData(Enum.Current))^ of
+    Idx := PInteger(tvSettings.GetNodeData(Enum.Current))^;
+    case Idx of
       100: TreeExpandState[0] := tvSettings.Expanded[Enum.Current];
       101: Settings.ShowJumps := Checked;
       102: Settings.ShowOpcodes := Checked;
@@ -430,6 +474,7 @@ begin
       202: Settings.ValidationDump[avtReadable] := Checked;
       203: Settings.ValidationDump[avtStack] := Checked;
       204: Settings.HintInDump := Checked;
+      205: Settings.DuplicatesDump := Checked;
       300: TreeExpandState[2] := tvSettings.Expanded[Enum.Current];
       301: Settings.ValidationReg[avtExecutable] := Checked;
       302: Settings.ValidationReg[avtReadable] := Checked;
@@ -441,8 +486,19 @@ begin
       402: Settings.ValidationStack[avtReadable] := Checked;
       403: Settings.ValidationStack[avtStack] := Checked;
       404: Settings.HintInStack := Checked;
+      405: Settings.DuplicatesStack := Checked;
+      500: TreeExpandState[4] := tvSettings.Expanded[Enum.Current];
+      501..514:
+      begin
+        if Checked then
+        begin
+          Idx := Byte(bvmHex64) + Idx - 501;
+          Include(APointerValues, PPointerValue(@Idx)^);
+        end;
+      end;
     end;
   end;
+  Settings.ExtendedHintPointerValues := APointerValues;
 end;
 
 function TCpuViewMainOptionsFrame.IsMainFrame: Boolean;

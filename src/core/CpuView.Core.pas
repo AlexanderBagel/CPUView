@@ -928,7 +928,7 @@ procedure TCpuViewCore.OnGetHint(Sender: TObject; const Param: THintParam;
     QueryCacheItem(AddrVA, AItem);
     case AccessToAddrType(AItem) of
       atExecute: QueryDisasmAtAddr(AddrVA, AItem);
-      atRead: QueryPointerValueAtAddr(AddrVA, AItem);
+      atRead, atStack: QueryPointerValueAtAddr(AddrVA, AItem);
     end;
     FExtendedHintData.AddrChain[Index] := AItem;
   end;

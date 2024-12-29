@@ -45,6 +45,7 @@ uses
 
 type
   TPointerValue = bvmHex64..bvmFloat80;
+  PPointerValue = ^TPointerValue;
   TPointerValues = set of TPointerValue;
   PPointerValues = ^TPointerValues;
 

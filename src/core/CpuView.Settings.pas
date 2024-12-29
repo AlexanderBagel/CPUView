@@ -198,12 +198,14 @@ type
     FontHeight: Double;
     AddrValidation: array [TAddrValidationType] of Boolean;
     Hints: Boolean;
+    ShowDuplicates: Boolean;
   end;
 
   TStackSettings = record
     FontHeight: Double;
     AddrValidation: array [TAddrValidationType] of Boolean;
     Hints: Boolean;
+    ShowDuplicates: Boolean;
   end;
 
   TSplitters = (spTopHorz, spBottomHorz, spCenterVert);
@@ -345,6 +347,8 @@ type
     property ColorMode: TColorMode read FColorMode write FColorMode;
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
+    property DuplicatesDump: Boolean read FDumpSettings.ShowDuplicates write FDumpSettings.ShowDuplicates ;
+    property DuplicatesStack: Boolean read FStackSettings.ShowDuplicates write FStackSettings.ShowDuplicates ;
     property ExtendedHints: Boolean read FExtendedHints write FExtendedHints;
     property ExtendedHintPointerValues: TPointerValues read FPointerValues write FPointerValues;
     property ForceFindSymbols: Boolean read FForceFindSymbols write FForceFindSymbols;
@@ -668,6 +672,7 @@ begin
   FDumpSettings.AddrValidation[avtReadable] := True;
   FDumpSettings.AddrValidation[avtStack] := True;
   FDumpSettings.Hints := True;
+  FDumpSettings.ShowDuplicates := True;
 
   {$IFDEF MSWINDOWS}
   FFontName := 'Consolas';
@@ -687,6 +692,7 @@ begin
   FStackSettings.AddrValidation[avtReadable] := True;
   FStackSettings.AddrValidation[avtStack] := True;
   FStackSettings.Hints := True;
+  FStackSettings.ShowDuplicates := True;
 
   FUseDebugInfo := True;
   FUseDebugLog := True;
@@ -893,6 +899,7 @@ begin
   FDumpSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
   FDumpSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
   FDumpSettings.Hints := GetNodeAttr(Root, xmlHint);
+  FDumpSettings.ShowDuplicates := GetNodeAttr(Root, xmlAddrDuplicate);
 end;
 
 procedure TCpuViewSettins.LoadFromXML_Full(Root: IXMLNode);
@@ -958,6 +965,7 @@ begin
   FStackSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
   FStackSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
   FStackSettings.Hints := GetNodeAttr(Root, xmlHint);
+  FStackSettings.ShowDuplicates := GetNodeAttr(Root, xmlAddrDuplicate);
 end;
 
 procedure TCpuViewSettins.Reset(APart: TSettingPart);
@@ -1198,6 +1206,7 @@ begin
   SetNodeAttr(Root, xmlAddrValidateR, FDumpSettings.AddrValidation[avtReadable]);
   SetNodeAttr(Root, xmlAddrValidateS, FDumpSettings.AddrValidation[avtStack]);
   SetNodeAttr(Root, xmlHint, FDumpSettings.Hints);
+  SetNodeAttr(Root, xmlAddrDuplicate, FDumpSettings.ShowDuplicates);
 end;
 
 procedure TCpuViewSettins.SaveToXML_Full(Root: IXMLNode);
@@ -1257,6 +1266,7 @@ begin
   SetNodeAttr(Root, xmlAddrValidateR, FStackSettings.AddrValidation[avtReadable]);
   SetNodeAttr(Root, xmlAddrValidateS, FStackSettings.AddrValidation[avtStack]);
   SetNodeAttr(Root, xmlHint, FStackSettings.Hints);
+  SetNodeAttr(Root, xmlAddrDuplicate, FStackSettings.ShowDuplicates);
 end;
 
 procedure TCpuViewSettins.SeStackValidation(Index: TAddrValidationType;
@@ -1413,6 +1423,7 @@ begin
   ADumpView.Encoder.EncodeType := FDumpSettings.EncodeType;
   ADumpView.Encoder.CodePage := FDumpSettings.CodePage;
   ADumpView.Encoder.EncodingName := FDumpSettings.EncodingName;
+  ADumpView.HightLightSelected := FDumpSettings.ShowDuplicates;
   // Without validation, the dump doesn't know about the addresses
   ADumpView.ShowHint := UseAddrValidation and HintInDump;
   ADumpView.ValidateAddress := UseAddrValidation;
@@ -1441,6 +1452,7 @@ begin
   RestoreViewDefSettings(AStackView);
   AStackView.Font.Height := DoubleToDpi(FStackSettings.FontHeight, AStackView);
   AStackView.ShowHint := HintInStack;
+  AStackView.HightLightSelected := FStackSettings.ShowDuplicates;
   AStackView.ValidateAddress := UseAddrValidation;
   AStackView.ValidateType[avtExecutable] := ValidationStack[avtExecutable];
   AStackView.ValidateType[avtReadable] := ValidationStack[avtReadable];
