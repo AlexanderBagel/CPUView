@@ -23,7 +23,7 @@ interface
 
 uses
   LMessages, Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, Graphics,
-  IDEOptEditorIntf, IDEImagesIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList;
+  IDEOptEditorIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList;
 
 type
 
@@ -239,9 +239,6 @@ procedure TCpuViewMainOptionsFrame.FillImageList;
     end;
   end;
 
-var
-  Idx: Integer;
-  Ico: TIcon;
 begin
   ilSettings.Clear;
   ilSettings.Width := tvSettings.DefaultNodeHeight;
@@ -250,14 +247,7 @@ begin
   AddColorRect(Settings.Color[xmlAddrValidateR]);
   AddColorRect(clGray);
   AddColorRect(Settings.Color[xmlAddrValidateS]);
-  Idx := IDEImages.LoadImage('menu_view_todo');
-  Ico := TIcon.Create;
-  try
-    IDEImages.Images_16.GetIcon(Idx, Ico);
-    ilSettings.AddIcon(Ico);
-  finally
-    Ico.Free;
-  end;
+  AddColorRect(clWhite);
 end;
 
 procedure TCpuViewMainOptionsFrame.FillSettingsView;

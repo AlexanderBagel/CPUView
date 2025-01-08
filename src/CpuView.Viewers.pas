@@ -210,6 +210,7 @@ type
     function GetDefaultCaretChangeMode: TCaretChangeMode; override;
     function GetHeaderClass: THeaderClass; override;
     function GetOverloadPainterClass(Value: TPrimaryRowPainterClass): TPrimaryRowPainterClass; override;
+    function IgnoreSelectionWhenCopyAddress: Boolean; override;
     procedure InitPainters; override;
     function IsJumpValid(AJmpToAddr: Int64): Boolean; override;
   protected
@@ -355,7 +356,7 @@ type
     procedure UpdateVerticalScrollPos; override;
   protected
     property ColorMap: TAddressViewColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
-    property HightLightSelected: Boolean read FHightLightSelected write SetHightLightSelected;
+    property HightLightSelected: Boolean read FHightLightSelected write SetHightLightSelected default True;
     property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
   public
@@ -1446,6 +1447,11 @@ begin
       Result := Value;
 end;
 
+function TCustomAsmView.IgnoreSelectionWhenCopyAddress: Boolean;
+begin
+  Result := True;
+end;
+
 procedure TCustomAsmView.InitPainters;
 begin
   inherited;
@@ -1728,6 +1734,7 @@ var
   CheckWindowAddrVA: Int64;
 begin
   Selections.DropSelectionsAtTag(1);
+  if not HightLightSelected then Exit;
   ASelStart := Min(SelStart, SelEnd);
   ASelEnd := Max(SelStart, SelEnd);
   ASelLength := ASelEnd - ASelStart + 1;
