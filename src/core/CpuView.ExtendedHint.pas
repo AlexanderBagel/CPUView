@@ -92,9 +92,11 @@ type
     FTextHeight, FMaxChainLine, FMaxLine, FMaxHint: Integer;
     procedure CalculateExecute(MaxWidth: Integer);
     procedure CalculatePointerValue(MaxWidth: Integer);
+    procedure CalculateString(MaxWidth: Integer);
     procedure DrawAddrChain;
     procedure DrawExecuteData;
     procedure DrawPointerValue;
+    procedure DrawStringData;
     function GetAddrString(const AItem: TAddrCacheItem): string;
     function GetPointerValue(APointerValue: TPointerValue): string;
   protected
@@ -176,7 +178,7 @@ begin
 
   case FDisplayedItem.AddrType of
     atExecute: CalculateExecute(MaxWidth);
-    atString:; // not implemented yet...
+    atString: CalculateString(MaxWidth);
   else
     CalculatePointerValue(MaxWidth);
   end;
@@ -226,6 +228,28 @@ begin
     FExtendedRect.Top,
     Max(FMaxChainLine, FMaxLine * FData.CharWidth) + FData.BorderWidth shl 1,
     FHints.Count * FData.RowHeight + FData.BorderWidth shl 1);
+end;
+
+procedure TExtendedHintWindow.CalculateString(MaxWidth: Integer);
+var
+  R: TRect;
+  SavedFont: TFont;
+begin
+  R := Rect(0, 0, MaxWidth shr 1, 1);
+  SavedFont := TFont.Create;
+  try
+    SavedFont.Assign(Canvas.Font);
+    Canvas.Font := FData.Font;
+    DrawText(Canvas, FDisplayedItem.Symbol, -1, R, DT_NOPREFIX or DT_WORDBREAK or DT_CALCRECT);
+  finally
+    Canvas.Font.Assign(SavedFont);
+  end;
+  R.Width := Min(MaxWidth shr 1, R.Width);
+  FExtendedRect := Bounds(
+    FExtendedRect.Left,
+    FExtendedRect.Top,
+    Max(FMaxChainLine, R.Width) + FData.BorderWidth shl 1,
+    R.Height + FData.BorderWidth shl 1);
 end;
 
 procedure TExtendedHintWindow.CMTextChanged(var Message: TMessage);
@@ -398,9 +422,20 @@ begin
   end;
 end;
 
+procedure TExtendedHintWindow.DrawStringData;
+var
+  R: TRect;
+begin
+  Canvas.Font.Color := FData.ColorMap.TextCommentColor;
+  Canvas.Font.Style := [];
+  R := FExtendedRect;
+  InflateRect(R, -FData.BorderWidth, -FData.BorderWidth);
+  DrawText(Canvas, FDisplayedItem.Symbol, -1, R, DT_NOPREFIX or DT_WORDBREAK or DT_END_ELLIPSIS);
+end;
+
 function TExtendedHintWindow.GetAddrString(const AItem: TAddrCacheItem): string;
 begin
-  if AItem.Symbol = '' then
+  if (AItem.Symbol = '') or (AItem.AddrType = atString) then
   begin
     if AItem.AddrType = atNone then
       Result := Format('0x%x', [AItem.AddrVA])
@@ -472,10 +507,12 @@ begin
     end;
     Canvas.Brush.Style := bsClear;
 
-    if FDisplayedItem.AddrType = atExecute then
-      DrawExecuteData
+    case FDisplayedItem.AddrType of
+      atExecute: DrawExecuteData;
+      atString: DrawStringData;
     else
       DrawPointerValue;
+    end;
 
     Canvas.Font.Assign(SavedFont);
   finally

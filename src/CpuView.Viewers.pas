@@ -312,10 +312,12 @@ type
     FReadColor: TColor;
     FStackColor: TColor;
     FDuplicateColor: TColor;
+    FStringColor: TColor;
     procedure SetExecuteColor(AValue: TColor);
     procedure SetReadColor(AValue: TColor);
     procedure SetStackColor(AValue: TColor);
     procedure SetDuplicateColor(const Value: TColor);
+    procedure SetStringColor(AValue: TColor);
   protected
     procedure AssignTo(Dest: TPersistent); override;
     procedure InitLightMode; override;
@@ -324,6 +326,7 @@ type
     property AddrExecuteColor: TColor read FExecuteColor write SetExecuteColor stored IsColorStored;
     property AddrReadColor: TColor read FReadColor write SetReadColor stored IsColorStored;
     property AddrStackColor: TColor read FStackColor write SetStackColor stored IsColorStored;
+    property AddrStringColor: TColor read FStringColor write SetStringColor stored IsColorStored;
     property DuplicateColor: TColor read FDuplicateColor write SetDuplicateColor stored IsColorStored;
   end;
 
@@ -1571,6 +1574,15 @@ begin
   end;
 end;
 
+procedure TAddressViewColorMap.SetStringColor(AValue: TColor);
+begin
+  if FStringColor <> AValue then
+  begin
+    FStringColor := AValue;
+    DoChange;
+  end;
+end;
+
 procedure TAddressViewColorMap.SetExecuteColor(AValue: TColor);
 begin
   if FExecuteColor <> AValue then
@@ -1606,6 +1618,7 @@ begin
     TAddressViewColorMap(Dest).FExecuteColor := FExecuteColor;
     TAddressViewColorMap(Dest).FReadColor := FReadColor;
     TAddressViewColorMap(Dest).FStackColor := FStackColor;
+    TAddressViewColorMap(Dest).FStringColor := FStringColor;
   end;
 end;
 
@@ -1616,6 +1629,7 @@ begin
   FExecuteColor := $CC33FF;
   FReadColor := $CC66;
   FStackColor := $2197FF;
+  FStringColor := $FF6380;
 end;
 
 procedure TAddressViewColorMap.InitDarkMode;
@@ -1625,6 +1639,7 @@ begin
   FExecuteColor := $CC33FF;
   FReadColor := $CC66;
   FStackColor := $2197FF;
+  FStringColor := $C20041;
 end;
 
 { TCustomAddressView }
@@ -1670,6 +1685,7 @@ begin
   FValidateType[avtExecutable] := True;
   FValidateType[avtReadable] := True;
   FValidateType[avtStack] := True;
+  FValidateType[avtString] := True;
 end;
 
 procedure TCustomAddressView.InitPainters;
@@ -1786,8 +1802,9 @@ begin
   case AAddrType of
     atNone: Result := False;
     atExecute: Result := ValidateType[avtExecutable];
-    atRead, atReadLinked, atString: Result := ValidateType[avtReadable];
+    atRead, atReadLinked: Result := ValidateType[avtReadable];
     atStack: Result := ValidateType[avtStack];
+    atString: Result := ValidateType[avtString];
   end;
 end;
 
@@ -1936,9 +1953,10 @@ begin
         atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
         atRead, atReadLinked: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
         atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
+        atString: ACanvas.Brush.Color := View.ColorMap.AddrStringColor;
       end;
       ABounds := GetBounds(I);
-      if AddrType = atRead then
+      if AddrType in [atRead, atString] then
       begin
         ACanvas.Pen.Style := psDot;
         ACanvas.MoveTo(ARect.Left + ABounds.LeftOffset, ARect.Bottom - 2);
@@ -1984,15 +2002,18 @@ end;
 
 procedure TCustomDumpView.DoGetHint(var AHintParam: THintParam;
   var AHint: string);
-const
-  PostFix: array [TAddrType] of string = (
-    '',
-    'in Assembly.',
-    'in the Dump.',
-    'in the Dump.',
-    'on the Stack.',
-    'in the Dump.'
-  );
+
+  function PostFix(AAddrType: TAddrType): string;
+  begin
+    case AAddrType of
+      atExecute: Result := 'in Assembly.';
+      atStack: Result := 'in the Stack.';
+      atRead, atReadLinked, atString: Result := 'in the Dump.';
+    else
+      Result := '';
+    end;
+  end;
+
 var
   Painter: TAbstractPrimaryRowPainter;
   AddrType: TAddrType;
@@ -2036,7 +2057,7 @@ begin
       FLastInvalidAddrRect := TRect.Empty;
       inherited;
       AHint := AHint + sLineBreak +
-        'Press Ctrl+Click to jump to an address ' + PostFix[AddrType];
+        'Press Ctrl+Click to jump to an address ' + PostFix(AddrType);
     end;
   end;
 end;
@@ -2325,6 +2346,7 @@ begin
       atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
       atRead, atReadLinked: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
       atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
+      atString: ACanvas.Brush.Color := View.ColorMap.AddrStringColor;
     end;
     ValidateRect := ARect;
     ABounds := GetBounds(0);
@@ -2679,6 +2701,7 @@ begin
           atExecute: ACanvas.Brush.Color := View.ColorMap.AddrExecuteColor;
           atRead, atReadLinked: ACanvas.Brush.Color := View.ColorMap.AddrReadColor;
           atStack: ACanvas.Brush.Color := View.ColorMap.AddrStackColor;
+          atString: ACanvas.Brush.Color := View.ColorMap.AddrStringColor;
         end;
         ValidateRect := DrawR;
         ValidateRect.Width := ValidateRect.Height;

@@ -34,7 +34,6 @@ interface
 {$message 'The x87/SIMD registers are not editable'}
 {$message 'View for Call param'}
 {$message 'Run to user code'}
-{$message 'Display strings in hint with disassembly for executable AddrVA and in addr validation (blue color)'}
 {$message 'The dump should not reset the selection during a debug step'}
 
 uses
@@ -137,6 +136,7 @@ type
     FDBase: TCpuViewDBase;
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
+    FDisplayStrings: Boolean;
     FDumpViewList: TDumpViewList;
     FExtendedHintData: TExtendedHintData;
     FExtendedHints: Boolean;
@@ -146,12 +146,14 @@ type
     FLockSelChange: Boolean;
     FLastCachedAddrVA: Int64;
     FLastCtx: TCommonCpuContext;
+    FMinimumStringLength: Integer;
     FPointerValues: TPointerValues;
     FRegView: TRegView;
     FSessionCache: TDictionary<Int64, TAddrCacheItem>;
     FShowCallFuncName: Boolean;
     FStackView: TStackView;
     FStackStream: TBufferedROStream;
+    FStringStream: TBufferedROStream;
     FThreadChange: Boolean;
     FOldAsmScroll: TOnVerticalScrollEvent;
     FOldAsmSelect: TNotifyEvent;
@@ -186,6 +188,7 @@ type
       InDeepCall: Boolean = False): Boolean;
     function QueryDisasmAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     function QueryPointerValueAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
+    function QueryStringAtAddr(AddrVA: Int64; var AItem: TAddrCacheItem; out AsPtrValue: Int64): Boolean;
     procedure SetAsmView(const Value: TAsmView);
     procedure SetRegView(const Value: TRegView);
     procedure SetStackView(const Value: TStackView);
@@ -228,8 +231,9 @@ type
     function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean;
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
-    property Debugger: TAbstractDebugger read FDebugger;
     property DBase: TCpuViewDBase read FDBase;
+    property Debugger: TAbstractDebugger read FDebugger;
+    property DisplayStrings: Boolean read FDisplayStrings write FDisplayStrings;
     property DumpViewList: TDumpViewList read FDumpViewList;
     property ExtendedHints: Boolean read FExtendedHints write FExtendedHints;
     property ExtendedHintPointerValues: TPointerValues read FPointerValues write FPointerValues;
@@ -240,6 +244,7 @@ type
     // Necessary for proper Undo/Redo operations in the transition cache.
     property LastCachedAddrVA: Int64 read FLastCachedAddrVA;
     property LastStackLimit: TStackLimit read FLastStackLimit;
+    property MinimumStringLength: Integer read FMinimumStringLength write FMinimumStringLength;
     property RegView: TRegView read FRegView write SetRegView;
     property StackView: TStackView read FStackView write SetStackView;
     property ShowCallFuncName: Boolean read FShowCallFuncName write FShowCallFuncName;
@@ -470,6 +475,108 @@ begin
   end;
 end;
 
+function TCpuViewCore.QueryStringAtAddr(AddrVA: Int64;
+  var AItem: TAddrCacheItem; out AsPtrValue: Int64): Boolean;
+var
+  pCursor, pStartChar, pMaxPos: PByte;
+  Len: Integer;
+  Unicode: Boolean;
+
+  procedure NextChar;
+  begin
+    Len := 0;
+    pStartChar := nil;
+    Inc(pCursor);
+  end;
+
+  function StrEnd: Boolean;
+  var
+    ABuff: AnsiString;
+    UBuff: UnicodeString;
+  begin
+    Result := False;
+    if Len >= MinimumStringLength then
+    begin
+      if Unicode then
+      begin
+        if PWord(pCursor)^ <> 0 then
+          Exit;
+        SetLength(UBuff, Len);
+        Move(pStartChar^, UBuff[1], Len * 2);
+        AItem.Symbol := 'U: "' + string(UBuff) + '"';
+      end
+      else
+      begin
+        if pCursor^ <> 0 then
+          Exit;
+        SetLength(ABuff, Len);
+        Move(pStartChar^, ABuff[1], Len);
+        AItem.Symbol := 'A: "' + string(ABuff) + '"';
+      end;
+      AItem.AddrType := atString;
+      Result := True;
+    end;
+  end;
+
+begin
+  Result := False;
+  AsPtrValue := 0;
+  FStringStream.SetAddrWindow(AddrVA, FStringStream.BufferSize);
+  if FStringStream.Read(AsPtrValue, Debugger.PointerSize) <> Debugger.PointerSize then Exit;
+  pCursor := FStringStream.Memory;
+  pStartChar := pCursor;
+  Len := 0;
+  pMaxPos := pCursor + FStringStream.BufferSize;
+  while pCursor < pMaxPos do
+  begin
+    if pCursor^ in [10, 13, 32..126] then
+    begin
+      if Len = 0 then
+      begin
+        case PWord(pCursor)^ of
+          10, 13, 32..126:
+          begin
+            Unicode := True;
+            pStartChar := pCursor;
+            Inc(pCursor, 2);
+          end;
+        else
+          Unicode := False;
+          pStartChar := pCursor;
+          Inc(pCursor);
+        end;
+        Len := 1;
+      end
+      else
+      begin
+        if Unicode then
+        begin
+          case PWord(pCursor)^ of
+            10, 13, 32..126:
+            begin
+              Inc(Len);
+              Inc(pCursor, 2);
+            end;
+          else
+            Result := StrEnd;
+            Break;
+          end;
+        end
+        else
+        begin
+          Inc(Len);
+          Inc(pCursor);
+        end;
+      end;
+    end
+    else
+    begin
+      Result := StrEnd;
+      Break;
+    end;
+  end;
+end;
+
 function TCpuViewCore.QueryRegion(AddrVA: Int64; out RegionData: TRegionData
   ): Boolean;
 var
@@ -571,6 +678,12 @@ begin
   FShowCallFuncName := True;
   FAsmJmpStack := TJumpStack.Create;
   FDBase := TCpuViewDBase.Create;
+  RemoteStream := TRemoteStream.Create(FUtils);
+  FStringStream := TBufferedROStream.Create(RemoteStream, soOwned);
+  FStringStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+  FStringStream.BufferSize := 1024;
+  MinimumStringLength := 4;
+  DisplayStrings := True;
 end;
 
 destructor TCpuViewCore.Destroy;
@@ -586,6 +699,7 @@ begin
   FDebugger.Free;
   FUtils.Free;
   FDBase.Free;
+  FStringStream.Free;
   inherited;
 end;
 
@@ -974,6 +1088,7 @@ begin
     FExtendedHintData.Colors[atExecute] := RegView.ColorMap.AddrExecuteColor;
     FExtendedHintData.Colors[atRead] := RegView.ColorMap.AddrReadColor;
     FExtendedHintData.Colors[atStack] := RegView.ColorMap.AddrStackColor;
+    FExtendedHintData.Colors[atString] := RegView.ColorMap.AddrStringColor;
     FExtendedHintData.Font := AsmView.Font;
     FExtendedHintData.RowHeight := AsmView.RowHeight;
     FExtendedHintData.Tokenizer := AsmView.Tokenizer;
@@ -1082,7 +1197,7 @@ begin
       if not (raExecute in AItem.Region.Access) then
       begin
         AddrPtr := 0;
-        if Debugger.ReadMemory(AddrVA, AddrPtr, Debugger.PointerSize) then
+        if not QueryStringAtAddr(AddrVA, AItem, AddrPtr) then
         begin
           AddrPtrItem := Default(TAddrCacheItem);
           if ForceFindSymbols then
@@ -1269,6 +1384,8 @@ end;
 function TCpuViewCore.AccessToAddrType(const AItem: TAddrCacheItem): TAddrType;
 begin
   Result := atNone;
+  if AItem.AddrType = atString then
+    Exit(atString);
   if (raExecute in AItem.Region.Access) then
     Exit(atExecute);
   if (AItem.AddrVA <= LastStackLimit.Base) and (AItem.AddrVA >= LastStackLimit.Limit) then

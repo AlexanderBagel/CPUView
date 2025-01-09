@@ -48,6 +48,8 @@ type
     property OnUpdated: TOnCacheUpdated read FUpdated write FUpdated;
   end;
 
+  { TBufferedROStream }
+
   TBufferedROStream = class(TStream)
   private
     FStream: TRemoteStream;
@@ -58,6 +60,7 @@ type
     FBuffSize: Integer;
     procedure InvalidateBuffer;
     function GetBuffer_EndPosition: Int64;
+    function GetMemory: PByte;
     procedure SetBufferSize(Value: Integer);
   protected
     property Buffer_StartPosition: Int64 read FBuffStartPosition;
@@ -84,6 +87,7 @@ type
     /// </summary>
     procedure SetAddrWindow(AStartAddrVA, AEndAddrVA: Int64);
     property BufferSize: Integer read FBuffSize write SetBufferSize;
+    property Memory: PByte read GetMemory;
     property Stream: TRemoteStream read FStream;
   end;
 
@@ -187,6 +191,14 @@ end;
 procedure TBufferedROStream.InvalidateBuffer;
 begin
   FBuff := nil;
+end;
+
+function TBufferedROStream.GetMemory: PByte;
+begin
+  if Length(FBuff) = 0 then
+    Result := nil
+  else
+    Result := @FBuff[0];
 end;
 
 function TBufferedROStream.Read(var Buffer; Count: Longint): Longint;
