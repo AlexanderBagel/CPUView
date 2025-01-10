@@ -513,6 +513,7 @@ var
         Move(pStartChar^, ABuff[1], Len);
         AItem.Symbol := 'A: "' + string(ABuff) + '"';
       end;
+      AItem.InDeepSymbol := AItem.Symbol;
       AItem.AddrType := atString;
       Result := True;
     end;
@@ -805,7 +806,7 @@ begin
       FAsmView.DataMap.AddComment(Line.AddrVA, Line.DecodedStr)
     else
       if Line.LinkIndex > 0 then
-        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, '',
+        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, Line.HintStr,
           Line.JmpTo, Line.LinkIndex, Length(Line.DecodedStr) - Line.LinkIndex)
       else
         FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
@@ -816,7 +817,7 @@ begin
         FAsmView.DataMap.AddComment(Line.DecodedStr)
       else
         if Line.LinkIndex > 0 then
-          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, '', Line.JmpTo,
+          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo,
             Line.LinkIndex, Length(Line.DecodedStr) - Line.LinkIndex)
         else
           FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
@@ -861,7 +862,7 @@ end;
 function TCpuViewCore.FormatInstructionToAsmLine(const AIns: TInstruction
   ): TAsmLine;
 var
-  SpaceIndex: Integer;
+  SpaceIndex, SquareBracketPos: Integer;
 begin
   Result.AddrVA := AIns.AddrVA;
   Result.DecodedStr := AIns.AsString;
@@ -874,19 +875,17 @@ begin
     Result.LinkIndex := Pos(' ', Result.DecodedStr);
     SpaceIndex := Pos(' ', Result.HintStr);
     if SpaceIndex = 0 then
+      SpaceIndex := Length(Result.HintStr) + 1;
+    if ShowCallFuncName and Result.DecodedStr.StartsWith('CALL') then
     begin
-      if Result.HintStr.StartsWith('__$dll$') then
-        SpaceIndex := Length(Result.HintStr) + 1
-      else
-        Exit;
-    end;
-    if ShowCallFuncName then
-    begin
-      if Result.DecodedStr.StartsWith('CALL') then
+      SquareBracketPos := Pos('[', Result.DecodedStr);
+      if SquareBracketPos = 0 then
       begin
         Result.DecodedStr := 'CALL ' + Copy(Result.HintStr, 1, SpaceIndex - 1);
         Result.HintStr := '';
-      end;
+      end
+      else
+        Result.LinkIndex := SquareBracketPos - 1;
     end;
   end;
 end;

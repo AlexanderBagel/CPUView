@@ -738,6 +738,7 @@ var
   AnInfo: TDbgInstInfo;
   ExternalAddr, RipAddr: Int64;
   SpaceIndex: Integer;
+  HasMem: Boolean;
 begin
   CpuViewDebugLog.Log(Format('DebugGate: Disassembly(AddrVA: 0x%x, nSize: %d)', [AddrVA, nSize]), True);
 
@@ -765,13 +766,26 @@ begin
     Disasm.Disassemble(pBuff, ACodeBytes, ACode, AnInfo);
     Instruction.AddrVA := AddrVA;
     Instruction.AsString := FormatAsmCode(ACode, AnInfo, Length(ACodeBytes) shr 1);
-    ExternalAddr := AddrVA + AnInfo.InstrTargetOffs;
+
+    HasMem := (AnInfo.InstrType = itJump) and (Pos('[', Instruction.AsString) > 0);
+    if HasMem then
+    begin
+      // Error in TX86AsmDecoder.Disassemble, AnInfo.InstrTargetOffs is not returned correctly.
+      Dec(AnInfo.InstrTargetOffs, Length(ACodeBytes) shr 1);
+      ExternalAddr := 0;
+      ReadMemory(AnInfo.InstrTargetOffs, ExternalAddr, PointerSize);
+    end
+    else
+      ExternalAddr := AddrVA + AnInfo.InstrTargetOffs;
 
     if AnInfo.InstrTargetOffs <> 0 then
     begin
       Instruction.Hint := QuerySymbolAtAddr(ExternalAddr, qsName);
       if Instruction.Hint = '' then
-        Instruction.Hint := '0x' + IntToHex(ExternalAddr, 1);
+        Instruction.Hint := '0x' + IntToHex(ExternalAddr, 1)
+      else
+        if HasMem then
+          Instruction.Hint := '[0x' + IntToHex(ExternalAddr, 1) + '] -> ' + Instruction.Hint;
     end
     else
       Instruction.Hint := '';
@@ -779,7 +793,7 @@ begin
     if AnInfo.InstrType = itJump then
     begin
       Instruction.JmpTo := ExternalAddr;
-      if ShowFullAddress then
+      if ShowFullAddress and not HasMem then
       begin
         SpaceIndex := Pos(' ', Instruction.AsString);
         if SpaceIndex > 0 then
@@ -794,12 +808,15 @@ begin
       Instruction.JmpTo := 0;
       if AnInfo.InstrTargetOffs <> 0 then
       begin
-        FSupportStream.Position := ExternalAddr;
-        RipAddr := 0;
         RipSimbol := '';
-        FSupportStream.Read(RipAddr, PointerSize);
+        RipAddr := 0;
+        ReadMemory(ExternalAddr, RipAddr, PointerSize);
         if RipAddr <> 0 then
+        begin
           RipSimbol := QuerySymbolAtAddr(RipAddr, qsName);
+          if Instruction.AsString.StartsWith('CALL') then
+            Instruction.JmpTo := RipAddr;
+        end;
         if RipSimbol = '' then
           Instruction.Hint := Format('RIP (0x%.1x) %s', [ExternalAddr, Instruction.Hint])
         else
