@@ -356,6 +356,7 @@ begin
   FAddrValidation[avtExecutable] := True;
   FAddrValidation[avtReadable] := True;
   FAddrValidation[avtStack] := True;
+  FAddrValidation[avtString] := True;
 end;
 
 procedure TContextAbstractSettings.LoadFromXML(Root: IXMLNode);

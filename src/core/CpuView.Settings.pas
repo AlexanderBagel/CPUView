@@ -165,6 +165,7 @@ const
   xmlAddrValidateE = 'addrExec';
   xmlAddrValidateR = 'addrRead';
   xmlAddrValidateS = 'addrStack';
+  xmlAddrValidateStr = 'addrString';
   xmlAddrDuplicate = 'addrDuplicate';
 
   xmlValidation = 'useValidation';
@@ -173,6 +174,8 @@ const
   xmlForceFindSymbols = 'useForceFindSymbols';
   xmlExtendedHints = 'useExtendedHints';
   xmlHintPointerValues = 'useHintPointerValues';
+  xmlDisplayStrings = 'useStr';
+  xmlMinimumStringLength = 'minStrLen';
 
   // not used
   xmlContext = 'ctx';
@@ -247,10 +250,12 @@ type
     FColors: TDictionary<string, TColor>;
     FColorsMap: TList<TColorMapItem>;
     FCpuViewDlgSettings: TCpuViewDlgSettings;
+    FDisplayStrings: Boolean;
     FDumpSettings: TDumpSettings;
     FExtendedHints: Boolean;
     FForceFindSymbols: Boolean;
     FFontName: string;
+    FMinimumStringLength: Integer;
     FPointerValues: TPointerValues;
     FSaveFormSession: Boolean;
     FSaveViewersSession: Boolean;
@@ -347,6 +352,7 @@ type
     property ColorMode: TColorMode read FColorMode write FColorMode;
     property Color[const Index: string]: TColor read GetColor write SetColor;
     property CpuViewDlgSettings: TCpuViewDlgSettings read FCpuViewDlgSettings write FCpuViewDlgSettings;
+    property DisplayStrings: Boolean read FDisplayStrings write FDisplayStrings;
     property DuplicatesDump: Boolean read FDumpSettings.ShowDuplicates write FDumpSettings.ShowDuplicates ;
     property DuplicatesStack: Boolean read FStackSettings.ShowDuplicates write FStackSettings.ShowDuplicates ;
     property ExtendedHints: Boolean read FExtendedHints write FExtendedHints;
@@ -358,6 +364,7 @@ type
     property HintInRegForFlag: Boolean read GetHintInRegForFlag write SetHintInRegForFlag;
     property HintInStack: Boolean read FStackSettings.Hints write FStackSettings.Hints;
     property FontName: string read FFontName write FFontName;
+    property MinimumStringLength: Integer read FMinimumStringLength write FMinimumStringLength;
     property SaveFormSession: Boolean read FSaveFormSession write FSaveFormSession;
     property SaveViewersSession: Boolean read FSaveViewersSession write FSaveViewersSession;
     property ShotCutMode: TShortCutMode read FShotCutMode write FShotCutMode;
@@ -524,6 +531,7 @@ begin
   FColors.Add(xmlAddrValidateE, Value.AddrExecuteColor);
   FColors.Add(xmlAddrValidateR, Value.AddrReadColor);
   FColors.Add(xmlAddrValidateS, Value.AddrStackColor);
+  FColors.Add(xmlAddrValidateStr, Value.AddrStringColor);
   FColors.Add(xmlAddrDuplicate, Value.DuplicateColor);
 end;
 
@@ -671,6 +679,7 @@ begin
   FDumpSettings.AddrValidation[avtExecutable] := True;
   FDumpSettings.AddrValidation[avtReadable] := True;
   FDumpSettings.AddrValidation[avtStack] := True;
+  FDumpSettings.AddrValidation[avtString] := True;
   FDumpSettings.Hints := True;
   FDumpSettings.ShowDuplicates := True;
 
@@ -691,6 +700,7 @@ begin
   FStackSettings.AddrValidation[avtExecutable] := True;
   FStackSettings.AddrValidation[avtReadable] := True;
   FStackSettings.AddrValidation[avtStack] := True;
+  FStackSettings.AddrValidation[avtString] := True;
   FStackSettings.Hints := True;
   FStackSettings.ShowDuplicates := True;
 
@@ -701,6 +711,8 @@ begin
   FForceFindSymbols := True;
   FExtendedHints := True;
   FPointerValues := [bvmHex64..bvmFloat80];
+  FDisplayStrings := True;
+  FMinimumStringLength := 4;
 end;
 
 procedure TCpuViewSettins.InitDefaultShortCuts;
@@ -844,6 +856,8 @@ begin
   FExtendedHints := GetNodeAttr(Root, xmlExtendedHints);
   APointerValues := GetNodeAttr(Root, xmlHintPointerValues);
   FPointerValues := PPointerValues(@APointerValues)^;
+  FDisplayStrings := GetNodeAttr(Root, xmlDisplayStrings);
+  FMinimumStringLength := GetNodeAttr(Root, xmlMinimumStringLength);
   if FSaveFormSession then
   begin
     FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
@@ -898,6 +912,7 @@ begin
   FDumpSettings.AddrValidation[avtExecutable] := GetNodeAttr(Root, xmlAddrValidateE);
   FDumpSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
   FDumpSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
+  FDumpSettings.AddrValidation[avtString] := GetNodeAttr(Root, xmlAddrValidateStr);
   FDumpSettings.Hints := GetNodeAttr(Root, xmlHint);
   FDumpSettings.ShowDuplicates := GetNodeAttr(Root, xmlAddrDuplicate);
 end;
@@ -935,6 +950,7 @@ begin
   FRegSettings.AddrValidation[avtExecutable] := GetNodeAttr(Root, xmlAddrValidateE);
   FRegSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
   FRegSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
+  FRegSettings.AddrValidation[avtString] := GetNodeAttr(Root, xmlAddrValidateStr);
   FRegSettings.HintForReg := GetNodeAttr(Root, xmlHint);
   FRegSettings.HintForFlag := GetNodeAttr(Root, xmlHintFlag);
   FRegSettings.LoadFromXML(Root);
@@ -964,6 +980,7 @@ begin
   FStackSettings.AddrValidation[avtExecutable] := GetNodeAttr(Root, xmlAddrValidateE);
   FStackSettings.AddrValidation[avtReadable] := GetNodeAttr(Root, xmlAddrValidateR);
   FStackSettings.AddrValidation[avtStack] := GetNodeAttr(Root, xmlAddrValidateS);
+  FStackSettings.AddrValidation[avtString] := GetNodeAttr(Root, xmlAddrValidateStr);
   FStackSettings.Hints := GetNodeAttr(Root, xmlHint);
   FStackSettings.ShowDuplicates := GetNodeAttr(Root, xmlAddrDuplicate);
 end;
@@ -997,6 +1014,7 @@ begin
   Value.AddrExecuteColor := Color[xmlAddrValidateE];
   Value.AddrReadColor := Color[xmlAddrValidateR];
   Value.AddrStackColor := Color[xmlAddrValidateS];
+  Value.AddrStringColor := Color[xmlAddrValidateStr];
   Value.DuplicateColor := Color[xmlAddrDuplicate];
 end;
 
@@ -1161,6 +1179,8 @@ begin
   SetNodeAttr(Root, xmlForceFindSymbols, FForceFindSymbols);
   SetNodeAttr(Root, xmlExtendedHints, FExtendedHints);
   SetNodeAttr(Root, xmlHintPointerValues, PInteger(@FPointerValues)^);
+  SetNodeAttr(Root, xmlDisplayStrings, FDisplayStrings);
+  SetNodeAttr(Root, xmlMinimumStringLength, FMinimumStringLength);
   if FSaveFormSession then
   begin
     SetNodeAttr(Root, xmlLeft, FCpuViewDlgSettings.BoundsRect.Left);
@@ -1205,6 +1225,7 @@ begin
   SetNodeAttr(Root, xmlAddrValidateE, FDumpSettings.AddrValidation[avtExecutable]);
   SetNodeAttr(Root, xmlAddrValidateR, FDumpSettings.AddrValidation[avtReadable]);
   SetNodeAttr(Root, xmlAddrValidateS, FDumpSettings.AddrValidation[avtStack]);
+  SetNodeAttr(Root, xmlAddrValidateStr, FDumpSettings.AddrValidation[avtString]);
   SetNodeAttr(Root, xmlHint, FDumpSettings.Hints);
   SetNodeAttr(Root, xmlAddrDuplicate, FDumpSettings.ShowDuplicates);
 end;
@@ -1236,6 +1257,7 @@ begin
   SetNodeAttr(Root, xmlAddrValidateE, FRegSettings.AddrValidation[avtExecutable]);
   SetNodeAttr(Root, xmlAddrValidateR, FRegSettings.AddrValidation[avtReadable]);
   SetNodeAttr(Root, xmlAddrValidateS, FRegSettings.AddrValidation[avtStack]);
+  SetNodeAttr(Root, xmlAddrValidateStr, FRegSettings.AddrValidation[avtString]);
   SetNodeAttr(Root, xmlHint, FRegSettings.HintForReg);
   SetNodeAttr(Root, xmlHintFlag, FRegSettings.HintForFlag);
   FRegSettings.SaveToXML(Root);
@@ -1265,6 +1287,7 @@ begin
   SetNodeAttr(Root, xmlAddrValidateE, FStackSettings.AddrValidation[avtExecutable]);
   SetNodeAttr(Root, xmlAddrValidateR, FStackSettings.AddrValidation[avtReadable]);
   SetNodeAttr(Root, xmlAddrValidateS, FStackSettings.AddrValidation[avtStack]);
+  SetNodeAttr(Root, xmlAddrValidateStr, FStackSettings.AddrValidation[avtString]);
   SetNodeAttr(Root, xmlHint, FStackSettings.Hints);
   SetNodeAttr(Root, xmlAddrDuplicate, FStackSettings.ShowDuplicates);
 end;
@@ -1384,6 +1407,7 @@ begin
   Add(xmlAddrValidateE, 'Validation: Address is Executable');
   Add(xmlAddrValidateR, 'Validation: Address is Readable');
   Add(xmlAddrValidateS, 'Validation: Address is in Stack');
+  Add(xmlAddrValidateStr, 'Validation: Address is String');
   Add(xmlAddrDuplicate, 'Dump/Stack: The data matches the highlighted block');
 end;
 

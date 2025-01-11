@@ -524,6 +524,7 @@ begin
   AsPtrValue := 0;
   FStringStream.SetAddrWindow(AddrVA, FStringStream.BufferSize);
   if FStringStream.Read(AsPtrValue, Debugger.PointerSize) <> Debugger.PointerSize then Exit;
+  if not DisplayStrings then Exit;
   pCursor := FStringStream.Memory;
   pStartChar := pCursor;
   Len := 0;

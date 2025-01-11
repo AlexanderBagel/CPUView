@@ -657,10 +657,14 @@ begin
 
   if (Core.ShowCallFuncName <> Settings.ShowCallFuncName) or
     (Core.ForceFindSymbols <> Settings.ForceFindSymbols) or
+    (Core.DisplayStrings <> Settings.DisplayStrings) or
+    (Core.MinimumStringLength <> Settings.MinimumStringLength) or
     (DbgGate.ShowFullAddress <> Settings.ShowFullAddress) or
     (DbgGate.ShowSourceLines <> Settings.ShowSourceLines) or
     (DbgGate.UseDebugInfo <> Settings.UseDebugInfo) then
   begin
+    Core.DisplayStrings := Settings.DisplayStrings;
+    Core.MinimumStringLength := Settings.MinimumStringLength;
     Core.ShowCallFuncName := Settings.ShowCallFuncName;
     Core.ForceFindSymbols := Settings.ForceFindSymbols;
     DbgGate.ShowFullAddress := Settings.ShowFullAddress;

@@ -23,7 +23,7 @@ interface
 
 uses
   LMessages, Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, Graphics,
-  IDEOptEditorIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList;
+  IDEOptEditorIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList, Spin;
 
 type
 
@@ -56,12 +56,15 @@ type
     cbAddrValidation: TCheckBox;
     cbForceFindSymbols: TCheckBox;
     cbExtendedHints: TCheckBox;
+    cbDisplayStrings: TCheckBox;
     FontDialog: TFontDialog;
     gbPerformance: TGroupBox;
     gbSessions: TGroupBox;
     gbViewersSetting: TGroupBox;
     ilSettings: TImageList;
+    lblMinStringLen: TLabel;
     lblFont: TLabel;
+    seMinStrLen: TSpinEdit;
     procedure btnFontBrowseClick(Sender: TObject);
     procedure btnResetClick(Sender: TObject);
     procedure cbSymbolsClick(Sender: TObject);
@@ -278,24 +281,27 @@ begin
   Add(ANode, 201, BoolToTVCheckStyle(Settings.ValidationDump[avtExecutable]));
   Add(ANode, 202, BoolToTVCheckStyle(Settings.ValidationDump[avtReadable]));
   Add(ANode, 203, BoolToTVCheckStyle(Settings.ValidationDump[avtStack]));
-  Add(ANode, 204, BoolToTVCheckStyle(Settings.HintInDump));
-  Add(ANode, 205, BoolToTVCheckStyle(Settings.DuplicatesDump));
+  Add(ANode, 204, BoolToTVCheckStyle(Settings.ValidationDump[avtString]));
+  Add(ANode, 205, BoolToTVCheckStyle(Settings.HintInDump));
+  Add(ANode, 206, BoolToTVCheckStyle(Settings.DuplicatesDump));
   tvSettings.Expanded[ANode] := TreeExpandState[1];
 
   ANode := Add(nil, 300, tvcsNone);
   Add(ANode, 301, BoolToTVCheckStyle(Settings.ValidationReg[avtExecutable]));
   Add(ANode, 302, BoolToTVCheckStyle(Settings.ValidationReg[avtReadable]));
   Add(ANode, 303, BoolToTVCheckStyle(Settings.ValidationReg[avtStack]));
-  Add(ANode, 304, BoolToTVCheckStyle(Settings.HintInRegForReg));
-  Add(ANode, 305, BoolToTVCheckStyle(Settings.HintInRegForFlag));
+  Add(ANode, 304, BoolToTVCheckStyle(Settings.ValidationReg[avtString]));
+  Add(ANode, 305, BoolToTVCheckStyle(Settings.HintInRegForReg));
+  Add(ANode, 306, BoolToTVCheckStyle(Settings.HintInRegForFlag));
   tvSettings.Expanded[ANode] := TreeExpandState[2];
 
   ANode := Add(nil, 400, tvcsNone);
   Add(ANode, 401, BoolToTVCheckStyle(Settings.ValidationStack[avtExecutable]));
   Add(ANode, 402, BoolToTVCheckStyle(Settings.ValidationStack[avtReadable]));
   Add(ANode, 403, BoolToTVCheckStyle(Settings.ValidationStack[avtStack]));
-  Add(ANode, 404, BoolToTVCheckStyle(Settings.HintInStack));
-  Add(ANode, 405, BoolToTVCheckStyle(Settings.DuplicatesStack));
+  Add(ANode, 404, BoolToTVCheckStyle(Settings.ValidationStack[avtString]));
+  Add(ANode, 405, BoolToTVCheckStyle(Settings.HintInStack));
+  Add(ANode, 406, BoolToTVCheckStyle(Settings.DuplicatesStack));
   tvSettings.Expanded[ANode] := TreeExpandState[3];
 
   ANode := Add(nil, 500, tvcsNone);
@@ -344,6 +350,7 @@ const
   stExecutebleAddr = 'Mark the Executable Address';
   stReadableAddr = 'Mark the Readable Address';
   stStackAddr = 'Mark the Stack Address';
+  stStringAddr = 'Mark the String Address';
   stDuplicates = 'Highlighting of identical selected values';
 begin
   case PInteger(tvSettings.GetNodeData(Node))^ of
@@ -360,22 +367,25 @@ begin
     201: CellText := stExecutebleAddr;
     202: CellText := stReadableAddr;
     203: CellText := stStackAddr;
-    204: CellText := stShowHint;
-    205: CellText := stDuplicates;
+    204: CellText := stStringAddr;
+    205: CellText := stShowHint;
+    206: CellText := stDuplicates;
     // Register
     300: CellText := 'Register View';
     301: CellText := stExecutebleAddr;
     302: CellText := stReadableAddr;
     303: CellText := stStackAddr;
-    304: CellText := stShowHint + ' for Validated Address';
-    305: CellText := stShowHint + ' for Flags';
+    304: CellText := stStringAddr;
+    305: CellText := stShowHint + ' for Validated Address';
+    306: CellText := stShowHint + ' for Flags';
     // Stack
     400: CellText := 'Stack View';
     401: CellText := stExecutebleAddr;
     402: CellText := stReadableAddr;
     403: CellText := stStackAddr;
-    404: CellText := stShowHint;
-    405: CellText := stDuplicates;
+    404: CellText := stStringAddr;
+    405: CellText := stShowHint;
+    406: CellText := stDuplicates;
     // Extended hint
     500: CellText := 'Extended hint';
     501: CellText := 'Hex data';
@@ -406,6 +416,8 @@ end;
 procedure TCpuViewMainOptionsFrame.UpdateDebugSymbolsIndepended;
 begin
   cbForceFindSymbols.Enabled := cbSymbols.Checked;
+  lblMinStringLen.Font.Color := TColor(IfThen(cbDisplayStrings.Checked, clWindowText, clGrayText));
+  seMinStrLen.Enabled := cbDisplayStrings.Checked;
 end;
 
 procedure TCpuViewMainOptionsFrame.UpdateFrameControl;
@@ -419,6 +431,8 @@ begin
   cbDbgCrash.Checked := Settings.UseCrashDump;
   cbForceFindSymbols.Checked := Settings.ForceFindSymbols;
   cbExtendedHints.Checked := Settings.ExtendedHints;
+  cbDisplayStrings.Checked := Settings.DisplayStrings;
+  seMinStrLen.Value := Settings.MinimumStringLength;
   FillImageList;
   FillSettingsView;
   UpdateDebugSymbolsIndepended;
@@ -445,6 +459,8 @@ begin
   Settings.UseCrashDump := cbDbgCrash.Checked;
   Settings.ForceFindSymbols := cbForceFindSymbols.Checked;
   Settings.ExtendedHints := cbExtendedHints.Checked;
+  Settings.DisplayStrings := cbDisplayStrings.Checked;
+  Settings.MinimumStringLength := seMinStrLen.Value;
   APointerValues := [];
   Enum := tvSettings.Nodes.GetEnumerator;
   while Enum.MoveNext do
@@ -463,20 +479,23 @@ begin
       201: Settings.ValidationDump[avtExecutable] := Checked;
       202: Settings.ValidationDump[avtReadable] := Checked;
       203: Settings.ValidationDump[avtStack] := Checked;
-      204: Settings.HintInDump := Checked;
-      205: Settings.DuplicatesDump := Checked;
+      204: Settings.ValidationDump[avtString] := Checked;
+      205: Settings.HintInDump := Checked;
+      206: Settings.DuplicatesDump := Checked;
       300: TreeExpandState[2] := tvSettings.Expanded[Enum.Current];
       301: Settings.ValidationReg[avtExecutable] := Checked;
       302: Settings.ValidationReg[avtReadable] := Checked;
       303: Settings.ValidationReg[avtStack] := Checked;
-      304: Settings.HintInRegForReg := Checked;
-      305: Settings.HintInRegForFlag := Checked;
+      304: Settings.ValidationReg[avtString] := Checked;
+      305: Settings.HintInRegForReg := Checked;
+      306: Settings.HintInRegForFlag := Checked;
       400: TreeExpandState[3] := tvSettings.Expanded[Enum.Current];
       401: Settings.ValidationStack[avtExecutable] := Checked;
       402: Settings.ValidationStack[avtReadable] := Checked;
       403: Settings.ValidationStack[avtStack] := Checked;
-      404: Settings.HintInStack := Checked;
-      405: Settings.DuplicatesStack := Checked;
+      404: Settings.ValidationStack[avtString] := Checked;
+      405: Settings.HintInStack := Checked;
+      406: Settings.DuplicatesStack := Checked;
       500: TreeExpandState[4] := tvSettings.Expanded[Enum.Current];
       501..514:
       begin
@@ -500,6 +519,8 @@ procedure TCpuViewMainOptionsFrame.CMFontChanged(var Message: TLMessage);
 begin
   if Assigned(ilSettings) then
     FillImageList;
+  if Assigned(seMinStrLen) and Assigned(lblMinStringLen) then
+    seMinStrLen.Left := lblMinStringLen.Left + lblMinStringLen.Width + lblMinStringLen.Height;
 end;
 
 function TCpuViewMainOptionsFrame.GetTitle: string;

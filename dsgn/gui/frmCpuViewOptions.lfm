@@ -35,12 +35,12 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbPerformance: TGroupBox[3]
     Left = 10
-    Height = 168
-    Top = 56
+    Height = 240
+    Top = 48
     Width = 702
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Performance settings:'
-    ClientHeight = 138
+    ClientHeight = 210
     ClientWidth = 698
     TabOrder = 2
     object cbSymbols: TCheckBox
@@ -77,6 +77,34 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       Caption = 'Use address validation'
       TabOrder = 3
       OnClick = cbSymbolsClick
+    end
+    object cbDisplayStrings: TCheckBox
+      Left = 10
+      Height = 29
+      Top = 136
+      Width = 231
+      Caption = 'Search and display strings'
+      TabOrder = 4
+      OnClick = cbSymbolsClick
+    end
+    object seMinStrLen: TSpinEdit
+      Left = 184
+      Height = 33
+      Hint = 'Minimum string length'
+      Top = 168
+      Width = 75
+      MinValue = 2
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 5
+      Value = 4
+    end
+    object lblMinStringLen: TLabel
+      Left = 40
+      Height = 25
+      Top = 170
+      Width = 135
+      Caption = 'Minimum length:'
     end
   end
   object gbSessions: TGroupBox[4]
@@ -136,8 +164,8 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbViewersSetting: TGroupBox[8]
     Left = 10
-    Height = 280
-    Top = 224
+    Height = 200
+    Top = 304
     Width = 702
     Anchors = [akTop, akLeft, akRight, akBottom]
     Caption = 'Viewers customization:'
