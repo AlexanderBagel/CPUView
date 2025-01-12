@@ -144,9 +144,9 @@ begin
   try
     SetLength(LoadBuff{%H-}, 4096);
     repeat
-      I := F.Read(LoadBuff, 4096);
+      I := F.Read(LoadBuff[0], 4096);
       if I > 0 then
-        Result.WriteBuffer(LoadBuff, I);
+        Result.WriteBuffer(LoadBuff[0], I);
     until I = 0;
   finally
     F.Free;
@@ -254,6 +254,17 @@ begin
   Shared := LowerCase(AccessChar) = 's';
 end;
 
+function DefaultMBIComparer({$IFDEF EXTENDED_RTL}const{$ELSE}constref{$ENDIF} A, B: TMemoryBasicInformation): Integer;
+begin
+  if A.BaseAddress < B.BaseAddress then
+    Result := -1
+  else
+    if A.BaseAddress = B.BaseAddress then
+      Result := 0
+    else
+      Result := 1;
+end;
+
 function LoadVirtualMemoryInformation(AProcessID: Integer): TMemoryBasicInformationList;
 var
   MapsPath, Line: string;
@@ -266,17 +277,7 @@ var
   buff: PByte;
   Delimiter: Char;
 begin
-  Result := TMemoryBasicInformationList.Create(TComparer<TMemoryBasicInformation>.Construct(
-    function (const A, B: TMemoryBasicInformation): Integer
-    begin
-      if A.BaseAddress < B.BaseAddress then
-        Result := -1
-      else
-        if A.BaseAddress = B.BaseAddress then
-          Result := 0
-        else
-          Result := 1;
-    end));
+  Result := TMemoryBasicInformationList.Create(TComparer<TMemoryBasicInformation>.Construct(@DefaultMBIComparer));
   MapsPath := '/proc/' + IntToStr(AProcessID) + '/maps';
   if not FileExists(MapsPath) then Exit;
 
@@ -816,6 +817,17 @@ begin
   if List.Count = 0 then Exit(False);
   MBI.BaseAddress := AQueryAddr;
   Result := List.BinarySearch(MBI, Index);
+  if Index < 0 then
+  begin
+    for Index := 0 to List.Count - 1 do
+    begin
+      MBI := List[Index];
+      if (MBI.BaseAddress <= AQueryAddr) and
+         (MBI.BaseAddress + MBI.RegionSize > AQueryAddr) then
+        Exit(True);
+    end;
+    Exit;
+  end;
   if Result then
     MBI := List[Index]
   else
