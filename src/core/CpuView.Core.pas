@@ -503,7 +503,7 @@ var
           Exit;
         SetLength(UBuff, Len);
         Move(pStartChar^, UBuff[1], Len * 2);
-        AItem.Symbol := 'U: "' + string(UBuff) + '"';
+        AItem.Symbol := 'L"' + string(UBuff) + '"';
       end
       else
       begin
@@ -511,7 +511,7 @@ var
           Exit;
         SetLength(ABuff, Len);
         Move(pStartChar^, ABuff[1], Len);
-        AItem.Symbol := 'A: "' + string(ABuff) + '"';
+        AItem.Symbol := '"' + string(ABuff) + '"';
       end;
       AItem.InDeepSymbol := AItem.Symbol;
       AItem.AddrType := atString;
