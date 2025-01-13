@@ -1014,6 +1014,7 @@ begin
         FStackView.JumpClear;
       end;
       FDumpViewList.JumpClear;
+      FSessionCache.Clear;
       DoReset;
     end;
     adsFinished:
