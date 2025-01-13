@@ -192,7 +192,7 @@ type
     procedure SetAsmView(const Value: TAsmView);
     procedure SetRegView(const Value: TRegView);
     procedure SetStackView(const Value: TStackView);
-    procedure SynhronizeViewersWithContext;
+    function SynhronizeViewersWithContext: Boolean;
   protected
     function AccessToAddrType(const AItem: TAddrCacheItem): TAddrType;
     procedure BuildAsmWindow(AAddress: Int64);
@@ -1282,7 +1282,7 @@ procedure TCpuViewCore.RefreshAsmView(Forced: Boolean);
 begin
   if Assigned(FAsmView) then
   begin
-    SynhronizeViewersWithContext;
+    if not SynhronizeViewersWithContext then Exit;
     if Forced or not FAsmView.IsAddrVisible(FAsmView.InstructionPoint) then
       BuildAsmWindow(FAsmView.InstructionPoint);
     FAsmView.FocusOnAddress(FAsmView.InstructionPoint, ccmSelectRow);
@@ -1368,12 +1368,17 @@ begin
   end;
 end;
 
-procedure TCpuViewCore.SynhronizeViewersWithContext;
+function TCpuViewCore.SynhronizeViewersWithContext: Boolean;
+var
+  CurrentInstructionPoint: Int64;
 begin
+  CurrentInstructionPoint := FDebugger.CurrentInstructionPoint;
+  Result := CurrentInstructionPoint <> 0;
+  if not Result then Exit;
   if Assigned(FAsmView) then
   begin
     FAsmView.AddressMode := GetAddrMode;
-    FAsmView.InstructionPoint := FDebugger.CurrentInstructionPoint;
+    FAsmView.InstructionPoint := CurrentInstructionPoint;
     FAsmView.CurrentIPIsActiveJmp := FDebugger.IsActiveJmp;
     FAsmView.Invalidate;
   end;
