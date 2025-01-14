@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.ExtendedHint.pas
 //  * Purpose   : Extended Hint Window for CPU-View
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -28,6 +28,7 @@ uses
   LCLType, LCLIntf, LCLProc,
   {$ELSE}
   Windows,
+  Types,
   {$ENDIF}
   Messages,
   Classes,

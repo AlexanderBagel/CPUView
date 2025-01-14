@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.Core.pas
 //  * Purpose   : CPU-View mode kernel automates most of the utility actions.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -29,7 +29,6 @@ interface
   Add support to scryptor "bp user32.MessageBoxW"
 }
 
-{$message 'Min/Max col width to FWHexView for each coltype'}
 {$message 'Connect all 10 bookmarks on AsmView'}
 {$message 'The x87/SIMD registers are not editable'}
 {$message 'View for Call param'}

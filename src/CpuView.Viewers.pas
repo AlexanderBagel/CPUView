@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.Viewers.pas
 //  * Purpose   : Set of Viewers to implement the CPU-View mode
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -1800,11 +1800,12 @@ end;
 function TCustomAddressView.CanDrawValidation(AAddrType: TAddrType): Boolean;
 begin
   case AAddrType of
-    atNone: Result := False;
     atExecute: Result := ValidateType[avtExecutable];
     atRead, atReadLinked: Result := ValidateType[avtReadable];
     atStack: Result := ValidateType[avtStack];
     atString: Result := ValidateType[avtString];
+  else
+    Result := False;
   end;
 end;
 
@@ -2458,7 +2459,6 @@ procedure TCustomStackView.DoGetHint(var AHintParam: THintParam;
   var AHint: string);
 var
   Painter: TAbstractPrimaryRowPainter;
-  AddrType: TAddrType;
   ABounds: TBoundaries;
 begin
   if PtInRect(FLastInvalidAddrRect, AHintParam.MouseHitInfo.CursorPos) then Exit;
@@ -2521,6 +2521,7 @@ begin
   inherited;
   ByteViewMode := bvmAddress;
   Header.Columns := [ctWorkSpace, ctAddress, ctOpcode, ctComment];
+  Header.ColumnMinWidth[ctWorkSpace] := 42;
   Header.Visible := False;
   SeparateGroupByColor := False;
   // for automatic recalculation of column widths when font changes are made
