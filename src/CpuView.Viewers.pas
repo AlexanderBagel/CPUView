@@ -1786,7 +1786,7 @@ begin
       Inc(I, ASelLength);
       Continue;
     end;
-    Inc(I);
+    Inc(I, DefValueMetric(ByteViewMode).ByteCount);
   end;
 end;
 

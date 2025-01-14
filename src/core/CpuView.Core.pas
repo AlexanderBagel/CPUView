@@ -26,14 +26,10 @@ unit CpuView.Core;
 interface
 
 { TODO:
+  The x87/SIMD registers are not editable
   Add support to scryptor "bp user32.MessageBoxW"
+  Run to user code
 }
-
-{$message 'Connect all 10 bookmarks on AsmView'}
-{$message 'The x87/SIMD registers are not editable'}
-{$message 'View for Call param'}
-{$message 'Run to user code'}
-{$message 'The dump should not reset the selection during a debug step'}
 
 uses
   {$IFDEF FPC}
@@ -78,7 +74,7 @@ type
   TDumpViewRec = record
     View: TDumpView;
     Stream: TBufferedROStream;
-    LastAddrVA: Int64;
+    LastAddrVA, SelStart, SelEnd: Int64;
     Inited: Boolean;
   end;
 
@@ -345,7 +341,7 @@ var
   RemoteStream: TRemoteStream;
   Data: TDumpViewRec;
 begin
-  Data.LastAddrVA := 0;
+  Data := Default(TDumpViewRec);
   Data.View := AValue;
   RemoteStream := TRemoteStream.Create(FUtils);
   Data.Stream := TBufferedROStream.Create(RemoteStream, soOwned);
@@ -377,7 +373,11 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
+  begin
+    FItems.List[I].SelStart := FItems.List[I].View.SelStart;
+    FItems.List[I].SelEnd := FItems.List[I].View.SelEnd;
     FItems.List[I].View.JumpClear;
+  end;
 end;
 
 procedure TDumpViewList.Reset;
@@ -396,7 +396,7 @@ begin
   begin
     if FItems.List[I].LastAddrVA = 0 then
       FItems.List[I].LastAddrVA := DefAddrVA;
-    Update(I, FItems.List[I].LastAddrVA, 0, False);
+    Update(I, FItems.List[I].LastAddrVA, -1, False);
   end;
 end;
 
@@ -417,7 +417,14 @@ begin
   AStream.SetAddrWindow(RegData.BaseAddr, RegData.RegionSize);
   AView.SetDataStream(AStream, RegData.BaseAddr);
   AView.AddressMode := AddressMode;
-  AView.FocusOnAddress(AddrVA, ccmSelectPointer);
+  if ASelLength >= 0 then
+    AView.FocusOnAddress(AddrVA, ccmSelectPointer)
+  else
+  begin
+    AView.FocusOnAddress(FItems.List[Index].SelStart, ccmReset);
+    AView.SelStart := FItems.List[Index].SelStart;
+    AView.SelEnd := FItems.List[Index].SelEnd;
+  end;
   FItems.List[Index].LastAddrVA := AddrVA;
   if not FItems.List[Index].Inited then
   begin
