@@ -41,7 +41,7 @@ type
   // minimal abstract interface for different debuggers
 
   TAbstractDebugState = (adsError, adsStoped, adsStart, adsPaused, adsRunning, adsFinished);
-  TInterfaceDebugCommand = (idcRun, idcRunTo, idcPause, idcStepInto, idcStepOver, idcStepOut, idcBreakPoint);
+  TInterfaceDebugCommand = (idcRun, idcRunTo, idcPause, idcStepInto, idcStepOver, idcStepOut, idcBreakPoint, idcRunToUserCode);
 
   TQuerySymbol = (qsName, qsSourceLine);
 
@@ -93,6 +93,7 @@ type
       AFrames: TList<TStackFrame>); virtual;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;
+    function GetUserCodeAddrVA: Int64; virtual; abstract;
     procedure Pause; virtual; abstract;
     function PointerSize: Integer; virtual; abstract;
     function ProcessID: Cardinal; virtual; abstract;

@@ -5,7 +5,7 @@
 //  * Unit Name : dlgCpuView.pas
 //  * Purpose   : Basic GUI debugger class without CPU-specific implementation code
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -74,6 +74,7 @@ type
     acDumpsClosePage: TAction;
     acDumpsCloseAllToTheRight: TAction;
     acStackFollowRBP: TAction;
+    acDbgRunToUserCode: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -267,11 +268,14 @@ type
     tbSep2: TToolButton;
     tbRunTillRet: TToolButton;
     tbRunTo: TToolButton;
+    ToolButton1: TToolButton;
     procedure acAsmReturnToIPExecute(Sender: TObject);
     procedure acAsmReturnToIPUpdate(Sender: TObject);
     procedure acAsmSetNewIPExecute(Sender: TObject);
     procedure acAsmShowSourceExecute(Sender: TObject);
     procedure acAsmShowSourceUpdate(Sender: TObject);
+    procedure acDbgRunToUserCodeExecute(Sender: TObject);
+    procedure acDbgRunToUserCodeUpdate(Sender: TObject);
     procedure acDbgStepOutExecute(Sender: TObject);
     procedure acDbgRunToExecute(Sender: TObject);
     procedure acDbgRunToUpdate(Sender: TObject);
@@ -406,6 +410,7 @@ begin
   acStackFollowRSP.ImageIndex := IDEImages.LoadImage('evaluate_up');
   acViewGoto.ImageIndex := IDEImages.LoadImage('address');
   acDumpsClosePage.ImageIndex := IDEImages.LoadImage('menu_exit');
+  acDbgRunToUserCode.ImageIndex := IDEImages.LoadImage('menu_run_withdebugging');  ;
   ToolBar.Images := IDEImages.Images_16;
   pmAsm.Images := IDEImages.Images_16;
   pmDump.Images := IDEImages.Images_16;
@@ -1016,6 +1021,19 @@ begin
     (DbgGate.DebugState = adsPaused) and
     DbgGate.GetSourceLine(FAsmViewSelectedAddr, FSourcePath, FSourceLine) and
     (FSourceLine > 0);
+end;
+
+procedure TfrmCpuView.acDbgRunToUserCodeExecute(Sender: TObject);
+begin
+  LockZOrder;
+  DbgGate.TraceTo(DbgGate.GetUserCodeAddrVA);
+end;
+
+procedure TfrmCpuView.acDbgRunToUserCodeUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled :=
+    (DbgGate.DebugState = adsPaused) and
+    DbgGate.CommandAvailable(idcRunToUserCode);
 end;
 
 procedure TfrmCpuView.acAsmShowSourceExecute(Sender: TObject);

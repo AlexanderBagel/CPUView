@@ -159,6 +159,13 @@ object frmCpuView: TfrmCpuView
       ParentShowHint = False
       ShowHint = True
     end
+    object ToolButton1: TToolButton
+      Left = 192
+      Top = 2
+      Action = acDbgRunToUserCode
+      ParentShowHint = False
+      ShowHint = True
+    end
   end
   object pnDumps: TPanel
     Left = 0
@@ -732,6 +739,13 @@ object frmCpuView: TfrmCpuView
       Caption = 'Show Current Frame Base'
       OnExecute = acStackFollowRBPExecute
       OnUpdate = acStackFollowRBPUpdate
+    end
+    object acDbgRunToUserCode: TAction
+      Category = 'Debugger'
+      Caption = 'Run To User Code'
+      Hint = 'Run to User Code'
+      OnExecute = acDbgRunToUserCodeExecute
+      OnUpdate = acDbgRunToUserCodeUpdate
     end
   end
   object pmStack: TPopupMenu

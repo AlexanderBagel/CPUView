@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.FpDebug.pas
 //  * Purpose   : Implementation of gateway to Lazarus FpDebug debugger.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -51,6 +51,7 @@ uses
 
   // LazDebuggerIntf
   LazDebuggerIntfBaseTypes,
+  LazDebuggerIntf,
 
   // LazDebuggerFp
   FpDebugDebugger,
@@ -117,12 +118,16 @@ type
   TUpdateWaitingState = (uwsBreakpoint, uwsContext);
   TUpdateWaitingStates = set of TUpdateWaitingState;
 
+  TCheckUserCodeState = (ucFound, ucNotFound, ucNeedWait);
+
   { TCpuViewDebugGate }
 
   TCpuViewDebugGate = class(TAbstractDebugger)
   private
     FBreakPoints: TIDEBreakPoints;
     FBreakpointsNotification: TIDEBreakPointsNotification;
+    FCallStackMonitor: TIdeCallStackMonitor;
+    FCallStackNotification: TCallStackNotification;
     FDebugger: TDebuggerIntf;
     FDbgController: TDbgController;
     FErrorOnInit: Boolean;
@@ -137,21 +142,30 @@ type
     FThreadsMonitor: TIdeThreadsMonitor;
     FThreadsNotification: TThreadsNotification;
     FUpdateWaiting: TUpdateWaitingStates;
-    function CheckCanWork: Boolean;
+    FUserCodeAddrVA: Int64;
+    FWaitCheckUserCode: Boolean;
     procedure BreakPointChanged;
+    function CheckCanWork: Boolean;
+    function CheckUserCodeWithIdeCallStack: TCheckUserCodeState;
     function CurrentInstruction: TInstruction;
     procedure DoDebuggerDestroy(Sender: TObject);
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
     function IsMainThreadId: Boolean;
+    function IsUserCode(AAddrVA: Int64): Boolean;
     procedure OnBreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
+    procedure OnCallStackChanged(Sender: TObject);
     procedure OnCallStackCtxChanged(Sender: TObject);
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
     procedure StopAllWorkers;
     procedure UpdateContext; override;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
+  protected
+    procedure FillThreadStackFrames(ALimit: TStackLimit;
+      AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
+      AFrames: TList<TStackFrame>); override;
   public
     constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); override;
     destructor Destroy; override;
@@ -164,6 +178,7 @@ type
     function IsActiveJmp: Boolean; override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; override;
+    function GetUserCodeAddrVA: Int64; override;
     procedure Pause; override;
     function PointerSize: Integer; override;
     function ProcessID: Cardinal; override;
@@ -234,6 +249,43 @@ begin
   if FDebugger = nil then Exit;
   if FDebugger.State <> dsPause then Exit;
   Result := True;
+end;
+
+function TCpuViewDebugGate.CheckUserCodeWithIdeCallStack: TCheckUserCodeState;
+var
+  Snap: TSnapshot;
+  IdeStack: TIdeCallStack;
+  Entry: TIdeCallStackEntry;
+  I: Integer;
+begin
+  Result := ucNotFound;
+  if FCallStackMonitor = nil then Exit;
+  if Assigned(FSnapshotManager) then
+    Snap := FSnapshotManager.SelectedEntry
+  else
+    Snap := nil;
+  if Snap = nil then
+    IdeStack := FCallStackMonitor.CurrentCallStackList.EntriesForThreads[ThreadID]
+  else
+    IdeStack := FCallStackMonitor.Snapshots[Snap].EntriesForThreads[ThreadID];
+  if IdeStack <> nil then
+  begin
+    IdeStack.CountLimited(50);
+    if IdeStack.CountValidity <> ddsValid then Exit(ucNeedWait);
+    IdeStack.PrepareRange(0, IdeStack.Count);
+    for I := 0 to IdeStack.Count - 1 do
+    begin
+      Entry := IdeStack.Entries[I];
+      if (Entry = nil) or (Entry.Validity <> ddsValid) then
+        Exit(ucNeedWait);
+      if IsUserCode(Entry.Address) then
+      begin
+        FUserCodeAddrVA := Entry.Address;
+        Result := ucFound;
+        Break;
+      end;
+    end;
+  end;
 end;
 
 procedure TCpuViewDebugGate.BreakPointChanged;
@@ -454,10 +506,27 @@ begin
     Result := True;
 end;
 
+function TCpuViewDebugGate.IsUserCode(AAddrVA: Int64): Boolean;
+var
+  Sym: TFpSymbol;
+begin
+  Result := False;
+  if FDbgController = nil then Exit;
+  Sym := FDbgController.CurrentProcess.FindProcSymbol(AAddrVA);
+  if Sym <> nil then
+    Result := Sym.FileName <> '';
+end;
+
 procedure TCpuViewDebugGate.OnBreakPointChanged(const ASender: TIDEBreakPoints;
   const ABreakpoint: TIDEBreakPoint);
 begin
   BreakPointChanged;
+end;
+
+procedure TCpuViewDebugGate.OnCallStackChanged(Sender: TObject);
+begin
+  if FWaitCheckUserCode then
+    FWaitCheckUserCode := CheckUserCodeWithIdeCallStack = ucNeedWait;
 end;
 
 procedure TCpuViewDebugGate.OnCallStackCtxChanged(Sender: TObject);
@@ -538,6 +607,11 @@ begin
     FThreadsMonitor.RemoveNotification(FThreadsNotification);
     FThreadsMonitor := nil;
   end;
+  if Assigned(FCallStackMonitor) then
+  begin
+    FCallStackMonitor.RemoveNotification(FCallStackNotification);
+    FCallStackMonitor := nil;
+  end;
   FSnapshotManager := nil;
 
   CpuViewDebugLog.Log('DebugGate: Reset end', False);
@@ -604,6 +678,11 @@ begin
           end;
           if Assigned(DebugBoss.Snapshots) then
             FSnapshotManager := DebugBoss.Snapshots;
+          if Assigned(DebugBoss.CallStack) then
+          begin
+            FCallStackMonitor := DebugBoss.CallStack;
+            FCallStackMonitor.AddNotification(FCallStackNotification);
+          end;
         end;
         Utils.ProcessID := ProcessID;
         if ADebugger.State = dsPause then
@@ -624,6 +703,39 @@ begin
   CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);
 end;
 
+procedure TCpuViewDebugGate.FillThreadStackFrames(ALimit: TStackLimit;
+  AddrStack, AddrFrame: Int64; AStream: TRemoteStream; AFrames: TList<
+  TStackFrame>);
+var
+  I: Integer;
+  CallStackCheck: TCheckUserCodeState;
+  FrameRetAddrVA: Int64;
+begin
+  inherited;
+  FUserCodeAddrVA := 0;
+  FWaitCheckUserCode := False;
+  if FDbgController = nil then Exit;
+  if IsUserCode(CurrentInstructionPoint) then Exit;
+
+  // First we check IdeCallStack
+  CallStackCheck := CheckUserCodeWithIdeCallStack;
+  FWaitCheckUserCode := CallStackCheck = ucNeedWait;
+  if CallStackCheck = ucFound then Exit;;
+
+  // If no suitable address is found, we look for a suitable one in the stack frames
+
+  FrameRetAddrVA := 0;
+  for I := 0 to AFrames.Count - 1 do
+  begin
+    ReadMemory(AFrames[I].AddrPC, FrameRetAddrVA, PointerSize);
+    if IsUserCode(FrameRetAddrVA) then
+    begin
+      FUserCodeAddrVA := FrameRetAddrVA;
+      Break;
+    end;
+  end;
+end;
+
 constructor TCpuViewDebugGate.Create(AOwner: TComponent;
   AUtils: TCommonAbstractUtils);
 begin
@@ -639,6 +751,9 @@ begin
   FThreadsNotification := TThreadsNotification.Create;
   FThreadsNotification.AddReference;
   FThreadsNotification.OnChange := OnCallStackCtxChanged;
+  FCallStackNotification := TCallStackNotification.Create;
+  FCallStackNotification.AddReference;
+  FCallStackNotification.OnChange := OnCallStackChanged;
   if Assigned(DebugBoss) then
   begin
     DebugBoss.RegisterStateChangeHandler(OnState);
@@ -659,6 +774,8 @@ begin
   ReleaseRefAndNil(FBreakpointsNotification);
   FThreadsNotification.OnChange := nil;
   ReleaseRefAndNil(FThreadsNotification);
+  FCallStackNotification.OnChange := nil;
+  ReleaseRefAndNil(FCallStackNotification);
   FTemporaryIP.Free;
   inherited Destroy;
 end;
@@ -676,6 +793,8 @@ begin
   if FDebugger = nil then Exit;
   if ACommand = idcBreakPoint then
     Exit(DebugState = adsPaused);
+  if ACommand = idcRunToUserCode then
+    Exit(GetUserCodeAddrVA <> 0);
   if FDebugger.State = dsStop then
     AvailableCommands := FDebugger.SupportedCommandsFor(dsStop)
   else
@@ -879,6 +998,14 @@ begin
       Result := ASourceLine > 0;
     end;
   end;
+end;
+
+function TCpuViewDebugGate.GetUserCodeAddrVA: Int64;
+begin
+  if DebugState = adsPaused then
+    Result := FUserCodeAddrVA
+  else
+    Result := 0;
 end;
 
 procedure TCpuViewDebugGate.Pause;
