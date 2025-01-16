@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.Linux.pas
 //  * Purpose   : Implementing Linux-specific code.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -17,9 +17,11 @@
 
 unit CpuView.Linux;
 
-{$IFDEF FPC}
-  {$MODE Delphi}
-  {$ASMMODE INTEL}
+{$MODE Delphi}
+{$ASMMODE INTEL}
+{$UNDEF USE_CONSTREF}
+{$IF FPC_FULLVERSION <= 30202}
+  {$DEFINE USE_CONSTREF}
 {$ENDIF}
 
 interface
@@ -254,7 +256,7 @@ begin
   Shared := LowerCase(AccessChar) = 's';
 end;
 
-function DefaultMBIComparer({$IFDEF EXTENDED_RTL}const{$ELSE}constref{$ENDIF} A, B: TMemoryBasicInformation): Integer;
+function DefaultMBIComparer({$IFDEF USE_CONSTREF}constref{$ELSE}const{$ENDIF} A, B: TMemoryBasicInformation): Integer;
 begin
   if A.BaseAddress < B.BaseAddress then
     Result := -1
