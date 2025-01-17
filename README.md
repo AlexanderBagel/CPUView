@@ -3,6 +3,15 @@ Advanced CPU-View for Lazarus.
 
 Attention - BETA, version!!!
 
+###As of January 17, 2025, daily CPU-View updates have been suspended.  
+
+All core functionality has been added, only 4 steps remain, each of which will require a long development time and will not be posted so as not to break the current CPU-View behavior.  
+
+1. SIMD register editor.
+2. Window displaying function call parameters.
+3. Carbon/Cocoa widget support under macOS.
+4. Support for ARM architecture.
+
 ### Setup and use: 
 1. Download FWHexView https://github.com/AlexanderBagel/FWHexView and compile FWHexView.LCL.lpk
 2. Open CPUView_D.lpk and install it in the IDE (menu: Package->Install/Uninstall Packages) 
@@ -42,6 +51,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Supports thread switching with instantaneous change of displayed information about the active thread
 * Command to jump the selected address in any of the windows
 * Bidirectional jump stack in each editor
+* Active tooltips for each editor
 
 ### The disassembler window supports:
 * Output debugging information
@@ -53,8 +63,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Hinting on the selected instruction with a menu to jump to each block of the received information
 * Instruction coloring for easy code reading
 * Breakpoints (display and modify)
-* Bookmarks synchronization (not yet implemented)
-* Display the disassembler for each jump in the tooltip (not yet implemented)
+* Display the disassembler for each jump in the tooltip
 
 ### Register window:
 * Contains debugging information for each register (RAX..R15)
@@ -83,8 +92,8 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * 5 Copy mode (include pascal array)
 * Highlighting and hinting to validated addresses
 * Quick jumps to found validated addresses (via Ctrl+Click)
-* Selections (not yet implemented)
-* Address recognition and highlighting (not yet implemented)
+* Selections of duplicates
+* Address recognition and highlighting
 
 ### Appearance:
 
@@ -94,32 +103,21 @@ Light theme:
 Dark theme:
 ![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/dark.png)
 
-Active jump, breakpoints, smart hints for selected instructions and their menus:
-![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/light2.png)
+Active jump, breakpoints, smart hints for selected instructions and their menus, Register hightlight.
 
-Register hightlight:
-![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/highlight.png)
+RegView:
 
-Full regview mode:
-
-<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg1.png" height="500"/>
-
-Short regview mode with FPU-STx regs (Rx and Mx available):
-
-<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg2.png" height="500"/>
-
-Short regview mode with XMM regs (ymm and debug available):
-
-<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg3.png" height="500"/>
-
-Various options for displaying registers:
-
-<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/reg4.png" height="500"/>
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/regview.png"/>
 
 Stack:
 
-<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack.png" height="500"/>
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stackview.png"/>
 
-Stack with offsets:
+Dump:
 
-<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/stack2.png" height="500"/>
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/dumpview.png"/>
+
+Hints:
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/hints.png"/>
+
