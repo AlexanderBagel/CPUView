@@ -184,6 +184,11 @@ type
     ExtendedRegisters: array[0..MAXIMUM_SUPPORTED_EXTENSION-1] of Byte;
   end;
 
+  {$IFDEF CPUX86}
+  TContext = TWow64Context;
+  PContext = PWow64Context;
+  {$ENDIF}
+
 const
   ThreadBasicInformation = 0;
   THREAD_GET_CONTEXT = 8;
@@ -470,7 +475,7 @@ begin
     Ctx.EFlags := AContext.EFlags;
 
     Ctx.ContextFlags := ContextFlags;
-    Result := SetThreadContext(hThread, Ctx^);
+    Result := SetThreadContext(hThread, Windows.PContext(Ctx)^);
   finally
     CloseHandle(hThread);
   end;
