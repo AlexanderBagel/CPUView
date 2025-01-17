@@ -689,6 +689,7 @@ begin
   AddActionShortCut(acAsmSetNewIP, Settings.ShotCut[sctNewIP]);
   AddActionShortCut(acAsmReturnToIP, Settings.ShotCut[sctReturnToDef]);
   AddActionShortCut(acStackFollowRSP, Settings.ShotCut[sctReturnToDef]);
+  AddActionShortCut(acDbgRunToUserCode, Settings.ShotCut[sctRunToUser]);
 
   AddViewerShortCut(AsmView, Settings.ShotCut[sctViewerJmpIn], True);
   AddViewerShortCut(AsmView, Settings.ShotCut[sctViewerStepBack], False);

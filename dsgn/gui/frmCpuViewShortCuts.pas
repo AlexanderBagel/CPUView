@@ -208,7 +208,7 @@ begin
   Add('menu_stepover');
   Add('ActiveBreakPoint');
   Add('menu_run_cursor');
-  Add('');
+  Add('menu_run_withdebugging');
   Add('debugger_show_execution_point');
   Add('');
 end;
