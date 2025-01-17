@@ -3,14 +3,14 @@ Advanced CPU-View for Lazarus.
 
 Attention - BETA, version!!!
 
-### As of January 17, 2025, daily CPU-View updates have been suspended.  
+``` As of January 17, 2025, daily CPU-View updates have been suspended.  
 
 All core functionality has been added, only 4 steps remain, each of which will require a long development time and will not be posted so as not to break the current CPU-View behavior.  
 
 1. SIMD register editor.
 2. Window displaying function call parameters.
 3. Carbon/Cocoa widget support under macOS.
-4. Support for ARM architecture.
+4. Support for ARM architecture.```
 
 ### Setup and use: 
 1. Download FWHexView https://github.com/AlexanderBagel/FWHexView and compile FWHexView.LCL.lpk
