@@ -147,6 +147,7 @@ type
     FSessionCache: TDictionary<Int64, TAddrCacheItem>;
     FShowCallFuncName: Boolean;
     FStackView: TStackView;
+    FStackSelStart, FStackSelEnd: Int64;
     FStackStream: TBufferedROStream;
     FStringStream: TBufferedROStream;
     FThreadChange: Boolean;
@@ -1015,6 +1016,8 @@ begin
       end;
       if Assigned(FStackView) then
       begin
+        FStackSelStart := FStackView.SelStart;
+        FStackSelEnd := FStackView.SelEnd;
         FStackView.Frames.Clear;
         FStackView.FramesUpdated;
         FStackView.JumpClear;
@@ -1280,6 +1283,11 @@ begin
     FStackView.SetDataStream(FStackStream, FLastStackLimit.Limit);
     FStackView.FramesUpdated;
     FStackView.FocusOnAddress(FLastCtx.StackPoint, ccmSelectRow);
+    if FStackSelStart <> 0 then
+    begin
+      FStackView.SelStart := FStackSelStart;
+      FStackView.SelEnd := FStackSelEnd;
+    end;
   end;
   FDumpViewList.AddressMode := GetAddrMode;
   FDumpViewList.Restore(FDebugger.CurrentInstructionPoint);
