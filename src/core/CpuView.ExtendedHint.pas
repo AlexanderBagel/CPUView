@@ -240,10 +240,17 @@ begin
   SavedFont := TFont.Create;
   try
     SavedFont.Assign(Canvas.Font);
-    Canvas.Font := FData.Font;
-    DrawText(Canvas, FDisplayedItem.Symbol, -1, R, DT_NOPREFIX or DT_WORDBREAK or DT_CALCRECT);
+    try
+      Canvas.Font := FData.Font;
+      DrawText(Canvas, FDisplayedItem.Symbol, -1, R, DT_NOPREFIX or DT_WORDBREAK or DT_CALCRECT);
+      {$IFDEF LINUX}
+      R.Height := Max(Canvas.TextHeight('J'), R.Height);
+      {$ENDIF}
+    finally
+      Canvas.Font.Assign(SavedFont);
+    end;
   finally
-    Canvas.Font.Assign(SavedFont);
+    SavedFont.Free;
   end;
   R.Width := Min(MaxWidth shr 1, R.Width);
   FExtendedRect := Bounds(
