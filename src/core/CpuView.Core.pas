@@ -533,6 +533,7 @@ begin
   if FStringStream.Read(AsPtrValue, Debugger.PointerSize) <> Debugger.PointerSize then Exit;
   if not DisplayStrings then Exit;
   pCursor := FStringStream.Memory;
+  if pCursor = nil then Exit;
   pStartChar := pCursor;
   Len := 0;
   pMaxPos := pCursor + FStringStream.BufferSize;
@@ -1132,7 +1133,7 @@ begin
       OnQueryAddressType(Sender, AJmpAddr, AddrType);
       case AddrType of
         atExecute: ShowDisasmAtAddr(AJmpAddr);
-        atRead, atReadLinked: ShowDumpAtAddr(AJmpAddr);
+        atRead, atReadLinked, atString: ShowDumpAtAddr(AJmpAddr);
         atStack: ShowStackAtAddr(AJmpAddr);
       end;
       Handled := AddrType <> atNone;

@@ -1959,6 +1959,12 @@ begin
       ABounds := GetBounds(I);
       if AddrType in [atRead, atString] then
       begin
+        {$IFDEF LINUX}
+        ACanvas.Pen.Color := ACanvas.Brush.Color;
+        ACanvas.Pen.Width := 2;
+        {$ELSE}
+        ACanvas.Pen.Color := View.ColorMap.BackgroundColor;
+        {$ENDIF}
         ACanvas.Pen.Style := psDot;
         ACanvas.MoveTo(ARect.Left + ABounds.LeftOffset, ARect.Bottom - 2);
         ACanvas.LineTo(ARect.Left + ABounds.LeftOffset + ABounds.Width, ARect.Bottom - 2);
