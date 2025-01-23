@@ -730,7 +730,7 @@ var
   RegData: TRegionData;
 begin
   if FInvalidReg.RegionSize = 0 then
-    QueryRegion(AddrVA, FInvalidReg);
+    QueryRegion(0, FInvalidReg);
   if AddrVA < FInvalidReg.RegionSize then
     Result := False
   else
