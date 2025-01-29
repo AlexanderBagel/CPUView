@@ -3,6 +3,7 @@ inherited CpuViewShortCutsFrame: TCpuViewShortCutsFrame
   Width = 736
   ClientHeight = 573
   ClientWidth = 736
+  Constraints.MinWidth = 600
   DesignLeft = 1208
   DesignTop = 409
   object gbShortCuts: TGroupBox[0]

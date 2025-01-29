@@ -62,9 +62,9 @@ type
     gbSessions: TGroupBox;
     gbViewersSetting: TGroupBox;
     ilSettings: TImageList;
-    lblMinStringLen: TLabel;
     lblFont: TLabel;
     seMinStrLen: TSpinEdit;
+    seFindSymbolsDepth: TSpinEdit;
     procedure btnFontBrowseClick(Sender: TObject);
     procedure btnResetClick(Sender: TObject);
     procedure cbSymbolsClick(Sender: TObject);
@@ -416,8 +416,8 @@ end;
 procedure TCpuViewMainOptionsFrame.UpdateDebugSymbolsIndepended;
 begin
   cbForceFindSymbols.Enabled := cbSymbols.Checked;
-  lblMinStringLen.Font.Color := TColor(IfThen(cbDisplayStrings.Checked, clWindowText, clGrayText));
   seMinStrLen.Enabled := cbDisplayStrings.Checked;
+  seFindSymbolsDepth.Enabled := cbForceFindSymbols.Checked;
 end;
 
 procedure TCpuViewMainOptionsFrame.UpdateFrameControl;
@@ -433,6 +433,7 @@ begin
   cbExtendedHints.Checked := Settings.ExtendedHints;
   cbDisplayStrings.Checked := Settings.DisplayStrings;
   seMinStrLen.Value := Settings.MinimumStringLength;
+  seFindSymbolsDepth.Value := Settings.ForceFindSymbolsDepth;
   FillImageList;
   FillSettingsView;
   UpdateDebugSymbolsIndepended;
@@ -461,6 +462,7 @@ begin
   Settings.ExtendedHints := cbExtendedHints.Checked;
   Settings.DisplayStrings := cbDisplayStrings.Checked;
   Settings.MinimumStringLength := seMinStrLen.Value;
+  Settings.ForceFindSymbolsDepth := seFindSymbolsDepth.Value;
   APointerValues := [];
   Enum := tvSettings.Nodes.GetEnumerator;
   while Enum.MoveNext do
@@ -519,8 +521,6 @@ procedure TCpuViewMainOptionsFrame.CMFontChanged(var Message: TLMessage);
 begin
   if Assigned(ilSettings) then
     FillImageList;
-  if Assigned(seMinStrLen) and Assigned(lblMinStringLen) then
-    seMinStrLen.Left := lblMinStringLen.Left + lblMinStringLen.Width + lblMinStringLen.Height;
 end;
 
 function TCpuViewMainOptionsFrame.GetTitle: string;

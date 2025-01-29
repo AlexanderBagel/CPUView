@@ -172,6 +172,7 @@ const
   xmlHint = 'hint';
   xmlHintFlag = 'hintFlag';
   xmlForceFindSymbols = 'useForceFindSymbols';
+  xmlFindSymbolsDepth = 'useFindSymbolsDepth';
   xmlExtendedHints = 'useExtendedHints';
   xmlHintPointerValues = 'useHintPointerValues';
   xmlDisplayStrings = 'useStr';
@@ -253,6 +254,7 @@ type
     FDisplayStrings: Boolean;
     FDumpSettings: TDumpSettings;
     FExtendedHints: Boolean;
+    FFindSymbolsDepth: Integer;
     FForceFindSymbols: Boolean;
     FFontName: string;
     FMinimumStringLength: Integer;
@@ -358,6 +360,7 @@ type
     property ExtendedHints: Boolean read FExtendedHints write FExtendedHints;
     property ExtendedHintPointerValues: TPointerValues read FPointerValues write FPointerValues;
     property ForceFindSymbols: Boolean read FForceFindSymbols write FForceFindSymbols;
+    property ForceFindSymbolsDepth: Integer read FFindSymbolsDepth write FFindSymbolsDepth;
     property HintInAsm: Boolean read FAsmSettings.Hints write FAsmSettings.Hints;
     property HintInDump: Boolean read FDumpSettings.Hints write FDumpSettings.Hints;
     property HintInRegForReg: Boolean read GetHintInRegForReg write SetHintInRegForReg;
@@ -709,6 +712,7 @@ begin
   FUseCrashDump := True;
   FUseAddrValidation := True;
   FForceFindSymbols := True;
+  FFindSymbolsDepth := 5;
   FExtendedHints := True;
   FPointerValues := [bvmHex64..bvmFloat80];
   FDisplayStrings := True;
@@ -853,6 +857,7 @@ begin
   FUseDebugLog := GetNodeAttr(Root, xmlDbgLog);
   FUseCrashDump := GetNodeAttr(Root, xmlDbgDump);
   FForceFindSymbols := GetNodeAttr(Root, xmlForceFindSymbols);
+  FFindSymbolsDepth := GetNodeAttr(Root, xmlFindSymbolsDepth);
   FExtendedHints := GetNodeAttr(Root, xmlExtendedHints);
   APointerValues := GetNodeAttr(Root, xmlHintPointerValues);
   FPointerValues := PPointerValues(@APointerValues)^;
@@ -1177,6 +1182,7 @@ begin
   SetNodeAttr(Root, xmlDbgLog, FUseDebugLog);
   SetNodeAttr(Root, xmlDbgDump, FUseCrashDump);
   SetNodeAttr(Root, xmlForceFindSymbols, FForceFindSymbols);
+  SetNodeAttr(Root, xmlFindSymbolsDepth, FFindSymbolsDepth);
   SetNodeAttr(Root, xmlExtendedHints, FExtendedHints);
   SetNodeAttr(Root, xmlHintPointerValues, PInteger(@FPointerValues)^);
   SetNodeAttr(Root, xmlDisplayStrings, FDisplayStrings);

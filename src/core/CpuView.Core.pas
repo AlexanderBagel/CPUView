@@ -135,6 +135,7 @@ type
     FDumpViewList: TDumpViewList;
     FExtendedHintData: TExtendedHintData;
     FExtendedHints: Boolean;
+    FFindSymbolsDepth: Integer;
     FForceFindSymbols: Boolean;
     FInvalidReg: TRegionData;
     FLastStackLimit: TStackLimit;
@@ -180,8 +181,7 @@ type
     procedure OnRegQueryExternalComment(Sender: TObject;
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure OnThreadChange(Sender: TObject);
-    function QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem;
-      InDeepCall: Boolean = False): Boolean;
+    function QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem; CallIndex: Integer = 0): Boolean;
     function QueryDisasmAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     function QueryPointerValueAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     function QueryStringAtAddr(AddrVA: Int64; var AItem: TAddrCacheItem; out AsPtrValue: Int64): Boolean;
@@ -245,6 +245,7 @@ type
     property StackView: TStackView read FStackView write SetStackView;
     property ShowCallFuncName: Boolean read FShowCallFuncName write FShowCallFuncName;
     property ForceFindSymbols: Boolean read FForceFindSymbols write FForceFindSymbols;
+    property ForceFindSymbolsDepth: Integer read FFindSymbolsDepth write FFindSymbolsDepth;
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
 
@@ -1176,7 +1177,7 @@ begin
 end;
 
 function TCpuViewCore.QueryCacheItem(AddrVA: Int64; out AItem: TAddrCacheItem;
-  InDeepCall: Boolean): Boolean;
+  CallIndex: Integer): Boolean;
 var
   AddrPtr: Int64;
   AddrPtrItem: TAddrCacheItem;
@@ -1202,7 +1203,8 @@ begin
       AItem.InDeepSymbol := AItem.Symbol;
 
       // Lock in-deep search
-      if InDeepCall and not ForceFindSymbols then Exit;
+      if (CallIndex > 0) and not ForceFindSymbols then Exit;
+      if CallIndex >= ForceFindSymbolsDepth then Exit;
 
       // The task of deep search is to find executable code
       if not (raExecute in AItem.Region.Access) then
@@ -1212,7 +1214,7 @@ begin
         begin
           AddrPtrItem := Default(TAddrCacheItem);
           if ForceFindSymbols then
-            QueryCacheItem(AddrPtr, AddrPtrItem)
+            QueryCacheItem(AddrPtr, AddrPtrItem, CallIndex + 1)
           else
             AddrPtrItem.InDeepSymbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
           if AddrPtrItem.InDeepSymbol <> '' then

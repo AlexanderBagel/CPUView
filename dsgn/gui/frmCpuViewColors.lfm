@@ -1,6 +1,7 @@
 inherited CpuViewColorsFrame: TCpuViewColorsFrame
   Height = 629
   ClientHeight = 629
+  Constraints.MinWidth = 600
   DesignLeft = 1557
   DesignTop = 356
   object gbColors: TGroupBox[0]

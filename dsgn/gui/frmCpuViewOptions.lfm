@@ -1,16 +1,17 @@
 inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   Height = 700
-  Width = 735
+  Width = 600
   ClientHeight = 700
-  ClientWidth = 735
+  ClientWidth = 600
   Constraints.MinHeight = 700
+  Constraints.MinWidth = 600
   DesignLeft = 609
   DesignTop = 221
   object cbFont: TComboBox[0]
     Left = 67
     Height = 33
     Top = 8
-    Width = 610
+    Width = 475
     Anchors = [akTop, akLeft, akRight]
     ItemHeight = 25
     Style = csDropDownList
@@ -24,7 +25,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Caption = 'Font:'
   end
   object btnFontBrowse: TButton[2]
-    Left = 679
+    Left = 544
     Height = 33
     Top = 8
     Width = 33
@@ -35,13 +36,13 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbPerformance: TGroupBox[3]
     Left = 10
-    Height = 240
+    Height = 208
     Top = 48
-    Width = 702
+    Width = 567
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Performance settings:'
-    ClientHeight = 210
-    ClientWidth = 698
+    ClientHeight = 178
+    ClientWidth = 563
     TabOrder = 2
     object cbSymbols: TCheckBox
       Left = 10
@@ -56,8 +57,8 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       Left = 32
       Height = 29
       Top = 40
-      Width = 368
-      Caption = 'In-depth search for debugging information'
+      Width = 435
+      Caption = 'In-depth search for debugging information. Depth: '
       TabOrder = 1
       OnClick = cbSymbolsClick
     end
@@ -82,16 +83,18 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       Left = 10
       Height = 29
       Top = 136
-      Width = 231
-      Caption = 'Search and display strings'
+      Width = 380
+      Caption = 'Search and display strings. Minimum length: '
       TabOrder = 4
       OnClick = cbSymbolsClick
     end
     object seMinStrLen: TSpinEdit
-      Left = 184
+      AnchorSideLeft.Control = cbDisplayStrings
+      AnchorSideLeft.Side = asrBottom
+      Left = 390
       Height = 33
       Hint = 'Minimum string length'
-      Top = 168
+      Top = 136
       Width = 75
       MinValue = 2
       ParentShowHint = False
@@ -99,23 +102,31 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 5
       Value = 4
     end
-    object lblMinStringLen: TLabel
-      Left = 40
-      Height = 25
-      Top = 170
-      Width = 135
-      Caption = 'Minimum length:'
+    object seFindSymbolsDepth: TSpinEdit
+      AnchorSideLeft.Control = cbForceFindSymbols
+      AnchorSideLeft.Side = asrBottom
+      Left = 467
+      Height = 33
+      Hint = 'Minimum string length'
+      Top = 40
+      Width = 75
+      MaxValue = 50
+      MinValue = 2
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 6
+      Value = 5
     end
   end
   object gbSessions: TGroupBox[4]
     Left = 10
     Height = 104
     Top = 512
-    Width = 702
+    Width = 567
     Anchors = [akLeft, akRight, akBottom]
     Caption = 'Session settings:'
     ClientHeight = 74
-    ClientWidth = 698
+    ClientWidth = 563
     TabOrder = 3
     object cbForm: TCheckBox
       Left = 10
@@ -153,7 +164,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     TabOrder = 5
   end
   object btnReset: TButton[7]
-    Left = 545
+    Left = 410
     Height = 38
     Top = 624
     Width = 164
@@ -164,9 +175,9 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbViewersSetting: TGroupBox[8]
     Left = 10
-    Height = 200
-    Top = 304
-    Width = 702
+    Height = 240
+    Top = 264
+    Width = 567
     Anchors = [akTop, akLeft, akRight, akBottom]
     Caption = 'Viewers customization:'
     TabOrder = 7
@@ -174,11 +185,11 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object FontDialog: TFontDialog[9]
     MinFontSize = 0
     MaxFontSize = 0
-    Left = 496
-    Top = 88
+    Left = 664
+    Top = 56
   end
   object ilSettings: TImageList[10]
-    Left = 584
-    Top = 88
+    Left = 664
+    Top = 136
   end
 end
