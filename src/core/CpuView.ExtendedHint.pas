@@ -28,9 +28,9 @@ uses
   LCLType, LCLIntf, LCLProc,
   {$ELSE}
   Windows,
-  Types,
   {$ENDIF}
   Messages,
+  Types,
   Classes,
   SysUtils,
   Controls,

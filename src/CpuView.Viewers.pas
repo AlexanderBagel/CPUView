@@ -33,9 +33,9 @@ uses
   {$ELSE}
   Windows,
   UITypes,
-  Types,
   {$ENDIF}
   Messages,
+  Types,
   Classes,
   Graphics,
   SysUtils,
