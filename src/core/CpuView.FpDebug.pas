@@ -152,7 +152,6 @@ type
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
     function IsMainThreadId: Boolean;
-    function IsUserCode(AAddrVA: Int64): Boolean;
     procedure OnBreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
       const {%H-}ABreakpoint: TIDEBreakPoint);
     procedure OnCallStackChanged(Sender: TObject);
@@ -162,10 +161,6 @@ type
     procedure StopAllWorkers;
     procedure UpdateContext; override;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
-  protected
-    procedure FillThreadStackFrames(ALimit: TStackLimit;
-      AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
-      AFrames: TList<TStackFrame>); override;
   public
     constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); override;
     destructor Destroy; override;
@@ -176,6 +171,10 @@ type
       AShowSourceLines: Boolean): TListEx<TInstruction>; override;
     function IsActive: Boolean; override;
     function IsActiveJmp: Boolean; override;
+    function IsUserCode(AAddrVA: Int64): Boolean; override;
+    procedure FillThreadStackFrames(ALimit: TStackLimit;
+      AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
+      AFrames: TList<TStackFrame>); override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; override;
     function GetUserCodeAddrVA: Int64; override;
@@ -194,6 +193,7 @@ type
     procedure TraceOut; override;
     procedure TraceTilReturn; override;
     procedure TraceTo(AddrVA: Int64); override;
+    procedure TraceToList(AddrVA: array of Int64); override;
     function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean; override;
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); override;
     property Debugger: TDebuggerIntf read FDebugger;
@@ -712,7 +712,7 @@ var
   FrameRetAddrVA: Int64;
 begin
   inherited;
-  FUserCodeAddrVA := 0;
+  FUserCodeAddrVA := UserCodeAddrVAFound;
   FWaitCheckUserCode := False;
   if FDbgController = nil then Exit;
   if IsUserCode(CurrentInstructionPoint) then Exit;
@@ -731,9 +731,11 @@ begin
     if IsUserCode(FrameRetAddrVA) then
     begin
       FUserCodeAddrVA := FrameRetAddrVA;
-      Break;
+      Exit;
     end;
   end;
+
+  FUserCodeAddrVA := UserCodeAddrVANotFound;
 end;
 
 constructor TCpuViewDebugGate.Create(AOwner: TComponent;
@@ -819,6 +821,8 @@ begin
           AEntry := FThreadsMonitor.Threads.EntryById[ThreadID];
           if Assigned(AEntry) then
             Result := AEntry.TopFrame.Address;
+          if Result = 0 then
+            Result := FDebugger.GetLocation.Address;
         end;
     end;
   end;
@@ -1265,6 +1269,26 @@ begin
   TFpDebugDebuggerAccess(FDebugger).StartDebugLoop;
 
   CpuViewDebugLog.Log('DebugGate: TraceTo end', False);
+end;
+
+procedure TCpuViewDebugGate.TraceToList(AddrVA: array of Int64);
+var
+  ALocation: TDBGPtrArray;
+  I: Integer;
+begin
+  if not CheckCanWork then Exit;
+
+  CpuViewDebugLog.Log('DebugGate: TraceToList', True);
+
+  StopAllWorkers;
+
+  SetLength(ALocation{%H-}, Length(AddrVA));
+  for I := 0 to Length(AddrVA) - 1 do
+    ALocation[I] := QWord(AddrVA[I]);
+  FDbgController.InitializeCommand(TDbgControllerRunToCmd.Create(FDbgController, ALocation));
+  TFpDebugDebuggerAccess(FDebugger).StartDebugLoop;
+
+  CpuViewDebugLog.Log('DebugGate: TraceToList end', False);
 end;
 
 function TCpuViewDebugGate.UpdateRegValue(RegID: Integer; ANewRegValue: Int64

@@ -1029,7 +1029,7 @@ end;
 procedure TfrmCpuView.acDbgRunToUserCodeExecute(Sender: TObject);
 begin
   LockZOrder;
-  DbgGate.TraceTo(DbgGate.GetUserCodeAddrVA);
+  Core.TraceToUserCode;
 end;
 
 procedure TfrmCpuView.acDbgRunToUserCodeUpdate(Sender: TObject);

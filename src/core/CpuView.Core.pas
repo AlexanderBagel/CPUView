@@ -223,6 +223,7 @@ type
     procedure ShowDumpAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True); overload;
     procedure ShowDumpAtAddr(AddrVA: Int64; ASelLength: Integer; PushToJmpStack: Boolean = True); overload;
     procedure ShowStackAtAddr(AddrVA: Int64);
+    procedure TraceToUserCode;
     procedure UpdateAfterSettingsChange;
     function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean;
   public
@@ -1202,6 +1203,9 @@ begin
       AItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
       AItem.InDeepSymbol := AItem.Symbol;
 
+      if (raExecute in AItem.Region.Access) and (AItem.Symbol <> '') then
+        AItem.IsUserCode := FDebugger.IsUserCode(AddrVA);
+
       // Lock in-deep search
       if (CallIndex > 0) and not ForceFindSymbols then Exit;
       if CallIndex >= ForceFindSymbolsDepth then Exit;
@@ -1461,6 +1465,49 @@ procedure TCpuViewCore.ShowStackAtAddr(AddrVA: Int64);
 begin
   if Assigned(FStackView) then
     FStackView.JumpToAddress(AddrVA);
+end;
+
+procedure TCpuViewCore.TraceToUserCode;
+var
+  UserCodeAddrVA: Int64;
+  AddrVAList: array of Int64;
+  AStack: array of Byte;
+  I, APointerSize, Cnt: Integer;
+  AItem: TAddrCacheItem;
+begin
+  UserCodeAddrVA := FDebugger.GetUserCodeAddrVA;
+  case UserCodeAddrVA of
+    UserCodeAddrVANotFound:
+    begin
+      SetLength(AStack, FLastStackLimit.Base - FLastCtx.StackPoint);
+      FDebugger.ReadMemory(FLastCtx.StackPoint, AStack[0], Length(AStack));
+      UserCodeAddrVA := 0;
+      APointerSize := Debugger.PointerSize;
+      Cnt := 0;
+      I := 0;
+      while I < Length(AStack) do
+      begin
+        if APointerSize = 8 then
+          UserCodeAddrVA := PInt64(@AStack[I])^
+        else
+          UserCodeAddrVA := PInteger(@AStack[I])^;
+        Inc(I, APointerSize);
+        QueryCacheItem(UserCodeAddrVA, AItem);
+        if AItem.IsUserCode then
+        begin
+          Inc(Cnt);
+          SetLength(AddrVAList, Cnt + 1);
+          AddrVAList[Cnt] := UserCodeAddrVA;
+          Inc(Cnt);
+        end;
+      end;
+      if Cnt > 0 then
+        FDebugger.TraceToList(AddrVAList);
+    end;
+    UserCodeAddrVAFound:;
+  else
+    FDebugger.TraceTo(UserCodeAddrVA);
+  end;
 end;
 
 procedure TCpuViewCore.UpdateAfterSettingsChange;

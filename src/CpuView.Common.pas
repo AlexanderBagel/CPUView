@@ -71,6 +71,7 @@ type
     Symbol: string;
     InDeepSymbol: string;
     InDeepCount: Integer;
+    IsUserCode: Boolean;
     ExtendedDataPresent: Boolean;
     AsmLines, HintLines: string;
     case Integer of

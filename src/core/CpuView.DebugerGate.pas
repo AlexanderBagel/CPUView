@@ -35,6 +35,10 @@ uses
   CpuView.Stream,
   CpuView.Viewers;
 
+const
+  UserCodeAddrVANotFound = -1;
+  UserCodeAddrVAFound = 0;
+
 type
 
   // минимальный абстрактный интерфейс под разные отладчики
@@ -88,6 +92,7 @@ type
       AShowSourceLines: Boolean): TList<TInstruction>; virtual; abstract;
     function IsActive: Boolean; virtual; abstract;
     function IsActiveJmp: Boolean; virtual; abstract;
+    function IsUserCode(AAddrVA: Int64): Boolean; virtual; abstract;
     procedure FillThreadStackFrames(ALimit: TStackLimit;
       AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
       AFrames: TList<TStackFrame>); virtual;
@@ -109,6 +114,7 @@ type
     procedure TraceOut; virtual; abstract;
     procedure TraceTilReturn; virtual; abstract;
     procedure TraceTo(AddrVA: Int64); virtual; abstract;
+    procedure TraceToList(AddrVA: array of Int64); virtual; abstract;
     function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean; virtual; abstract;
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); virtual; abstract;
     property BreakPointList: TListEx<TBasicBreakPoint> read FBreakPointList;
