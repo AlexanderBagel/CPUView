@@ -125,7 +125,6 @@ Hints:
 
 <img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/hints.png"/>
 
-Run to user code:
+https://github.com/user-attachments/assets/65bea692-c68c-4264-b4c6-74bf9d3f8c99
 
-[![Watch the video](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/run_to_user_code.png)](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/run_to_user_code.mp4)
 
