@@ -18,17 +18,10 @@ posted so as not to break the current CPU-View behavior.
 
 ### Setup and use: 
 1. Download FWHexView https://github.com/AlexanderBagel/FWHexView and compile FWHexView.LCL.lpk
-2. Open CPUView_D.lpk and install it in the IDE (menu: Package->Install/Uninstall Packages) 
+2. Open CPUView_win_x86_64_D.lpk (or CPUView_lin_x86_64_D.lpk for Linux) and install it in the IDE (menu: Package->Install/Uninstall Packages) 
 3. Rebuild IDE
 4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
 5. Enjoy
-
-### Known issues:
-If during rebuild Lazarus writes "Fatal: Can't find unit dlgCpuViewImplementation used by CpuView.Reg", is necessary:
-1. Compile the CPUView_D package again
-2. Rebuild the IDE again  
-
-The reasons for this error are not yet clear.
 
 ### Debug Log and Crash Dump:
 The debug log is stored in the following path: “lazarus_path\config_lazarus\cpuview\debug.log”.  

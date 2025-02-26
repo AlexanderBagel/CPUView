@@ -2,7 +2,7 @@
 <CONFIG>
   <Package Version="5">
     <PathDelim Value="\"/>
-    <Name Value="CPUView_D"/>
+    <Name Value="CPUView_win_x86_64_D"/>
     <Type Value="RunAndDesignTime"/>
     <Author Value="Alexander (Rouse_) Bagel"/>
     <CompilerOptions>
@@ -10,15 +10,9 @@
       <PathDelim Value="\"/>
       <SearchPaths>
         <IncludeFiles Value="src;dsgn\gui"/>
-        <OtherUnitFiles Value="src;src\core;dsgn;dsgn\gui"/>
+        <OtherUnitFiles Value="src;src\core;dsgn;dsgn\gui;dsgn\gui\processors\intel"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
-      <Conditionals Value="if TargetCPU = &apos;i386&apos; then
-  UnitPath += &apos;;dsgn\gui\processors\intel&apos;;
-if TargetCPU = &apos;x86_64&apos; then
-  UnitPath += &apos;;dsgn\gui\processors\intel&apos;;
-if TargetCPU = &apos;arm&apos; then
-  UnitPath += &apos;;dsgn\gui\processors\arm&apos;;"/>
       <Other>
         <CompilerMessages>
           <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4046="True"/>
@@ -29,10 +23,6 @@ if TargetCPU = &apos;arm&apos; then
     <License Value="GPL v3"/>
     <Version Major="1"/>
     <Files>
-      <Item>
-        <Filename Value="CpuView.AllUnits.pas"/>
-        <UnitName Value="CpuView.AllUnits"/>
-      </Item>
       <Item>
         <Filename Value="src\CpuView.Actions.pas"/>
         <UnitName Value="CpuView.Actions"/>
@@ -72,7 +62,7 @@ if TargetCPU = &apos;arm&apos; then
       <Item>
         <Filename Value="src\core\CpuView.ExtendedHint.pas"/>
         <UnitName Value="CpuView.ExtendedHint"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.FpDebug.pas"/>
         <UnitName Value="CpuView.FpDebug"/>
@@ -145,6 +135,26 @@ if TargetCPU = &apos;arm&apos; then
       <Item>
         <Filename Value="dsgn\gui\frmCpuViewShortCuts.pas"/>
         <UnitName Value="frmCpuViewShortCuts"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.Windows.pas"/>
+        <UnitName Value="CpuView.Windows"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\processors\intel\dlgCpuViewImplementation.pas"/>
+        <UnitName Value="dlgCpuViewImplementation"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.IntelContext.pas"/>
+        <UnitName Value="CpuView.IntelContext"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.IntelContext.Types.pas"/>
+        <UnitName Value="CpuView.IntelContext.Types"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.ScriptExecutor.Intel.pas"/>
+        <UnitName Value="CpuView.ScriptExecutor.Intel"/>
       </Item>
     </Files>
     <RequiredPkgs>
