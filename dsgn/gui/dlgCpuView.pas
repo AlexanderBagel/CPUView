@@ -370,8 +370,11 @@ type
     property Settings: TCpuViewSettins read FSettings;
   end;
 
+  TfrmCpuViewClass = class of TfrmCpuView;
+
 var
   frmCpuView: TfrmCpuView;
+  frmCpuViewClass: TfrmCpuViewClass;
 
 implementation
 

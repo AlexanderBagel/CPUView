@@ -372,5 +372,9 @@ begin
   Result := FContext;
 end;
 
+initialization
+
+  frmCpuViewClass := TfrmCpuViewImpl;
+
 end.
 

@@ -37,7 +37,6 @@ uses
   IDEOptionsIntf,
   IDEImagesIntf,
   dlgCpuView,
-  dlgCpuViewImplementation,
   frmCpuViewOptions,
   frmCpuViewColors,
   frmCpuViewShortCuts,
@@ -72,7 +71,7 @@ procedure StartCpuView(Sender: TObject);
 begin
   if DebugBoss = nil then Exit;
   if frmCpuView = nil then
-    frmCpuView := TfrmCpuViewImpl.Create(DebugBoss);
+    frmCpuView := frmCpuViewClass.Create(DebugBoss);
   frmCpuView.BringToFront;
   frmCpuView.Show;
 end;
