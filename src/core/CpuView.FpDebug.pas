@@ -148,6 +148,8 @@ type
     function CheckCanWork: Boolean;
     function CheckUserCodeWithIdeCallStack: TCheckUserCodeState;
     function CurrentInstruction: TInstruction;
+    function FormatSymbol(AddrVA: Int64; ASym: TFpSymbol; AParam: TQuerySymbol): string;
+    function GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
     procedure DoDebuggerDestroy(Sender: TObject);
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
@@ -375,6 +377,78 @@ begin
   finally
     List.Free;
   end;
+end;
+
+function TCpuViewDebugGate.FormatSymbol(AddrVA: Int64; ASym: TFpSymbol; AParam: TQuerySymbol
+  ): string;
+var
+  PasSource: TCodeBuffer;
+  Editor: TSourceEditorInterface;
+  ASrcLineNumber: Cardinal;
+  ASrcFileName: string;
+begin
+  Result := '';
+  if ASym = nil then Exit;
+  try
+
+    if (AParam = qsName) or (ASym.Line <= 0) then
+    begin
+      Result := ASym.Name;
+      if Result = '' then Exit;
+      if ASym.Parent <> nil then
+        Result := ASym.Parent.Name + '.' + Result;
+      if ASym.Line > 0 then
+        Result := Format('%s %s:%d', [
+          Result, ExtractFileName(ASym.FileName), ASym.Line])
+      else
+      begin
+        if AParam <> qsName then
+        begin
+          if FPreviosSrcFuncName = Result then
+          begin
+            Result := '';
+            Exit;
+          end;
+          FPreviosSrcFuncName := Result;
+        end;
+        if AddrVA <> ASym.Address.Address then
+          Result := Format('%s+%d', [Result, AddrVA - ASym.Address.Address]);
+      end;
+      Exit;
+    end;
+
+    ASrcFileName := ASym.FileName;
+    ASrcLineNumber := ASym.Line;
+    if (FPreviosSrcLine = ASrcLineNumber) and (FPreviosSrcFileName = ASrcFileName) then
+      Exit;
+    FPreviosSrcLine := ASrcLineNumber;
+    FPreviosSrcFileName := ASrcFileName;
+    FPreviosSrcFuncName := ASym.Name;
+
+    if DebugBoss.GetFullFilename(ASrcFileName, False) then
+    begin
+      PasSource := CodeToolBoss.LoadFile(ASrcFileName, True, False);
+      if Assigned(PasSource) then
+      begin
+        Editor := SourceEditorManagerIntf.SourceEditorIntfWithFilename(ASrcFileName);
+        if Editor <> nil then
+          ASrcLineNumber := Editor.DebugToSourceLine(ASrcLineNumber);
+        Result := Format('%s:%d %s', [
+          ExtractFileName(ASrcFileName), ASrcLineNumber,
+          Trim(PasSource.GetLine(ASrcLineNumber - 1, False))]);
+      end;
+    end;
+  finally
+    ASym.ReleaseReference;
+  end;
+end;
+
+function TCpuViewDebugGate.GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
+begin
+  if UseDebugInfo and Assigned(FDbgController) then
+    Result := FDbgController.CurrentProcess.FindProcSymbol(AddrVA)
+  else
+    Result := nil;
 end;
 
 procedure TCpuViewDebugGate.DoDebuggerDestroy(Sender: TObject);
@@ -862,6 +936,9 @@ var
   ExternalAddr, RipAddr: Int64;
   SpaceIndex: Integer;
   HasMem: Boolean;
+
+  PrevSymAddrVA, MissCount: TDBGPtr;
+  Sym: TFpSymbol;
 begin
   CpuViewDebugLog.Log(Format('DebugGate: Disassembly(AddrVA: 0x%x, nSize: %d)', [AddrVA, nSize]), True);
 
@@ -871,11 +948,43 @@ begin
   if Process = nil then Exit;
   Disasm := Process.Disassembler;
   if Disasm = nil then Exit;
+  PrevSymAddrVA := 0;
   while nSize > 0 do
   begin
+    Sym := GetSymbolAtAddr(AddrVA);
+    if Sym <> nil then
+    begin
+      if PrevSymAddrVA = 0 then
+        PrevSymAddrVA := Sym.Address.Address
+      else
+      begin
+        if PrevSymAddrVA <> Sym.Address.Address then
+        begin
+          PrevSymAddrVA := Sym.Address.Address;
+          if (AddrVA > PrevSymAddrVA) and (Result.Count > 0) then
+          begin
+            MissCount := AddrVA - PrevSymAddrVA;
+            Instruction := Result.Last;
+            if Instruction.Len > MissCount then
+            begin
+              Result.Delete(Result.Count - 1);
+              Dec(Instruction.Len, MissCount);
+              Instruction.AsString := '???';
+              Instruction.JmpTo := 0;
+              Instruction.Hint := '';
+              Result.Add(Instruction);
+              Dec(pBuff, MissCount);
+              Dec(AddrVA, MissCount);
+              Inc(nSize, MissCount);
+            end;
+          end;
+        end;
+      end;
+    end;
+
     if AShowSourceLines then
     begin
-      Instruction.AsString := QuerySymbolAtAddr(AddrVA, qsSourceLine);
+      Instruction.AsString := FormatSymbol(AddrVA, Sym, qsSourceLine);
       if Instruction.AsString <> '' then
       begin
         Instruction.AddrVA := AddrVA;
@@ -885,6 +994,7 @@ begin
         Result.Add(Instruction);
       end;
     end;
+
     PrevVA := {%H-}Int64(pBuff);
     Disasm.Disassemble(pBuff, ACodeBytes, ACode, AnInfo);
     Instruction.AddrVA := AddrVA;
@@ -1038,70 +1148,8 @@ begin
 end;
 
 function TCpuViewDebugGate.QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): string;
-var
-  Sym: TFpSymbol;
-  PasSource: TCodeBuffer;
-  Editor: TSourceEditorInterface;
-  ASrcLineNumber: Cardinal;
-  ASrcFileName: string;
 begin
-  Result := '';
-  if not UseDebugInfo then Exit;
-  if FDbgController = nil then Exit;
-  Sym := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
-  if Sym = nil then Exit;
-  try
-
-    if (AParam = qsName) or (Sym.Line <= 0) then
-    begin
-      Result := Sym.Name;
-      if Result = '' then Exit;
-      if Sym.Parent <> nil then
-        Result := Sym.Parent.Name + '.' + Result;
-      if Sym.Line > 0 then
-        Result := Format('%s %s:%d', [
-          Result, ExtractFileName(Sym.FileName), Sym.Line])
-      else
-      begin
-        if AParam <> qsName then
-        begin
-          if FPreviosSrcFuncName = Result then
-          begin
-            Result := '';
-            Exit;
-          end;
-          FPreviosSrcFuncName := Result;
-        end;
-        if AddrVA <> Sym.Address.Address then
-          Result := Format('%s+%d', [Result, AddrVA - Sym.Address.Address]);
-      end;
-      Exit;
-    end;
-
-    ASrcFileName := Sym.FileName;
-    ASrcLineNumber := Sym.Line;
-    if (FPreviosSrcLine = ASrcLineNumber) and (FPreviosSrcFileName = ASrcFileName) then
-      Exit;
-    FPreviosSrcLine := ASrcLineNumber;
-    FPreviosSrcFileName := ASrcFileName;
-    FPreviosSrcFuncName := Sym.Name;
-
-    if DebugBoss.GetFullFilename(ASrcFileName, False) then
-    begin
-      PasSource := CodeToolBoss.LoadFile(ASrcFileName, True, False);
-      if Assigned(PasSource) then
-      begin
-        Editor := SourceEditorManagerIntf.SourceEditorIntfWithFilename(ASrcFileName);
-        if Editor <> nil then
-          ASrcLineNumber := Editor.DebugToSourceLine(ASrcLineNumber);
-        Result := Format('%s:%d %s', [
-          ExtractFileName(ASrcFileName), ASrcLineNumber,
-          Trim(PasSource.GetLine(ASrcLineNumber - 1, False))]);
-      end;
-    end;
-  finally
-    Sym.ReleaseReference;
-  end;
+  Result := FormatSymbol(AddrVA, GetSymbolAtAddr(AddrVA), AParam);
 end;
 
 function TCpuViewDebugGate.ReadMemory(AddrVA: Int64; var Buff; Size: Integer
