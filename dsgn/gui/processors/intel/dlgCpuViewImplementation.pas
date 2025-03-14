@@ -5,7 +5,7 @@
 //  * Unit Name : dlgCpuView.pas
 //  * Purpose   : GUI debugger with implementation for Intel x86_64 processor.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -78,7 +78,7 @@ type
     procedure edCommandsKeyPress(Sender: TObject; var Key: char);
     procedure pmHintPopup(Sender: TObject);
   private type
-    THintMenuType = (hmtAddrVA, hmtSeparator, hmtCopy, hmtSelectAll);
+    THintMenuType = (hmtAddrVA, hmtSeparator, hmtCopy, hmtSelectAll, hmtSimdSingle, hmtSimdDouble);
     THintMenuParam = record
       Caption: string;
       AddrVA: Int64;
@@ -92,13 +92,16 @@ type
   private
     FContext: TIntelCpuContext;
     FScript: TIntelScriptExecutor;
+    FShowSimdHintAsSingle: Boolean;
     FHintMenuData: TList<THintMenuParam>;
+    FScryptExecutorValue, FScryptExecutorMemValue: Int64;
     procedure OnHintMenuClick(Sender: TObject);
     procedure OnReset(Sender: TObject);
   protected
     procedure AfterDbgGateCreate; override;
     procedure BeforeDbgGateDestroy; override;
     function GetContext: TCommonCpuContext; override;
+    procedure InitStatusBarValues(APanelIndex: Integer); override;
   public
 
   end;
@@ -168,16 +171,20 @@ begin
 end;
 
 procedure TfrmCpuViewImpl.AsmViewSelectionChange(Sender: TObject);
+const
+  SimdX87FormatMode: TFormatMode = (Align: False; Inverted: True; Divide: True; Divider: #9);
 var
   ExecuteResult, ValueAccess, MemValueAccess, Symbol, MemSymbol: string;
   I, Idx: Integer;
   Expression: TExpression;
   HintParam: THintMenuParam;
+  ShowSimdMenu: Boolean;
 begin
   inherited;
   memHints.Lines.BeginUpdate;
   try
     memHints.Lines.Clear;
+    ShowSimdMenu := False;
     FHintMenuData.Clear;
     FScript.CurrentRIPOffset := AsmView.SelectedInstructionAddr + AsmView.SelectedRawLength;
     if not FScript.Execute(
@@ -210,16 +217,38 @@ begin
         FHintMenuData.Add(HintParam);
       if Expression.MemSize > 0 then
       begin
-        MemSymbol := Core.QuerySymbolAtAddr(Expression.MemValue);
-        MemValueAccess := Core.QueryAccessStr(Expression.MemValue);
-        ExecuteResult := Format('%s = [%x (%s)%s] -> %x (%s) %s',
-          [Expression.Data, Expression.Value, ValueAccess, Symbol,
-          Expression.MemValue, MemValueAccess, MemSymbol]);
-        HintParam.AddrVA := Expression.MemValue;
-        HintParam.Caption := Expression.Data;
-        HintParam.MemSize := DbgGate.PointerSize;
-        if Core.AddrInDump(HintParam.AddrVA) then
-          FHintMenuData.Add(HintParam);
+        if etSimdX87 in Expression.Types then
+        begin
+          MemSymbol := '';
+          case Expression.MemSize of
+            8: MemSymbol := 'double: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat64), bvmFloat64, SimdX87FormatMode);
+            10: MemSymbol := 'extended: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat80), bvmFloat80, SimdX87FormatMode);
+          else
+            ShowSimdMenu := True;
+            if FShowSimdHintAsSingle then
+              MemSymbol := 'single array: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat32), bvmFloat32, SimdX87FormatMode)
+            else
+              MemSymbol := 'double array: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat64), bvmFloat64, SimdX87FormatMode);
+          end;
+          if etMem in Expression.Types then
+            ExecuteResult := Format('%s = [%x (%s)%s] -> %s',
+              [Expression.Data, Expression.Value, ValueAccess, Symbol, MemSymbol])
+          else
+            ExecuteResult := Format('%s = %s', [Expression.Data, MemSymbol]);
+        end
+        else
+        begin
+          MemSymbol := Core.QuerySymbolAtAddr(Expression.MemValue);
+          MemValueAccess := Core.QueryAccessStr(Expression.MemValue);
+          ExecuteResult := Format('%s = [%x (%s)%s] -> %x (%s) %s',
+            [Expression.Data, Expression.Value, ValueAccess, Symbol,
+            Expression.MemValue, MemValueAccess, MemSymbol]);
+          HintParam.AddrVA := Expression.MemValue;
+          HintParam.Caption := Expression.Data;
+          HintParam.MemSize := DbgGate.PointerSize;
+          if Core.AddrInDump(HintParam.AddrVA) then
+            FHintMenuData.Add(HintParam);
+        end;
       end
       else
         ExecuteResult := Format('%s = %x (%s)%s',
@@ -232,6 +261,15 @@ begin
     FHintMenuData.Add(HintParam);
     HintParam.MenuType := hmtCopy;
     FHintMenuData.Add(HintParam);
+    if ShowSimdMenu then
+    begin
+      HintParam.MenuType := hmtSeparator;
+      FHintMenuData.Add(HintParam);
+      HintParam.MenuType := hmtSimdSingle;
+      FHintMenuData.Add(HintParam);
+      HintParam.MenuType := hmtSimdDouble;
+      FHintMenuData.Add(HintParam);
+    end;
   finally
     memHints.Lines.EndUpdate;
   end;
@@ -245,15 +283,20 @@ begin
   if Key <> #13 then Exit;
   if Trim(edCommands.Text) = '' then Exit;
   FScript.CurrentRIPOffset := AsmView.SelectedInstructionAddr + AsmView.SelectedRawLength;
-  if FScript.Execute(edCommands.Text, ExecuteResult) then
+  if FScript.Execute(edCommands.Text, ExecuteResult) and (FScript.CalculatedList.Count > 0) then
   begin
     Expression := FScript.CalculatedList[0];
     if Expression.MemSize > 0 then
-      ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue])
+    begin
+      ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue]);
+      FScryptExecutorMemValue := Expression.MemValue;
+    end
     else
       ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
   end;
-  StatusBar.Panels[2].Text := ExecuteResult;
+  FScryptExecutorValue := FScript.CalculatedValue;
+  StatusBar.Panels[3].Text := ExecuteResult;
+  UpdateStatusBar;
 end;
 
 procedure TfrmCpuViewImpl.pmHintPopup(Sender: TObject);
@@ -281,6 +324,8 @@ begin
       hmtSeparator: AddMenuItem(pmHint.Items, '-', I);
       hmtCopy: AddMenuItem(pmHint.Items, 'Copy', I);
       hmtSelectAll: AddMenuItem(pmHint.Items, 'Select All', I);
+      hmtSimdSingle: AddMenuItem(pmHint.Items, 'Show SIMD value as Single Array', I).Checked := FShowSimdHintAsSingle;
+      hmtSimdDouble: AddMenuItem(pmHint.Items, 'Show SIMD value as Double Array', I).Checked := not FShowSimdHintAsSingle;
       hmtAddrVA:
       begin
         AItem := AddMenuItem(pmHint.Items, AParam.Caption +
@@ -333,6 +378,11 @@ begin
         memHints.SelectAll;
         ActiveControl := memHints;
       end;
+      hmtSimdDouble, hmtSimdSingle:
+      begin
+        FShowSimdHintAsSingle := FHintMenuData[TMenuItem(Sender).Tag].MenuType = hmtSimdSingle;
+        AsmViewSelectionChange(nil);
+      end;
     end;
   end;
 end;
@@ -370,6 +420,13 @@ begin
   if FContext = nil then
     FContext := TIntelCpuContext.Create(Self);
   Result := FContext;
+end;
+
+procedure TfrmCpuViewImpl.InitStatusBarValues(APanelIndex: Integer);
+begin
+  if (APanelIndex = 3) and (FScryptExecutorValue <> 0) then
+    SBPanelValue := IntToHex(FScryptExecutorValue, 1);
+  inherited;
 end;
 
 initialization

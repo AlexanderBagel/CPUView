@@ -18,12 +18,12 @@ object frmCpuView: TfrmCpuView
   OnKeyPress = FormKeyPress
   object pnDebug: TPanel
     Left = 0
-    Height = 72
-    Top = 1232
+    Height = 79
+    Top = 1225
     Width = 2096
     Align = alBottom
     AutoSize = True
-    ClientHeight = 72
+    ClientHeight = 79
     ClientWidth = 2096
     TabOrder = 0
     object edCommands: TEdit
@@ -38,7 +38,7 @@ object frmCpuView: TfrmCpuView
     end
     object StatusBar: TStatusBar
       Left = 1
-      Height = 29
+      Height = 36
       Top = 42
       Width = 2094
       Panels = <      
@@ -57,22 +57,23 @@ object frmCpuView: TfrmCpuView
         item
           Width = 50
         end>
+      PopupMenu = pmStatusBar
       SimplePanel = False
     end
   end
   object pnAsmReg: TPanel
     Left = 0
-    Height = 693
+    Height = 686
     Top = 39
     Width = 2096
     Align = alClient
     Caption = 'pnAsmReg'
-    ClientHeight = 693
+    ClientHeight = 686
     ClientWidth = 2096
     TabOrder = 1
     object AsmView: TAsmView
       Left = 1
-      Height = 691
+      Height = 684
       Top = 1
       Width = 1376
       Align = alClient
@@ -82,7 +83,7 @@ object frmCpuView: TfrmCpuView
     end
     object RegView: TRegView
       Left = 1385
-      Height = 691
+      Height = 684
       Top = 1
       Width = 710
       Align = alRight
@@ -95,7 +96,7 @@ object frmCpuView: TfrmCpuView
     end
     object splitAsmReg: TSplitter
       Left = 1377
-      Height = 691
+      Height = 684
       Top = 1
       Width = 8
       Align = alRight
@@ -126,7 +127,7 @@ object frmCpuView: TfrmCpuView
     end
     object tbSep1: TToolButton
       Left = 106
-      Height = 33
+      Height = 8
       Top = 2
       Caption = 'tbSep1'
       Style = tbsSeparator
@@ -140,7 +141,7 @@ object frmCpuView: TfrmCpuView
     end
     object tbSep2: TToolButton
       Left = 149
-      Height = 33
+      Height = 8
       Top = 2
       Caption = 'tbSep2'
       Style = tbsSeparator
@@ -170,7 +171,7 @@ object frmCpuView: TfrmCpuView
   object pnDumps: TPanel
     Left = 0
     Height = 492
-    Top = 740
+    Top = 733
     Width = 2096
     Align = alBottom
     Caption = 'pnDumps'
@@ -214,13 +215,13 @@ object frmCpuView: TfrmCpuView
         OnChange = pcDumpsChange
         object tabDump0: TTabSheet
           Caption = 'DUMP 0'
-          ClientHeight = 385
-          ClientWidth = 1136
+          ClientHeight = 387
+          ClientWidth = 1132
           object DumpView: TDumpView
             Left = 0
-            Height = 385
+            Height = 387
             Top = 0
-            Width = 1136
+            Width = 1132
             PopupMenu = pmDump
             Align = alClient
             BytesInGroup = 4
@@ -253,7 +254,7 @@ object frmCpuView: TfrmCpuView
     Cursor = crVSplit
     Left = 0
     Height = 8
-    Top = 732
+    Top = 725
     Width = 2096
     Align = alBottom
     ResizeAnchor = akBottom
@@ -747,6 +748,16 @@ object frmCpuView: TfrmCpuView
       OnExecute = acDbgRunToUserCodeExecute
       OnUpdate = acDbgRunToUserCodeUpdate
     end
+    object acSBCopyPanelText: TAction
+      Category = 'StatusBar'
+      Caption = 'Copy as Text'
+      OnExecute = acSBCopyPanelTextExecute
+    end
+    object acSBCopyScriptorValue: TAction
+      Category = 'StatusBar'
+      Caption = 'Copy Value'
+      OnExecute = acSBCopyScriptorValueExecute
+    end
   end
   object pmStack: TPopupMenu
     Left = 1656
@@ -1017,6 +1028,17 @@ object frmCpuView: TfrmCpuView
     object miProfilerSaveDump: TMenuItem
       Caption = 'miProfilerSaveDump'
       OnClick = miProfilerSaveDumpClick
+    end
+  end
+  object pmStatusBar: TPopupMenu
+    OnPopup = pmStatusBarPopup
+    Left = 1504
+    Top = 1152
+    object miSBCopyText: TMenuItem
+      Action = acSBCopyPanelText
+    end
+    object miSBCopyValue: TMenuItem
+      Action = acSBCopyScriptorValue
     end
   end
 end

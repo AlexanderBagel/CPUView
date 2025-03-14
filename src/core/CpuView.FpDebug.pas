@@ -30,6 +30,7 @@ interface
 uses
   LCLType,
   LCLIntf,
+  Maps,
 
   SysUtils,
   Classes,
@@ -177,6 +178,8 @@ type
     procedure FillThreadStackFrames(ALimit: TStackLimit;
       AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
       AFrames: TList<TStackFrame>); override;
+    function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; override;
+    function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; override;
     function GetUserCodeAddrVA: Int64; override;
@@ -812,6 +815,78 @@ begin
   FUserCodeAddrVA := UserCodeAddrVANotFound;
 end;
 
+function TCpuViewDebugGate.GetRemoteModuleHandle(const ALibraryName: string
+  ): TRemoteModule;
+var
+  LibraryMap: TLibraryMap;
+  Iterator: TMapIterator;
+  Lib: TDbgLibrary;
+  AName: string;
+begin
+  Result := Default(TRemoteModule);
+  if FDbgController = nil then Exit;
+  LibraryMap := FDbgController.CurrentProcess.LibMap;
+  if LibraryMap = nil then Exit;
+  Iterator := TMapIterator.Create(LibraryMap);
+  try
+    while not Iterator.EOM do
+    begin
+      Iterator.GetData(Lib);
+      AName := ExtractFileName(Lib.Name);
+      {$IFDEF LINUX}
+      // ignore the library version in the extension
+      if AName.StartsWith(ALibraryName, False) then
+      {$ELSE}
+      if SameText(AName, ALibraryName) then
+      {$ENDIF}
+      begin
+        Result.hInstance := Lib.ModuleHandle;
+        Result.ImageBase := Lib.LoaderList.ImageBase + Lib.LoaderList.RelocationOffset;
+        Result.LibraryPath := Lib.Name;
+        Break;
+      end;
+      Iterator.Next;
+    end;
+  finally
+    Iterator.Free;
+  end;
+end;
+
+function TCpuViewDebugGate.GetRemoteProcAddress(ALibHandle: TLibHandle;
+  const AProcName: string): Int64;
+var
+  LibraryMap: TLibraryMap;
+  Iterator: TMapIterator;
+  Lib: TDbgLibrary;
+  Sym: TFpSymbol;
+begin
+  Result := 0;
+  if FDbgController = nil then Exit;
+  LibraryMap := FDbgController.CurrentProcess.LibMap;
+  if LibraryMap = nil then Exit;
+  Iterator := TMapIterator.Create(LibraryMap);
+  try
+    while not Iterator.EOM do
+    begin
+      Iterator.GetData(Lib);
+      if Lib.ModuleHandle = ALibHandle then
+      begin
+        Sym := nil;
+        if Lib.DbgInfo <> nil then
+          Sym := Lib.DbgInfo.FindProcSymbol(AProcName);
+        if (Sym = nil) and (Lib.SymbolTableInfo <> nil) then
+          Sym := Lib.SymbolTableInfo.FindProcSymbol(AProcName);
+        if Sym <> nil then
+          Result := Sym.Address.Address;
+        Break;
+      end;
+      Iterator.Next;
+    end;
+  finally
+    Iterator.Free;
+  end;
+end;
+
 constructor TCpuViewDebugGate.Create(AOwner: TComponent;
   AUtils: TCommonAbstractUtils);
 begin
@@ -936,7 +1011,6 @@ var
   ExternalAddr, RipAddr: Int64;
   SpaceIndex: Integer;
   HasMem: Boolean;
-
   PrevSymAddrVA, MissCount: TDBGPtr;
   Sym: TFpSymbol;
 begin

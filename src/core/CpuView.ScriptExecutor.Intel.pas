@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.ScriptExecutor.Intel.pas
 //  * Purpose   : Script executor taking into account Intel x86_64 processor architecture.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -91,6 +91,8 @@ begin
     PrevIsMemRip := (AExpression.Types * [etMem, etRip] = [etMem, etRip]) and
       not (etSizePfx in AExpression.Types);
   end;
+  if (CalculatedList.Count > 0) and CalculatedList.List[0].Calculated then
+    CalculatedValue := CalculatedList.List[0].Value;
   Result := True;
 end;
 
@@ -102,9 +104,10 @@ var
   TokenLen, I: Integer;
   Token: TToken;
   WaitState: TWaitStates;
-  Sign, Multiply, Mem, RegPresent: Boolean;
+  Sign, Multiply, Mem: Boolean;
   MemSize: Integer;
   RegValue: TRegValue;
+  RegType: TRegType;
 begin
   Result := False;
   if (Context = nil) or (Debugger = nil) then Exit;
@@ -115,7 +118,6 @@ begin
     Mem := False;
     WaitState := [wsInstruction, wsSizePfx, wsMem, wsRegImm];
     MemSize := 0;
-    RegPresent := False;
     AExpression := Default(TExpression);
     while nSize > 0 do
     begin
@@ -171,7 +173,7 @@ begin
             end;
             ',':
             begin
-              if Tokens.Count = 0 then
+              if (Tokens.Count = 0) and (WaitState <> []) then
                 Exit
               else
               begin
@@ -224,6 +226,15 @@ begin
         begin
           TokenStr := Copy(pData, 1, TokenLen);
           AExpression.Data := AExpression.Data + TokenStr;
+          RegType := FParser.GetRegType(TokenStr);
+          case RegType of
+            rtUnknown, rtRegSeg: Exit;
+            rtX87, rtSimd64, rtSimd128, rtSimd256, rtSimd512:
+            begin
+              if Mem or Sign or Multiply or (Tokens.Count > 0) then Exit;
+              Include(AExpression.Types, etSimdX87);
+            end;
+          end;
           if wsRegImm in WaitState then
           begin
             if (TokenStr = 'RIP') and Mem then
@@ -236,21 +247,37 @@ begin
                 Include(AExpression.Types, etReg)
               else
                 Exit;
-            RegPresent := True;
-            Token.Value := RegValue.QwordValue;
-            Token.Decrement := Sign;
-            Sign := False;
-            if Multiply then
+            if (etSimdX87 in AExpression.Types) and not Mem then
             begin
-              Multiply := False;
-              Tokens.List[Tokens.Count - 1].Value := Tokens.Last.Value * Token.Value;
+              if RegType = rtSimd64 then
+                Move(RegValue.QwordValue, AExpression.SimdX87[0], 8)
+              else
+                Move(RegValue.Ext32[0], AExpression.SimdX87[0], 32);
+              case RegType of
+                rtX87: AExpression.MemSize := 10;
+                rtSimd64: AExpression.MemSize := 8;
+                rtSimd128: AExpression.MemSize := 16;
+                rtSimd256: AExpression.MemSize := 32;
+              end;
+              WaitState := [];
             end
             else
-              Tokens.Add(Token);
+            begin
+              Token.Value := RegValue.QwordValue;
+              Token.Decrement := Sign;
+              Sign := False;
+              if Multiply then
+              begin
+                Multiply := False;
+                Tokens.List[Tokens.Count - 1].Value := Tokens.Last.Value * Token.Value;
+              end
+              else
+                Tokens.Add(Token);
+              WaitState := [wsOperand];
+            end;
           end
           else
             Exit;
-          WaitState := [wsOperand];
         end;
         ttPrefix, ttKernel, ttNop:;
         ttSize:
@@ -259,11 +286,16 @@ begin
           AExpression.Data := AExpression.Data + TokenStr + ' ';
           if wsSizePfx in WaitState then
           begin
-            case IndexStr(TokenStr, ['BYTE', 'WORD', 'DWORD', 'QWORD']) of
+            case IndexStr(TokenStr, ['BYTE', 'WORD', 'DWORD', 'QWORD', 'TBYTE']) of
               0: MemSize := 1;
               1: MemSize := 2;
               2: MemSize := 4;
               3: MemSize := 8;
+              4:
+              begin
+                MemSize := 10;
+                Include(AExpression.Types, etSimdX87);
+              end;
             else
               Exit(False);
             end;
@@ -288,11 +320,17 @@ begin
     begin
       if MemSize = 0 then
         MemSize := Debugger.PointerSize;
-      if Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize) then
-        AExpression.MemSize := MemSize;
+      if etSimdX87 in AExpression.Types then
+      begin
+        if Debugger.ReadMemory(AExpression.Value, AExpression.SimdX87[0], MemSize) then
+          AExpression.MemSize := MemSize;
+      end
+      else
+        if Debugger.ReadMemory(AExpression.Value, AExpression.MemValue, MemSize) then
+          AExpression.MemSize := MemSize;
     end;
 
-    AExpression.Calculated := RegPresent or (Mem and (AExpression.MemSize > 0));
+    AExpression.Calculated := (etReg in AExpression.Types) or (Mem and (AExpression.MemSize > 0));
     Result := True;
 
     while (nSize > 0) and (pData^ = ' ') do

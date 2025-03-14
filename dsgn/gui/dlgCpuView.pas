@@ -24,7 +24,7 @@ interface
 
 uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
-  ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList,
+  ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Clipbrd,
 
   FWHexView,
   FWHexView.Actions,
@@ -75,6 +75,8 @@ type
     acDumpsCloseAllToTheRight: TAction;
     acStackFollowRBP: TAction;
     acDbgRunToUserCode: TAction;
+    acSBCopyPanelText: TAction;
+    acSBCopyScriptorValue: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -121,6 +123,8 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miSBCopyText: TMenuItem;
+    miSBCopyValue: TMenuItem;
     miStackFollowRbp: TMenuItem;
     miProfilerSaveDump: TMenuItem;
     miResetProfiler: TMenuItem;
@@ -246,6 +250,7 @@ type
     pmHint: TPopupMenu;
     pmDumps: TPopupMenu;
     pmDebug: TPopupMenu;
+    pmStatusBar: TPopupMenu;
     RegView: TRegView;
     miRegSep1: TMenuItem;
     miAsmSep3: TMenuItem;
@@ -293,6 +298,8 @@ type
     procedure acRegModifyNewValueExecute(Sender: TObject);
     procedure acRegModifyToggleExecute(Sender: TObject);
     procedure acRegModifyZeroExecute(Sender: TObject);
+    procedure acSBCopyPanelTextExecute(Sender: TObject);
+    procedure acSBCopyScriptorValueExecute(Sender: TObject);
     procedure acShowInAsmExecute(Sender: TObject);
     procedure acShowInAsmUpdate(Sender: TObject);
     procedure acShowInDumpExecute(Sender: TObject);
@@ -321,6 +328,7 @@ type
     procedure miProfilerSaveDumpClick(Sender: TObject);
     procedure miResetProfilerClick(Sender: TObject);
     procedure pcDumpsChange(Sender: TObject);
+    procedure pmStatusBarPopup(Sender: TObject);
     procedure RegViewDblClick(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
       RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
@@ -332,6 +340,8 @@ type
     FCore: TCpuViewCore;
     FContext: TCommonCpuContext;
     FDbgGate: TCpuViewDebugGate;
+    FSBPanelText: string;
+    FSBPanelValue: string;
     FSettings: TCpuViewSettins;
     FAsmViewSelectedAddr,
     FContextRegValue,
@@ -356,12 +366,15 @@ type
     procedure AfterDbgGateCreate; virtual; abstract;
     procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
+    procedure InitStatusBarValues(APanelIndex: Integer); virtual;
     function ToDpi(Value: Integer): Integer;
     function ToDefaultDpi(Value: Integer): Integer;
     procedure LockZOrder;
     function MeasureCanvas: TBitmap;
     procedure UnlockZOrder;
     procedure UpdateStatusBar;
+    property SBPanelText: string read FSBPanelText write FSBPanelText;
+    property SBPanelValue: string read FSBPanelValue write FSBPanelValue;
   public
     procedure LoadSettings;
     procedure SaveSettings;
@@ -473,6 +486,17 @@ end;
 procedure TfrmCpuView.pcDumpsChange(Sender: TObject);
 begin
   Core.DumpViewList.ItemIndex := pcDumps.PageIndex;
+end;
+
+procedure TfrmCpuView.pmStatusBarPopup(Sender: TObject);
+var
+  P: TPoint;
+begin
+  GetCursorPos(P);
+  P := StatusBar.ScreenToClient(P);
+  SBPanelText := '';
+  SBPanelValue := '';
+  InitStatusBarValues(StatusBar.GetPanelIndexAt(P.X, P.Y));
 end;
 
 procedure TfrmCpuView.RegViewDblClick(Sender: TObject);
@@ -755,6 +779,16 @@ begin
     Exit(3);
 end;
 
+procedure TfrmCpuView.InitStatusBarValues(APanelIndex: Integer);
+begin
+  acSBCopyPanelText.Enabled := APanelIndex >= 0;
+  if acSBCopyPanelText.Enabled then
+    SBPanelText := StatusBar.Panels[APanelIndex].Text;
+  if (APanelIndex = 2) and (ActiveViewerSelectedValue <> 0) then
+    SBPanelValue := IntToHex(ActiveViewerSelectedValue, 1);
+  acSBCopyScriptorValue.Enabled := SBPanelValue <> '';
+end;
+
 function TfrmCpuView.ToDpi(Value: Integer): Integer;
 begin
   Result := MulDiv(Value, PixelsPerInch, 96);
@@ -1005,6 +1039,16 @@ procedure TfrmCpuView.acRegModifyZeroExecute(Sender: TObject);
 begin
   FContextRegValue := 0;
   FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
+end;
+
+procedure TfrmCpuView.acSBCopyPanelTextExecute(Sender: TObject);
+begin
+  Clipboard.AsText := SBPanelText;
+end;
+
+procedure TfrmCpuView.acSBCopyScriptorValueExecute(Sender: TObject);
+begin
+  Clipboard.AsText := SBPanelValue;
 end;
 
 procedure TfrmCpuView.acHighlightRegExecute(Sender: TObject);

@@ -61,6 +61,12 @@ type
     AddrVA: Int64;
   end;
 
+  TRemoteModule = record
+    hInstance: TLibHandle;
+    ImageBase: Int64;
+    LibraryPath: string;
+  end;
+
   { TAbstractDebugger }
 
   TAbstractDebugger = class(TComponent)
@@ -96,6 +102,8 @@ type
     procedure FillThreadStackFrames(ALimit: TStackLimit;
       AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
       AFrames: TList<TStackFrame>); virtual;
+    function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; virtual; abstract;
+    function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; virtual; abstract;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;
     function GetUserCodeAddrVA: Int64; virtual; abstract;

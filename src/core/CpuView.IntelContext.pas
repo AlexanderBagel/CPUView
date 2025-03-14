@@ -165,7 +165,7 @@ type
 implementation
 
 const
-  ExtendedRegNames: array[0..70] of string = (
+  ExtendedRegNames: array[0..126] of string = (
     'RAX', 'EAX', 'AX', 'AH', 'AL',
     'RBX', 'EBX', 'BX', 'BH', 'BL',
     'RCX', 'ECX', 'CX', 'CH', 'CL',
@@ -182,9 +182,16 @@ const
     'R12', 'R12D', 'R12W', 'R12B',
     'R13', 'R13D', 'R13W', 'R13B',
     'R14', 'R14D', 'R14W', 'R14B',
-    'R15', 'R15D', 'R15W', 'R15B'
+    'R15', 'R15D', 'R15W', 'R15B',
+    'MM0', 'MM1', 'MM2', 'MM3', 'MM4', 'MM5', 'MM6', 'MM7',
+    'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7',
+    'ST(0)', 'ST(1)', 'ST(2)', 'ST(3)', 'ST(4)', 'ST(5)', 'ST(6)', 'ST(7)',
+    'XMM0', 'XMM1', 'XMM2', 'XMM3', 'XMM4', 'XMM5', 'XMM6', 'XMM7',
+    'XMM8', 'XMM9', 'XMM10', 'XMM11', 'XMM12', 'XMM13', 'XMM14', 'XMM15',
+    'YMM0', 'YMM1', 'YMM2', 'YMM3', 'YMM4', 'YMM5', 'YMM6', 'YMM7',
+    'YMM8', 'YMM9', 'YMM10', 'YMM11', 'YMM12', 'YMM13', 'YMM14', 'YMM15'
   );
-  ExtendedRegIndex: array[0..70] of TRegID = (
+  ExtendedRegIndex: array[0..126] of TRegID = (
     0, 0, 0, 0, 0,
     1, 1, 1, 1, 1,
     2, 2, 2, 2, 2,
@@ -201,7 +208,12 @@ const
     13, 13, 13, 13,
     14, 14, 14, 14,
     15, 15, 15, 15,
-    16, 16, 16, 16
+    16, 16, 16, 16,
+    33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48,
+    49, 50, 51, 52, 53, 54, 55, 56,
+    58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+    74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89
   );
 
 { TIntelCtxSettings }
@@ -1245,7 +1257,7 @@ end;
 function TIntelCpuContext.RegQueryValue(const ARegName: string;
   out ARegValue: TRegValue): Boolean;
 const
-  ValueType: array[0..70] of Integer = (
+  ValueType: array[0..126] of Integer = (
     0, 1, 2, 3, 4,
     0, 1, 2, 3, 4,
     0, 1, 2, 3, 4,
@@ -1262,7 +1274,14 @@ const
     0, 1, 2, 4,
     0, 1, 2, 4,
     0, 1, 2, 4,
-    0, 1, 2, 4
+    0, 1, 2, 4,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5
   );
 var
   Idx: Integer;
@@ -1278,6 +1297,7 @@ begin
       2: ARegValue.WordValue := FullRegValue.WordValue;
       3: ARegValue.ByteValue := Byte(FullRegValue.WordValue shr 8);
       4: ARegValue.ByteValue := FullRegValue.ByteValue;
+      5: Move(FullRegValue.Ext32[0], ARegValue.Ext32[0], 32);
     end;
     case ValueType[Idx] of
       1: ARegValue.ValueSize := 4;

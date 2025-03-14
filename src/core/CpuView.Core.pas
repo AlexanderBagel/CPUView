@@ -27,8 +27,7 @@ interface
 
 { TODO:
   The x87/SIMD registers are not editable
-  Add support to scryptor "bp user32.MessageBoxW"
-  Run to user code
+  Run to user code (detect IsRetAddr via previos Call)
 }
 
 uses
@@ -137,6 +136,7 @@ type
     FExtendedHints: Boolean;
     FFindSymbolsDepth: Integer;
     FForceFindSymbols: Boolean;
+    FGenerateCacheOnScroll: Boolean;
     FInvalidReg: TRegionData;
     FLastStackLimit: TStackLimit;
     FLockSelChange: Boolean;
@@ -741,8 +741,8 @@ end;
 
 function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
 
-  procedure BuildCacheFromBuff(FromAddr: Int64; FromBuff: PByte;
-    BufSize: Integer);
+  function BuildCacheFromBuff(FromAddr: Int64; FromBuff: PByte;
+    BufSize: Integer): Integer;
   var
     List: TList<TInstruction>;
     Inst: TInstruction;
@@ -764,7 +764,7 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
       List.Free;
     end;
 
-    if BufSize > 0 then
+    if (BufSize > 0) and not FGenerateCacheOnScroll then
     begin
       AsmLine.AddrVA := FromAddr;
       AsmLine.DecodedStr := '???';
@@ -772,12 +772,15 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
       AsmLine.JmpTo := 0;
       FAddrIndex.TryAdd(FromAddr, FCacheList.Count);
       FCacheList.Add(AsmLine);
+      BufSize := 0;
     end;
+
+    Result := BufSize;
   end;
 
 var
   WindowAddr: Int64;
-  Count, TopCacheSize: Integer;
+  Count, TopCacheSize, Missed: Integer;
   Buff: array of Byte;
   RegData: TRegionData;
 begin
@@ -789,6 +792,7 @@ begin
   else
     WindowAddr := AAddress;
   TopCacheSize := AAddress - WindowAddr;
+  Missed := 0;
 
   FDisassemblyStream.SetAddrWindow(WindowAddr, DisasmBuffSize);
   SetLength(Buff{%H-}, DisasmBuffSize);
@@ -796,8 +800,9 @@ begin
   if Count > 0 then
   begin
     if TopCacheSize > 0 then
-      BuildCacheFromBuff(WindowAddr, @Buff[0], TopCacheSize);
+      Missed := BuildCacheFromBuff(WindowAddr, @Buff[0], TopCacheSize);
     Result := FCacheList.Count;
+    Dec(TopCacheSize, Missed);
     BuildCacheFromBuff(AAddress, @Buff[TopCacheSize], Count - TopCacheSize);
   end;
 end;
@@ -938,32 +943,37 @@ var
   NewCacheIndex: Integer;
 begin
   if FCacheList.Count = 0 then Exit;
-  NewCacheIndex := FCacheListIndex;
-  case AStep of
-    ssdLineUp: Dec(NewCacheIndex);
-    ssdWheelUp: Dec(NewCacheIndex, FAsmView.WheelMultiplyer);
-    ssdPageUp: Dec(NewCacheIndex, FAsmView.VisibleRowCount);
-    ssdLineDown: Inc(NewCacheIndex);
-    ssdWheelDown: Inc(NewCacheIndex, FAsmView.WheelMultiplyer);
-    ssdPageDown: Inc(NewCacheIndex, FAsmView.VisibleRowCount);
-  end;
-  if NewCacheIndex < 0 then
-    NewCacheIndex := GenerateCache(FCacheList[0].AddrVA);
-  if NewCacheIndex >= FCacheList.Count - FAsmView.VisibleRowCount then
-  begin
-    if NewCacheIndex < FCacheList.Count then
-      NewCacheIndex := GenerateCache(FCacheList[NewCacheIndex].AddrVA)
+  FGenerateCacheOnScroll := True;
+  try
+    NewCacheIndex := FCacheListIndex;
+    case AStep of
+      ssdLineUp: Dec(NewCacheIndex);
+      ssdWheelUp: Dec(NewCacheIndex, FAsmView.WheelMultiplyer);
+      ssdPageUp: Dec(NewCacheIndex, FAsmView.VisibleRowCount);
+      ssdLineDown: Inc(NewCacheIndex);
+      ssdWheelDown: Inc(NewCacheIndex, FAsmView.WheelMultiplyer);
+      ssdPageDown: Inc(NewCacheIndex, FAsmView.VisibleRowCount);
+    end;
+    if NewCacheIndex < 0 then
+      NewCacheIndex := GenerateCache(FCacheList[0].AddrVA);
+    if NewCacheIndex >= FCacheList.Count - FAsmView.VisibleRowCount then
+    begin
+      if NewCacheIndex < FCacheList.Count then
+        NewCacheIndex := GenerateCache(FCacheList[NewCacheIndex].AddrVA)
+      else
+        NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - FAsmView.VisibleRowCount].AddrVA);
+    end;
+    FLockSelChange := True;
+    if (NewCacheIndex >= 0) and (NewCacheIndex < FCacheList.Count) then
+      BuildAsmWindow(FCacheList[NewCacheIndex].AddrVA)
     else
-      NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - FAsmView.VisibleRowCount].AddrVA);
+      FLockSelChange := False; // dbg...
+    FLockSelChange := False;
+    if Assigned(FOldAsmScroll) then
+      FOldAsmScroll(Sender, AStep);
+  finally
+    FGenerateCacheOnScroll := False;
   end;
-  FLockSelChange := True;
-  if (NewCacheIndex >= 0) and (NewCacheIndex < FCacheList.Count) then
-    BuildAsmWindow(FCacheList[NewCacheIndex].AddrVA)
-  else
-    FLockSelChange := False; // dbg...
-  FLockSelChange := False;
-  if Assigned(FOldAsmScroll) then
-    FOldAsmScroll(Sender, AStep);
 end;
 
 procedure TCpuViewCore.OnAsmSelectionChange(Sender: TObject);
