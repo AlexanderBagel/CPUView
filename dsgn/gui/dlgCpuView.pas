@@ -77,6 +77,7 @@ type
     acDbgRunToUserCode: TAction;
     acSBCopyPanelText: TAction;
     acSBCopyScriptorValue: TAction;
+    acSaveRawDump: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -123,6 +124,9 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miStackDump: TMenuItem;
+    miDumpSave: TMenuItem;
+    miAsmDump: TMenuItem;
     miSBCopyText: TMenuItem;
     miSBCopyValue: TMenuItem;
     miStackFollowRbp: TMenuItem;
@@ -258,6 +262,7 @@ type
     miAsmSep0: TMenuItem;
     miDumpSep0: TMenuItem;
     miStackSep0: TMenuItem;
+    SaveDialog: TSaveDialog;
     splitAsmDumps: TSplitter;
     splitDumpStack: TSplitter;
     splitAsmReg: TSplitter;
@@ -298,6 +303,8 @@ type
     procedure acRegModifyNewValueExecute(Sender: TObject);
     procedure acRegModifyToggleExecute(Sender: TObject);
     procedure acRegModifyZeroExecute(Sender: TObject);
+    procedure acSaveRawDumpExecute(Sender: TObject);
+    procedure acSaveRawDumpUpdate(Sender: TObject);
     procedure acSBCopyPanelTextExecute(Sender: TObject);
     procedure acSBCopyScriptorValueExecute(Sender: TObject);
     procedure acShowInAsmExecute(Sender: TObject);
@@ -362,6 +369,7 @@ type
     procedure InternalShowInDump(AddrVA: Int64);
   protected
     function ActiveDumpView: TDumpView;
+    function ActiveView: TFWCustomHexView;
     function ActiveViewIndex: Integer;
     procedure AfterDbgGateCreate; virtual; abstract;
     procedure BeforeDbgGateDestroy; virtual; abstract;
@@ -766,6 +774,18 @@ begin
   Result := pcDumps.ActivePage.Controls[0] as TDumpView;
 end;
 
+function TfrmCpuView.ActiveView: TFWCustomHexView;
+begin
+  case ActiveViewIndex of
+    0: Result := AsmView;
+    1: Result := RegView;
+    2: Result := StackView;
+    3: Result := ActiveDumpView;
+  else
+    Result := nil;
+  end;
+end;
+
 function TfrmCpuView.ActiveViewIndex: Integer;
 begin
   Result := -1;
@@ -1039,6 +1059,26 @@ procedure TfrmCpuView.acRegModifyZeroExecute(Sender: TObject);
 begin
   FContextRegValue := 0;
   FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
+end;
+
+procedure TfrmCpuView.acSaveRawDumpExecute(Sender: TObject);
+var
+  AStream: TFileStream;
+begin
+  if SaveDialog.Execute then
+  begin
+    AStream := TFileStream.Create(SaveDialog.FileName, fmCreate);
+    try
+      ActiveView.CopySelectedToStream(AStream);
+    finally
+      AStream.Free;
+    end;
+  end;
+end;
+
+procedure TfrmCpuView.acSaveRawDumpUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := (ActiveViewIndex in [0, 2, 3]) and (ActiveView.SelectedRawLength > 0);
 end;
 
 procedure TfrmCpuView.acSBCopyPanelTextExecute(Sender: TObject);

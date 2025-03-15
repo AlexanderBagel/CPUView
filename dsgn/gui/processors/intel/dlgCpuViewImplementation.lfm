@@ -4,7 +4,6 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   inherited pnDebug: TPanel
-    Top = 733
     inherited edCommands: TEdit
       TabOrder = 1
       OnKeyPress = edCommandsKeyPress
@@ -21,17 +20,12 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   inherited ToolBar: TToolBar
     inherited tbSep1: TToolButton
       Left = 71
-      Height = 33
-    end
-    inherited tbSep2: TToolButton
-      Height = 33
     end
     inherited tbRunTillRet: TToolButton
       Left = 79
     end
   end
   inherited pnDumps: TPanel
-    Top = 812
     inherited memHints: TMemo
       Lines.Strings = (
         'Hint text display here'
@@ -193,6 +187,8 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     end
     inherited acSBCopyScriptorValue: TAction[79]
     end
+    inherited acSaveRawDump: TAction[80]
+    end
   end
   inherited pmDump: TPopupMenu
     Left = 176
@@ -200,7 +196,7 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   inherited pmHint: TPopupMenu
     OnPopup = pmHintPopup
   end
-  object pmIntelReg: TPopupMenu[15]
+  object pmIntelReg: TPopupMenu[16]
     Left = 1544
     Top = 112
     object miRegIntelViewMode: TMenuItem
