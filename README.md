@@ -99,6 +99,23 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Selections of duplicates
 * Address recognition and highlighting
 
+### Commands:
+
+"?" - calculates the result of the expression
+For example: "? [RIP+EAX*2+123]" output [RIP+EAX*2+123] = [100003982] -> 35DC5E8D98948C3
+
+"gmh", "getmodulehandle" - returns the ImageBase of the library in the process being debugged
+For example: "gmh user32" output "user32.dll" instance 7FFEFDDF0000. Path: C:\WINDOWS\System32\user32.dll
+
+"gpa", "getprocaddress" - returns address of procedure in debugging process
+for example: "gpa user32:MessageBoxA" output "user32:MessageBoxA" address: 7FFEFDE7C5B0
+
+"bp" - Set new BreakPoint 
+for example: "bp user32:MessageBoxA" output "user32:MessageBoxA" address: 7FFEFDE7C5B0 breakpoint set
+
+"bc" - Delete the previously set BreakPoint
+for example: "bc user32:MessageBoxA" output "user32:MessageBoxA" address: 7FFEFDE7C5B0 breakpoint remove
+
 ### Appearance:
 
 Light theme:
