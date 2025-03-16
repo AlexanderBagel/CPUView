@@ -859,7 +859,7 @@ function TCommonUtils.GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean
 var
   io: iovec;
   Regs: TUserRegs;
-  StackBase: Int64;
+  StackPointer: Int64;
   MBI: TMemoryBasicInformation;
 begin
   Result := Default(TStackLimit);
@@ -868,15 +868,15 @@ begin
   if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
   {$IFDEF CPUX32}
-  StackBase := Max(Regs.regs32[UESP], Regs.regs32[EBP]);
+  StackPointer := Regs.regs32[UESP];
   {$ENDIF}
   {$IFDEF CPUX64}
   if ThreadIs32 then
-    StackBase := Max(Regs.regs32[UESP], Regs.regs32[EBP])
+    StackPointer := Regs.regs32[UESP]
   else
-    StackBase := Max(Regs.regs64[RSP], Regs.regs64[RBP]);
+    StackPointer := Regs.regs64[RSP];
   {$ENDIF}
-  if VirtualQueryMBI(StackBase, MBI) then
+  if VirtualQueryMBI(StackPointer, MBI) then
   begin
     Result.Limit := MBI.BaseAddress;
     Result.Base := MBI.BaseAddress + MBI.RegionSize;
