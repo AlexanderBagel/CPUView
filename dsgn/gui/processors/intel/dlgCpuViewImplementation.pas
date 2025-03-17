@@ -172,7 +172,7 @@ end;
 
 procedure TfrmCpuViewImpl.AsmViewSelectionChange(Sender: TObject);
 const
-  SimdX87FormatMode: TFormatMode = (Align: False; Inverted: True; Divide: True; Divider: #9);
+  SimdX87FormatMode: TFormatMode = (Align: False; AlignChar: #0; Inverted: True; Divide: True; DivideChar: #9);
 var
   ExecuteResult, ValueAccess, MemValueAccess, Symbol, MemSymbol: string;
   I, Idx: Integer;

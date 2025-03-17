@@ -124,7 +124,7 @@ type
     property SourceLineColor: TColor read FSourceLineColor write SetSourceLineColor stored IsColorStored;
   end;
 
-  TAsmTextMertics = class(TFixedHexByteTextMetric)
+  TAsmTextMetrics = class(TFixedHexByteTextMetric)
   protected
     procedure UpdateCharPosition(BytesInRow, CharWidth: Integer); override;
   end;
@@ -1086,16 +1086,11 @@ begin
   end;
 end;
 
-{ TAsmTextMertics }
+{ TAsmTextMetrics }
 
-procedure TAsmTextMertics.UpdateCharPosition(BytesInRow, CharWidth: Integer);
-var
-  I: Integer;
+procedure TAsmTextMetrics.UpdateCharPosition(BytesInRow, CharWidth: Integer);
 begin
-  for I := 0 to Length(FCharPositions[False]) - 1 do
-    FCharPositions[False][I] := CharWidth;
-  for I := 0 to Length(FCharPositions[True]) - 1 do
-    FCharPositions[True][I] := CharWidth;
+  UpdateCharPositionText(BytesInRow, CharWidth);
 end;
 
 { TAsmViewDefRow }
@@ -1175,7 +1170,7 @@ end;
 
 function TAsmViewDefRow.GetTextMetricClass: TAbstractTextMetricClass;
 begin
-  Result := TAsmTextMertics;
+  Result := TAsmTextMetrics;
 end;
 
 { TAsmViewSrcLineRow }
@@ -1353,7 +1348,7 @@ begin
   inherited; Exit;
   {$endif}
   if ssCtrl in Shift then
-    DoFontResize(IfThen(WheelDelta > 0, 1, -1))
+    Zoom(IfThen(WheelDelta > 0, 1, -1))
   else
     if WheelDelta > 0 then
       DoScrollStep(ssdWheelUp)
@@ -2564,14 +2559,8 @@ end;
 
 procedure TRegisterTextMetrics.UpdateCharPosition(BytesInRow,
   CharWidth: Integer);
-var
-  I: Integer;
 begin
-  for I := 0 to Length(FCharPositions[False]) - 1 do
-  begin
-    FCharPositions[False][I] := CharWidth;
-    FCharPositions[True][I] := CharWidth;
-  end;
+  UpdateCharPositionText(BytesInRow, CharWidth);
 end;
 
 function TRegisterTextMetrics.ValueMetric: TValueMetric;

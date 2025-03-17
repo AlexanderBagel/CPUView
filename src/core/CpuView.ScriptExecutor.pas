@@ -108,7 +108,12 @@ begin
   if SameText(ExtractFileExt(AValue), ValidSuffix) then
     Result := AValue
   else
-    Result := AValue + ValidSuffix;
+    {$IFDEF LINUX}
+    if ExtractFileExt(AValue) <> '' then
+      Result := AValue
+    else
+    {$ENDIF}
+      Result := AValue + ValidSuffix;
 end;
 
 function TAbstractScriptExecutor.ExecuteGetModuleHandle(const Script: string;
