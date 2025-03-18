@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.Design.DbgLog.pas
 //  * Purpose   : Debug log implementation.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -29,7 +29,9 @@ uses
   Linux, unixtype,
   {$ENDIF}
   SysUtils, Generics.Collections,
-  LazLoggerBase, LazLogger, LazIDEIntf;
+  LazLoggerBase, LazLogger, LazIDEIntf,
+
+  CpuView.Design.Common;
 
 type
 
@@ -64,9 +66,6 @@ type
   function CpuViewDebugLog: TCpuViewDebugLog;
 
 implementation
-
-uses
-  CpuView.Design.Common;
 
 function CpuViewDebugLog: TCpuViewDebugLog;
 begin

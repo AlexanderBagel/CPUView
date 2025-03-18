@@ -429,9 +429,5 @@ begin
   inherited;
 end;
 
-initialization
-
-  frmCpuViewClass := TfrmCpuViewImpl;
-
 end.
 

@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.Stream.pas
 //  * Purpose   : Auxiliary streams for reading data from a remote process.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru

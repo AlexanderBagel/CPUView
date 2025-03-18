@@ -5,7 +5,7 @@
 //  * Unit Name : frmCpuViewOptions.pas
 //  * Purpose   : Main settings window frame for Lazarus.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -22,8 +22,22 @@ unit frmCpuViewOptions;
 interface
 
 uses
-  LMessages, Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, Graphics,
-  IDEOptEditorIntf, frmCpuViewBaseOptions, laz.VirtualTrees, ImgList, Spin;
+  LCLIntf, LMessages, Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs,
+  Graphics, laz.VirtualTrees, ImgList, Spin, Math, Themes,
+  {$IFDEF MSWINDOWS}
+  Win32Themes, UxTheme,
+  {$ENDIF}
+
+  IDEOptEditorIntf,
+
+  frmCpuViewBaseOptions,
+
+  FWHexView,
+  FWHexView.Common,
+
+  CpuView.Common,
+  CpuView.Settings,
+  CpuView.ExtendedHint;
 
 type
 
@@ -95,17 +109,6 @@ type
   end;
 
 implementation
-
-uses
-  LCLIntf, Math, Themes,
-  {$IFDEF MSWINDOWS}
-  Win32Themes, UxTheme,
-  {$ENDIF}
-  FWHexView,
-  FWHexView.Common,
-  CpuView.Common,
-  CpuView.Settings,
-  CpuView.ExtendedHint;
 
 var
   TreeExpandState: array [0..4] of Boolean;

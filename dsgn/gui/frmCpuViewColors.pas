@@ -5,7 +5,7 @@
 //  * Unit Name : frmCpuViewColors.pas
 //  * Purpose   : Color settings for all viewers.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -23,7 +23,10 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs, ColorBox,
-  frmCpuViewBaseOptions;
+
+  frmCpuViewBaseOptions,
+  FWHexView,
+  CpuView.Settings;
 
 type
 
@@ -57,10 +60,6 @@ type
   end;
 
 implementation
-
-uses
-  FWHexView,
-  CpuView.Settings;
 
 {$R *.lfm}
 

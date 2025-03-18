@@ -5,7 +5,7 @@
 //  * Unit Name : frmCpuViewShortCuts.pas
 //  * Purpose   : ShordCut settings for CPU-View dialog and all viewers.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -22,9 +22,13 @@ unit frmCpuViewShortCuts;
 interface
 
 uses
+  LCLType, LCLProc,
   Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ButtonPanel, ActnList,
+
   IDEOptEditorIntf, IdeInspectKeyGrapper, IDEImagesIntf,
-  frmCpuViewBaseOptions;
+
+  frmCpuViewBaseOptions,
+  CpuView.Settings;
 
 type
 
@@ -61,11 +65,6 @@ type
   end;
 
 implementation
-
-uses
-  LCLType,
-  LCLProc,
-  CpuView.Settings;
 
 {$R *.lfm}
 

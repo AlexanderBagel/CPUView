@@ -26,20 +26,28 @@ uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
   ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Clipbrd,
 
+  IDEImagesIntf,
+  BaseDebugManager,
+
   FWHexView,
   FWHexView.Actions,
   FWHexView.MappedView,
 
   CpuView.Core,
-  CpuView.Common,
   CpuView.CPUContext,
   CpuView.Viewers,
   CpuView.DebugerGate,
   CpuView.FpDebug,
   CpuView.Actions,
   CpuView.Settings,
+  CpuView.Design.Common,
   CpuView.Design.CrashDump,
-  CpuView.Design.DbgLog;
+  CpuView.Design.DbgLog,
+
+  dlgCpuView.TemporaryLocker,
+  dlgInputBox,
+
+  uni_profiler;
 
 type
 
@@ -391,21 +399,10 @@ type
     property Settings: TCpuViewSettins read FSettings;
   end;
 
-  TfrmCpuViewClass = class of TfrmCpuView;
-
 var
   frmCpuView: TfrmCpuView;
-  frmCpuViewClass: TfrmCpuViewClass;
 
 implementation
-
-uses
-  CpuView.Design.Common,
-  dlgCpuView.TemporaryLocker,
-  dlgInputBox,
-  IDEImagesIntf,
-  BaseDebugManager,
-  uni_profiler;
 
 {$R *.lfm}
 

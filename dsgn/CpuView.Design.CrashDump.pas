@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.Design.CrashDump.pas
 //  * Purpose   : Exception interceptor for Lazarus.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -22,7 +22,8 @@ unit CpuView.Design.CrashDump;
 interface
 
 uses
-  SysUtils, Forms;
+  SysUtils, Forms,
+  CpuView.Design.DbgLog;
 
 type
 
@@ -41,9 +42,6 @@ type
   end;
 
 implementation
-
-uses
-  CpuView.Design.DbgLog;
 
 { TExceptionLogger }
 
