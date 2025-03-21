@@ -109,6 +109,9 @@ for example: "bp user32:MessageBoxA" output "user32:MessageBoxA" address: 7FFEFD
 "bc" - Delete the previously set BreakPoint  
 for example: "bc user32:MessageBoxA" output "user32:MessageBoxA" address: 7FFEFDE7C5B0 breakpoint remove
 
+For gpa/getprocaddress/bp/bc commands, the library name is optional.  
+for example: "gpa PeekMessageA" output "user32.dll:PeekMessageA" address: 7FFE289E3FC0
+
 ### Appearance:
 
 Light theme:
