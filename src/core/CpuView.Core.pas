@@ -778,6 +778,9 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
     Result := BufSize;
   end;
 
+const
+  TopCacheMinLimit = 128;
+  TopCacheMaxLimit = 1024;
 var
   WindowAddr: Int64;
   Count, TopCacheSize, Missed: Integer;
@@ -788,15 +791,23 @@ begin
   if FDisassemblyStream = nil then Exit;
   ResetCache;
   if QueryRegion(AAddress, RegData) then
-    WindowAddr := Max(AAddress - 128, RegData.AllocationBase)
+  begin
+    WindowAddr := Max(AAddress - TopCacheMinLimit, RegData.AllocationBase);
+    WindowAddr := FDebugger.QuerySymbolAtAddr(WindowAddr, qsAddrVA).AddrVA;
+  end
   else
     WindowAddr := AAddress;
   TopCacheSize := AAddress - WindowAddr;
+  if TopCacheSize > TopCacheMaxLimit then
+  begin
+    TopCacheSize := TopCacheMaxLimit;
+    WindowAddr := AAddress - TopCacheMaxLimit;
+  end;
   Missed := 0;
 
-  FDisassemblyStream.SetAddrWindow(WindowAddr, DisasmBuffSize);
-  SetLength(Buff{%H-}, DisasmBuffSize);
-  Count := FDisassemblyStream.Read(Buff[0], DisasmBuffSize);
+  SetLength(Buff{%H-}, TopCacheSize + DisasmBuffSize);
+  FDisassemblyStream.SetAddrWindow(WindowAddr, Length(Buff));
+  Count := FDisassemblyStream.Read(Buff[0], Length(Buff));
   if Count > 0 then
   begin
     if TopCacheSize > 0 then
@@ -1210,7 +1221,7 @@ begin
 
     if raRead in AItem.Region.Access then
     begin
-      AItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
+      AItem.Symbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName).Description;
       AItem.InDeepSymbol := AItem.Symbol;
 
       if (raExecute in AItem.Region.Access) and (AItem.Symbol <> '') then
@@ -1230,7 +1241,7 @@ begin
           if ForceFindSymbols then
             QueryCacheItem(AddrPtr, AddrPtrItem, CallIndex + 1)
           else
-            AddrPtrItem.InDeepSymbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName);
+            AddrPtrItem.InDeepSymbol := Debugger.QuerySymbolAtAddr(AddrVA, qsName).Description;
           if AddrPtrItem.InDeepSymbol <> '' then
           begin
             AItem.InDeepSymbol := Trim(Format('%s [0x%x] -> %s', [AItem.Symbol, AddrPtr, AddrPtrItem.InDeepSymbol]));

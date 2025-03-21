@@ -227,7 +227,7 @@ begin
           TokenStr := Copy(pData, 1, TokenLen);
           AExpression.Data := AExpression.Data + TokenStr;
           RegType := FParser.GetRegType(TokenStr);
-          case RegType of
+          {%H-}case RegType of
             rtUnknown, rtRegSeg: Exit;
             rtX87, rtSimd64, rtSimd128, rtSimd256, rtSimd512:
             begin
@@ -253,7 +253,7 @@ begin
                 Move(RegValue.QwordValue, AExpression.SimdX87[0], 8)
               else
                 Move(RegValue.Ext32[0], AExpression.SimdX87[0], 32);
-              case RegType of
+              {%H-}case RegType of
                 rtX87: AExpression.MemSize := 10;
                 rtSimd64: AExpression.MemSize := 8;
                 rtSimd128: AExpression.MemSize := 16;

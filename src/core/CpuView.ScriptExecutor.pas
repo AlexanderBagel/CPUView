@@ -206,9 +206,28 @@ function TAbstractScriptExecutor.InternalGetProcAddress(const Script: string;
 var
   LibName, LibNameWithExt, ProcName: string;
   RemoteModule: TRemoteModule;
+  Libs: TList<TRemoteModule>;
+  I: Integer;
 begin
   Result := False;
   ExtractParams(Script, LibName, ProcName);
+  if ProcName = '' then
+  begin
+    Libs := FDebugger.GetRemoteModules;
+    try
+      for I := 0 to Libs.Count - 1 do
+      begin
+        Result := InternalGetProcAddress(Format('gpa %s:%s',
+          [ExtractFileName(Libs[I].LibraryPath), LibName]), ExecuteResult, AddrVA);
+        if Result then
+          Exit;
+      end;
+    finally
+      Libs.Free;
+    end;
+    ExecuteResult := Format('"%s" not found.', [LibName]);
+    Exit;
+  end;
   LibNameWithExt := ConvertToLibName(LibName);
   RemoteModule := FDebugger.GetRemoteModuleHandle(LibNameWithExt);
   if RemoteModule.hInstance = 0 then

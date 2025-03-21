@@ -23,7 +23,7 @@ interface
 
 uses
   LCLType, LCLProc,
-  Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ButtonPanel, ActnList,
+  Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ActnList,
 
   IDEOptEditorIntf, IdeInspectKeyGrapper, IDEImagesIntf,
 

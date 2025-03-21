@@ -47,7 +47,12 @@ type
   TAbstractDebugState = (adsError, adsStoped, adsStart, adsPaused, adsRunning, adsFinished);
   TInterfaceDebugCommand = (idcRun, idcRunTo, idcPause, idcStepInto, idcStepOver, idcStepOut, idcBreakPoint, idcRunToUserCode);
 
-  TQuerySymbol = (qsName, qsSourceLine);
+  TQuerySymbol = (qsName, qsSourceLine, qsAddrVA);
+
+  TQuerySymbolValue = record
+    AddrVA: Int64;
+    Description: string;
+  end;
 
   TInstruction = record
     AddrVA: Int64;
@@ -103,6 +108,7 @@ type
       AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
       AFrames: TList<TStackFrame>); virtual;
     function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; virtual; abstract;
+    function GetRemoteModules: TList<TRemoteModule>; virtual; abstract;
     function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; virtual; abstract;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;
@@ -110,7 +116,7 @@ type
     procedure Pause; virtual; abstract;
     function PointerSize: Integer; virtual; abstract;
     function ProcessID: Cardinal; virtual; abstract;
-    function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): string; virtual; abstract;
+    function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): TQuerySymbolValue; virtual; abstract;
     function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; virtual; abstract;
     procedure Run; virtual; abstract;
     procedure Stop; virtual; abstract;

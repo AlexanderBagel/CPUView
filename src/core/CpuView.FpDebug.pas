@@ -179,6 +179,7 @@ type
       AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
       AFrames: TList<TStackFrame>); override;
     function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; override;
+    function GetRemoteModules: TList<TRemoteModule>; override;
     function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; override;
@@ -186,7 +187,7 @@ type
     procedure Pause; override;
     function PointerSize: Integer; override;
     function ProcessID: Cardinal; override;
-    function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): string; override;
+    function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): TQuerySymbolValue; override;
     function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; override;
     procedure Run; override;
     procedure Stop; override;
@@ -852,6 +853,34 @@ begin
   end;
 end;
 
+function TCpuViewDebugGate.GetRemoteModules: TList<TRemoteModule>;
+var
+  LibraryMap: TLibraryMap;
+  Iterator: TMapIterator;
+  Lib: TDbgLibrary;
+  AName: string;
+  Item: TRemoteModule;
+begin
+  Result := TList<TRemoteModule>.Create;
+  if FDbgController = nil then Exit;
+  LibraryMap := FDbgController.CurrentProcess.LibMap;
+  if LibraryMap = nil then Exit;
+  Iterator := TMapIterator.Create(LibraryMap);
+  try
+    while not Iterator.EOM do
+    begin
+      Iterator.GetData(Lib);
+      Item.hInstance := Lib.ModuleHandle;
+      Item.ImageBase := Lib.LoaderList.ImageBase + Lib.LoaderList.RelocationOffset;
+      Item.LibraryPath := Lib.Name;
+      Result.Add(Item);
+      Iterator.Next;
+    end;
+  finally
+    Iterator.Free;
+  end;
+end;
+
 function TCpuViewDebugGate.GetRemoteProcAddress(ALibHandle: TLibHandle;
   const AProcName: string): Int64;
 var
@@ -1087,7 +1116,7 @@ begin
 
     if AnInfo.InstrTargetOffs <> 0 then
     begin
-      Instruction.Hint := QuerySymbolAtAddr(ExternalAddr, qsName);
+      Instruction.Hint := QuerySymbolAtAddr(ExternalAddr, qsName).Description;
       if Instruction.Hint = '' then
         Instruction.Hint := '0x' + IntToHex(ExternalAddr, 1)
       else
@@ -1120,7 +1149,7 @@ begin
         ReadMemory(ExternalAddr, RipAddr, PointerSize);
         if RipAddr <> 0 then
         begin
-          RipSimbol := QuerySymbolAtAddr(RipAddr, qsName);
+          RipSimbol := QuerySymbolAtAddr(RipAddr, qsName).Description;
           if Instruction.AsString.StartsWith('CALL') then
             Instruction.JmpTo := RipAddr;
         end;
@@ -1221,9 +1250,25 @@ begin
     Result := 0;
 end;
 
-function TCpuViewDebugGate.QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): string;
+function TCpuViewDebugGate.QuerySymbolAtAddr(AddrVA: Int64;
+  AParam: TQuerySymbol): TQuerySymbolValue;
+var
+  ASymbol: TFpSymbol;
 begin
-  Result := FormatSymbol(AddrVA, GetSymbolAtAddr(AddrVA), AParam);
+  ASymbol := GetSymbolAtAddr(AddrVA);
+  if ASymbol = nil then
+  begin
+    Result.AddrVA := AddrVA;
+    Result.Description := '';
+  end
+  else
+  begin
+    Result.AddrVA := ASymbol.Address.Address;
+    if AParam = qsAddrVA then
+      Result.Description := ''
+    else
+      Result.Description := FormatSymbol(AddrVA, ASymbol, AParam);
+  end;
 end;
 
 function TCpuViewDebugGate.ReadMemory(AddrVA: Int64; var Buff; Size: Integer

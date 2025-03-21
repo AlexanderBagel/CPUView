@@ -497,7 +497,7 @@ procedure TfrmCpuView.pmStatusBarPopup(Sender: TObject);
 var
   P: TPoint;
 begin
-  GetCursorPos(P);
+  GetCursorPos(P{%H-});
   P := StatusBar.ScreenToClient(P);
   SBPanelText := '';
   SBPanelValue := '';

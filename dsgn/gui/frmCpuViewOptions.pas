@@ -32,7 +32,6 @@ uses
 
   frmCpuViewBaseOptions,
 
-  FWHexView,
   FWHexView.Common,
 
   CpuView.Common,

@@ -15,7 +15,7 @@
       </SearchPaths>
       <Other>
         <CompilerMessages>
-          <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4046="True"/>
+          <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4046="True" idx3057="True"/>
         </CompilerMessages>
       </Other>
     </CompilerOptions>

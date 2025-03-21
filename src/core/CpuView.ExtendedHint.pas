@@ -36,7 +36,6 @@ uses
   Controls,
   Forms,
   Graphics,
-  Generics.Collections,
   Math,
 
   FWHexView.AsmTokenizer,
@@ -332,7 +331,7 @@ var
   Dx: array of Integer;
   DrawLinkStep: Byte;
 begin
-  SetLength(Dx, Max(FMaxLine, FMaxHint));
+  SetLength(Dx{%H-}, Max(FMaxLine, FMaxHint));
   for I := 0 to Length(Dx) - 1 do
     Dx[I] := FData.CharWidth;
 
