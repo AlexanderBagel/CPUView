@@ -959,10 +959,10 @@ begin
     NewCacheIndex := FCacheListIndex;
     case AStep of
       ssdLineUp: Dec(NewCacheIndex);
-      ssdWheelUp: Dec(NewCacheIndex, FAsmView.WheelMultiplyer);
+      ssdWheelUp: Dec(NewCacheIndex, FAsmView.WheelRowCount);
       ssdPageUp: Dec(NewCacheIndex, FAsmView.VisibleRowCount);
       ssdLineDown: Inc(NewCacheIndex);
-      ssdWheelDown: Inc(NewCacheIndex, FAsmView.WheelMultiplyer);
+      ssdWheelDown: Inc(NewCacheIndex, FAsmView.WheelRowCount);
       ssdPageDown: Inc(NewCacheIndex, FAsmView.VisibleRowCount);
     end;
     if NewCacheIndex < 0 then

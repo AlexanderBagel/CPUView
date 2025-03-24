@@ -66,6 +66,10 @@ type
     AddrVA: Int64;
   end;
 
+  {$IFNDEF FPC}
+  TLibHandle = THandle;
+  {$ENDIF}
+
   TRemoteModule = record
     hInstance: TLibHandle;
     ImageBase: Int64;

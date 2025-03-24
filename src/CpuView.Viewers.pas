@@ -271,7 +271,7 @@ type
     property TabOrder;
     property TabStop;
     property Visible;
-    property WheelMultiplyer;
+    property WheelMultiplier;
     property OnCacheEnd;
     property OnClick;
     property OnContextPopup;
@@ -451,7 +451,7 @@ type
     property TabStop;
     property ValidateAddress;
     property Visible;
-    property WheelMultiplyer;
+    property WheelMultiplier;
     property OnClick;
     property OnContextPopup;
     property OnDblClick;
@@ -605,7 +605,7 @@ type
     property TabStop;
     property ValidateAddress;
     property Visible;
-    property WheelMultiplyer;
+    property WheelMultiplier;
     property OnClick;
     property OnContextPopup;
     property OnDblClick;
@@ -652,8 +652,8 @@ type
   strict private
     FContext: TAbstractCPUContext;
   protected
-    function AcceptEdit(AColumn: TColumnType): Boolean; override;
     function AcceptSelection: Boolean; override;
+    function CaretEditMode(AColumn: TColumnType): TCaretEditMode; override;
     procedure CopyRowAsString(Builder: TSimplyStringBuilder); override;
     procedure DrawColumn(ACanvas: TCanvas; AColumn: TColumnType;
       var ARect: TRect); override;
@@ -792,7 +792,7 @@ type
     property TabStop;
     property ValidateAddress;
     property Visible;
-    property WheelMultiplyer;
+    property WheelMultiplier;
     property OnClick;
     property OnContextPopup;
     property OnDblClick;
@@ -2571,14 +2571,14 @@ end;
 
 { TRegisterPainter }
 
-function TRegisterPainter.AcceptEdit(AColumn: TColumnType): Boolean;
-begin
-  Result := False;
-end;
-
 function TRegisterPainter.AcceptSelection: Boolean;
 begin
   Result := not View.Context.EmptyRow(RowIndex);
+end;
+
+function TRegisterPainter.CaretEditMode(AColumn: TColumnType): TCaretEditMode;
+begin
+  Result := cemDisabled;
 end;
 
 procedure TRegisterPainter.CopyRowAsString(Builder: TSimplyStringBuilder);

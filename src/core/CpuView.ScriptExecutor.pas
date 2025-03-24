@@ -101,6 +101,10 @@ begin
 end;
 
 function TAbstractScriptExecutor.ConvertToLibName(const AValue: string): string;
+{$IFNDEF FPC}
+const
+  SharedSuffix = '.dll';
+{$ENDIF}
 var
   ValidSuffix: string;
 begin
