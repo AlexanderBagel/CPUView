@@ -36,6 +36,7 @@ uses
   Classes,
   Forms,
   Generics.Collections,
+  Generics.Defaults,
 
   // IdeDebugger
   Debugger,
@@ -65,6 +66,7 @@ uses
   FpDbgClasses,
   FpDbgInfo,
   FpDbgUtil,
+  fpDbgSymTableContext,
 
   // LazUtils
   LazLoggerBase,
@@ -121,6 +123,30 @@ type
 
   TCheckUserCodeState = (ucFound, ucNotFound, ucNeedWait);
 
+  TLocalSymbol = record
+    AddrVA, EndVA: Int64;
+    Name: string;
+  end;
+
+  TLocalSymbols = TListEx<TLocalSymbol>;
+
+  { TLocalLibrary }
+
+  TLocalLibrary = class
+  private
+    FHighAddr: TDBGPtr;
+    FLowAddr: TDBGPtr;
+    FName: string;
+    FSymbols: TLocalSymbols;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    property HighAddr: TDBGPtr read FHighAddr write FHighAddr;
+    property LowAddr: TDBGPtr read FLowAddr write FLowAddr;
+    property Name: string read FName write FName;
+    property Symbols: TLocalSymbols read FSymbols;
+  end;
+
   { TCpuViewDebugGate }
 
   TCpuViewDebugGate = class(TAbstractDebugger)
@@ -137,6 +163,7 @@ type
     FSupportStream: TRemoteStream;
     FPreviosSrcLine: Integer;
     FPreviosSrcFuncName, FPreviosSrcFileName: string;
+    FLocalSymbols: TObjectList<TLocalLibrary>;
     FLockTimeOut: Int64;
     FSnapshotManager:  TSnapshotManager;
     FTemporaryIP: TDictionary<Integer, Int64>;
@@ -162,8 +189,10 @@ type
     procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
     procedure Reset;
     procedure StopAllWorkers;
-    procedure UpdateContext; override;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
+    procedure UpdateLocalSymbols;
+  protected
+    procedure UpdateContext; override;
   public
     constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); override;
     destructor Destroy; override;
@@ -244,6 +273,31 @@ constructor TThreadWorkerChangeThreadContext.Create(ADbgIntf: TCpuViewDebugGate)
 begin
   inherited Create((ADbgIntf.Debugger as TFpDebugDebugger), twpContinue);
   FDbgIntf := ADbgIntf;
+end;
+
+{ TLocalLibrary }
+
+function LocalSymbolComparer({$IFDEF USE_CONSTREF}constref{$ELSE}const{$ENDIF} A, B: TLocalSymbol): Integer;
+begin
+  if A.AddrVA < B.AddrVA then
+    Result := -1
+  else
+    if A.AddrVA = B.AddrVA then
+      Result := 0
+    else
+      Result := 1;
+end;
+
+constructor TLocalLibrary.Create;
+begin
+  FSymbols := TListEx<TLocalSymbol>.Create(
+    TComparer<TLocalSymbol>.Construct(LocalSymbolComparer));
+end;
+
+destructor TLocalLibrary.Destroy;
+begin
+  FSymbols.Free;
+  inherited Destroy;
 end;
 
 { TCpuViewDebugGate }
@@ -447,10 +501,86 @@ begin
   end;
 end;
 
+// Патч для TArrayHelper<T>.BinarySearch я делал для FPC 3.3.1,
+// но необходима поддержка стабильной версии 3.2.2,
+// поэтому поиск будет выполнятся самостоятельно.
+
+// I made a patch for TArrayHelper<T>.BinarySearch for FPC 3.3.1,
+// but support for stable version 3.2.2 is required,
+// so the search will be done by itself.
+
+function SearchLocalSymbol(List: TLocalSymbols; AddrVA: Int64;
+  out AFoundIndex: SizeInt): Boolean;
+var
+  imin, imax, imid: Int32;
+  LCompare: SizeInt;
+  AItem: TLocalSymbol;
+begin
+  if List.Count = 0 then
+  begin
+    AFoundIndex := -1;
+    Exit(False);
+  end;
+  imin := 0;
+  imax := List.Count - 1;
+  AItem.AddrVA := AddrVA;
+  while (imin < imax) do
+  begin
+    imid := imin + ((imax - imin) shr 1);
+    LCompare := LocalSymbolComparer(List.List[imid], AItem);
+    if (LCompare < 0) then
+      imin := imid + 1
+    else
+    begin
+      imax := imid;
+      if LCompare = 0 then
+      begin
+        AFoundIndex := imid;
+        Exit(True);
+      end;
+    end;
+  end;
+  AFoundIndex := imin;
+  LCompare := LocalSymbolComparer(List.List[imin], AItem);
+  Result := (imax = imin) and (LCompare = 0);
+  if not Result and (LCompare < 0) then
+    Inc(AFoundIndex);
+end;
+
 function TCpuViewDebugGate.GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
+var
+  I: Integer;
+  Idx: SizeInt;
+  LocalSymbol: TLocalSymbol;
+  Found: Boolean;
 begin
   if UseDebugInfo and Assigned(FDbgController) then
-    Result := FDbgController.CurrentProcess.FindProcSymbol(AddrVA)
+  begin
+    Result := nil;
+    if UseCacheFoExternalSymbols then
+    begin
+      for I := 0 to FLocalSymbols.Count - 1 do
+        if (AddrVA >= FLocalSymbols[I].LowAddr) and (AddrVA < FLocalSymbols[I].HighAddr) then
+        begin
+          Found := SearchLocalSymbol(FLocalSymbols[I].Symbols, AddrVA, Idx);
+          if Found then
+            LocalSymbol := FLocalSymbols[I].Symbols[Idx]
+          else
+          begin
+            if Idx > 0 then Dec(Idx);
+            if Idx >= 0 then
+            begin
+              LocalSymbol := FLocalSymbols[I].Symbols[Idx];
+              Found := (AddrVA >= LocalSymbol.AddrVA) and (AddrVA < LocalSymbol.EndVA);
+            end;
+          end;
+          if Found then
+            Result := TFpSymbolTableProc.Create(LocalSymbol.Name, LocalSymbol.AddrVA);
+        end;
+    end;
+    if Result = nil then
+      Result := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
+  end
   else
     Result := nil;
 end;
@@ -691,6 +821,7 @@ begin
     FCallStackMonitor := nil;
   end;
   FSnapshotManager := nil;
+  FLocalSymbols.Clear;
 
   CpuViewDebugLog.Log('DebugGate: Reset end', False);
 end;
@@ -716,6 +847,7 @@ begin
     Exit;
   end;
   inherited UpdateContext;
+  UpdateLocalSymbols;
   Exclude(FUpdateWaiting, uwsContext);
 
   CpuViewDebugLog.Log('DebugGate: UpdateContext end', False);
@@ -779,6 +911,56 @@ begin
   Reset;
 
   CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);
+end;
+
+procedure TCpuViewDebugGate.UpdateLocalSymbols;
+var
+  LibraryMap: TLibraryMap;
+  Iterator: TMapIterator;
+  Lib: TDbgLibrary;
+  Symbol: TFpSymbol;
+  LocalLib: TLocalLibrary;
+  LocalSymbol: TLocalSymbol;
+  I, L: Integer;
+  RegionData: TRegionData;
+begin
+  if FDbgController = nil then Exit;
+  LibraryMap := FDbgController.CurrentProcess.LibMap;
+  if LibraryMap = nil then Exit;
+  if LibraryMap.Count = FLocalSymbols.Count then Exit;
+  FLocalSymbols.Clear;
+  Iterator := TMapIterator.Create(LibraryMap);
+  try
+    while not Iterator.EOM do
+    begin
+      Iterator.GetData(Lib);
+      LocalLib := TLocalLibrary.Create;
+      LocalLib.Name := Lib.Name;
+      LocalSymbol := Default(TLocalSymbol);
+      FLocalSymbols.Add(LocalLib);
+      L := Lib.SymbolTableInfo.SymbolCount - 1;
+      if L > 0 then
+      begin
+        for I := 0 to L do
+        begin
+          Symbol := Lib.SymbolTableInfo.Symbols[I];
+          LocalSymbol.Name := Symbol.Name;
+          LocalSymbol.AddrVA := Symbol.Address.Address;
+          LocalLib.Symbols.Add(LocalSymbol);
+        end;
+        LocalLib.Symbols.Sort;
+        LocalLib.LowAddr := LocalLib.Symbols.List[0].AddrVA;
+        for I := 1 to L do
+          LocalLib.Symbols.List[I - 1].EndVA := LocalLib.Symbols.List[I].AddrVA;
+        if Utils.QueryRegion(LocalLib.Symbols.List[L].AddrVA, RegionData) then
+          LocalLib.Symbols.List[L].EndVA := RegionData.BaseAddr + RegionData.RegionSize;
+        LocalLib.HighAddr := LocalLib.Symbols.List[L].EndVA;
+      end;
+      Iterator.Next;
+    end;
+  finally
+    Iterator.Free;
+  end;
 end;
 
 procedure TCpuViewDebugGate.FillThreadStackFrames(ALimit: TStackLimit;
@@ -934,6 +1116,7 @@ begin
   FCallStackNotification := TCallStackNotification.Create;
   FCallStackNotification.AddReference;
   FCallStackNotification.OnChange := OnCallStackChanged;
+  FLocalSymbols := TObjectList<TLocalLibrary>.Create;
   if Assigned(DebugBoss) then
   begin
     DebugBoss.RegisterStateChangeHandler(OnState);
@@ -947,6 +1130,7 @@ begin
   if FRegisterInDebugBoss and Assigned(DebugBoss) then
     DebugBoss.UnregisterStateChangeHandler(OnState);
   Reset;
+  FLocalSymbols.Free;
   FSupportStream.Free;
   FBreakpointsNotification.OnAdd := nil;
   FBreakpointsNotification.OnRemove := nil;

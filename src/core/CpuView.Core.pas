@@ -1087,6 +1087,7 @@ var
   AccessStr, Symbol: string;
   I: Integer;
   P: TPoint;
+  DrawMetrics: TDrawMetrics;
 begin
   if (Param.AddrVA <> 0) and Assigned(AsmView) and Assigned(RegView) then
   begin
@@ -1116,15 +1117,16 @@ begin
         FillCacheItem(I + 1, ChainAddrVA);
       end;
     end;
-    FExtendedHintData.BorderWidth := AsmView.SplitMargin;
-    FExtendedHintData.CharWidth := AsmView.CharWidth;
+    AsmView.FillDrawMetrics(DrawMetrics);
+    FExtendedHintData.BorderWidth := DrawMetrics.SplitMargin;
+    FExtendedHintData.CharWidth := DrawMetrics.CharWidth;
     FExtendedHintData.ColorMap := AsmView.ColorMap;
     FExtendedHintData.Colors[atExecute] := RegView.ColorMap.AddrExecuteColor;
     FExtendedHintData.Colors[atRead] := RegView.ColorMap.AddrReadColor;
     FExtendedHintData.Colors[atStack] := RegView.ColorMap.AddrStackColor;
     FExtendedHintData.Colors[atString] := RegView.ColorMap.AddrStringColor;
     FExtendedHintData.Font := AsmView.Font;
-    FExtendedHintData.RowHeight := AsmView.RowHeight;
+    FExtendedHintData.RowHeight := DrawMetrics.RowHeight;
     FExtendedHintData.Tokenizer := AsmView.Tokenizer;
     FExtendedHintData.PointerValues := ExtendedHintPointerValues;
     if FExtendedHintData.AddrChain[0].AddrType = atNone then

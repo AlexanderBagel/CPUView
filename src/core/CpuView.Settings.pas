@@ -177,6 +177,7 @@ const
   xmlHintPointerValues = 'useHintPointerValues';
   xmlDisplayStrings = 'useStr';
   xmlMinimumStringLength = 'minStrLen';
+  xmlSymCache = 'useSymCache';
 
   // not used
   xmlContext = 'ctx';
@@ -264,6 +265,7 @@ type
     FShotCutMode: TShortCutMode;
     FShortCuts: array [TShortCutType] of TCpuViewShortCut;
     FStackSettings: TStackSettings;
+    FSymCache: Boolean;
     FRegSettings: TContextAbstractSettings;
     FUseDebugInfo: Boolean;
     FUseDebugLog: Boolean;
@@ -379,6 +381,7 @@ type
     property ShowSourceLines: Boolean read FAsmSettings.ShowSourceLines write FAsmSettings.ShowSourceLines;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
+    property UseCacheFoExternalSymbols: Boolean read FSymCache write FSymCache;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
     property UseAddrValidation: Boolean read FUseAddrValidation write FUseAddrValidation;
     property ValidationDump[Index: TAddrValidationType]: Boolean read GetDumpValidation write SetDumpValidation;
@@ -717,6 +720,7 @@ begin
   FPointerValues := [bvmHex64..bvmFloat80];
   FDisplayStrings := True;
   FMinimumStringLength := 4;
+  FSymCache := True;
 end;
 
 procedure TCpuViewSettins.InitDefaultShortCuts;
@@ -863,6 +867,7 @@ begin
   FPointerValues := PPointerValues(@APointerValues)^;
   FDisplayStrings := GetNodeAttr(Root, xmlDisplayStrings);
   FMinimumStringLength := GetNodeAttr(Root, xmlMinimumStringLength);
+  FSymCache := GetNodeAttr(Root, xmlSymCache);
   if FSaveFormSession then
   begin
     FCpuViewDlgSettings.BoundsRect.Left := GetNodeAttr(Root, xmlLeft);
@@ -1187,6 +1192,7 @@ begin
   SetNodeAttr(Root, xmlHintPointerValues, PInteger(@FPointerValues)^);
   SetNodeAttr(Root, xmlDisplayStrings, FDisplayStrings);
   SetNodeAttr(Root, xmlMinimumStringLength, FMinimumStringLength);
+  SetNodeAttr(Root, xmlSymCache, FSymCache);
   if FSaveFormSession then
   begin
     SetNodeAttr(Root, xmlLeft, FCpuViewDlgSettings.BoundsRect.Left);

@@ -85,7 +85,7 @@ type
     FUtils: TCommonAbstractUtils;
     FChange: TNotifyEvent;
     FErrorMessage: string;
-    FShowFullAddress, FShowSourceLines, FUseDebugInfo: Boolean;
+    FShowFullAddress, FShowSourceLines, FUseDebugInfo, FUseCacheFoExternalSymbols: Boolean;
     FBreakPointsChange, FCtxChange, FStateChange, FThreadChange: TNotifyEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
@@ -141,6 +141,7 @@ type
     property ShowFullAddress: Boolean read FShowFullAddress write FShowFullAddress;
     property ShowSourceLines: Boolean read FShowSourceLines write FShowSourceLines;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
+    property UseCacheFoExternalSymbols: Boolean read FUseCacheFoExternalSymbols write FUseCacheFoExternalSymbols;
     property Utils: TCommonAbstractUtils read FUtils;
     property OnChange: TNotifyEvent read FChange write FChange;
     property OnContextChange: TNotifyEvent read FCtxChange write FCtxChange;

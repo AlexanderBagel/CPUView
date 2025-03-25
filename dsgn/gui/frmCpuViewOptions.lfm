@@ -1,7 +1,7 @@
 inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
-  Height = 700
+  Height = 733
   Width = 600
-  ClientHeight = 700
+  ClientHeight = 733
   ClientWidth = 600
   Constraints.MinHeight = 700
   Constraints.MinWidth = 600
@@ -36,12 +36,12 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   end
   object gbPerformance: TGroupBox[3]
     Left = 10
-    Height = 208
+    Height = 240
     Top = 48
     Width = 567
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Performance settings:'
-    ClientHeight = 178
+    ClientHeight = 210
     ClientWidth = 563
     TabOrder = 2
     object cbSymbols: TCheckBox
@@ -65,7 +65,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     object cbExtendedHints: TCheckBox
       Left = 10
       Height = 29
-      Top = 72
+      Top = 104
       Width = 501
       Caption = 'Extended hints (Disassembly/Pointer values/Address Chains)'
       TabOrder = 2
@@ -73,7 +73,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     object cbAddrValidation: TCheckBox
       Left = 10
       Height = 29
-      Top = 104
+      Top = 136
       Width = 203
       Caption = 'Use address validation'
       TabOrder = 3
@@ -82,7 +82,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     object cbDisplayStrings: TCheckBox
       Left = 10
       Height = 29
-      Top = 136
+      Top = 168
       Width = 380
       Caption = 'Search and display strings. Minimum length: '
       TabOrder = 4
@@ -94,7 +94,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       Left = 390
       Height = 33
       Hint = 'Minimum string length'
-      Top = 136
+      Top = 168
       Width = 75
       MinValue = 2
       ParentShowHint = False
@@ -117,11 +117,19 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 6
       Value = 5
     end
+    object cbUseSymbolCache: TCheckBox
+      Left = 32
+      Height = 29
+      Top = 72
+      Width = 274
+      Caption = 'Use Cache for External Symbols'
+      TabOrder = 7
+    end
   end
   object gbSessions: TGroupBox[4]
     Left = 10
     Height = 104
-    Top = 512
+    Top = 545
     Width = 567
     Anchors = [akLeft, akRight, akBottom]
     Caption = 'Session settings:'
@@ -148,7 +156,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object cbDbgLog: TCheckBox[5]
     Left = 10
     Height = 29
-    Top = 624
+    Top = 657
     Width = 213
     Anchors = [akLeft, akBottom]
     Caption = '(DEBUG) Use debug log'
@@ -157,7 +165,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object cbDbgCrash: TCheckBox[6]
     Left = 10
     Height = 29
-    Top = 656
+    Top = 689
     Width = 265
     Anchors = [akLeft, akBottom]
     Caption = '(DEBUG) Generate crash dump'
@@ -166,7 +174,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object btnReset: TButton[7]
     Left = 410
     Height = 38
-    Top = 624
+    Top = 657
     Width = 164
     Anchors = [akRight, akBottom]
     Caption = 'Reset to Default'
@@ -174,9 +182,9 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     OnClick = btnResetClick
   end
   object gbViewersSetting: TGroupBox[8]
-    Left = 10
-    Height = 240
-    Top = 264
+    Left = 8
+    Height = 241
+    Top = 296
     Width = 567
     Anchors = [akTop, akLeft, akRight, akBottom]
     Caption = 'Viewers customization:'

@@ -156,6 +156,14 @@
         <Filename Value="src\core\CpuView.ScriptExecutor.Intel.pas"/>
         <UnitName Value="CpuView.ScriptExecutor.Intel"/>
       </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgCpuView.TemporaryLocker.pas"/>
+        <UnitName Value="dlgCpuView.TemporaryLocker"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgInputBox.pas"/>
+        <UnitName Value="dlgInputBox"/>
+      </Item>
     </Files>
     <RequiredPkgs>
       <Item>

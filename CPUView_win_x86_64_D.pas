@@ -16,7 +16,8 @@ uses
   frmCpuViewBaseOptions, frmCpuViewColors, frmCpuViewOptions, 
   frmCpuViewShortCuts, CpuView.Windows, dlgCpuViewImplementation, 
   CpuView.IntelContext, CpuView.IntelContext.Types, 
-  CpuView.ScriptExecutor.Intel, LazarusPackageIntf;
+  CpuView.ScriptExecutor.Intel, dlgCpuView.TemporaryLocker, dlgInputBox, 
+  LazarusPackageIntf;
 
 implementation
 

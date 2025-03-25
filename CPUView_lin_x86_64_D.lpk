@@ -156,6 +156,14 @@
         <Filename Value="src\core\CpuView.Linux.pas"/>
         <UnitName Value="CpuView.Linux"/>
       </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgCpuView.TemporaryLocker.pas"/>
+        <UnitName Value="dlgCpuView.TemporaryLocker"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgInputBox.pas"/>
+        <UnitName Value="dlgInputBox"/>
+      </Item>
     </Files>
     <RequiredPkgs>
       <Item>

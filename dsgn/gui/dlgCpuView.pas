@@ -699,6 +699,7 @@ begin
     (Core.MinimumStringLength <> Settings.MinimumStringLength) or
     (DbgGate.ShowFullAddress <> Settings.ShowFullAddress) or
     (DbgGate.ShowSourceLines <> Settings.ShowSourceLines) or
+    (DbgGate.UseCacheFoExternalSymbols <> Settings.UseCacheFoExternalSymbols) or
     (DbgGate.UseDebugInfo <> Settings.UseDebugInfo) then
   begin
     Core.DisplayStrings := Settings.DisplayStrings;
@@ -709,6 +710,7 @@ begin
     DbgGate.ShowFullAddress := Settings.ShowFullAddress;
     DbgGate.ShowSourceLines := Settings.ShowSourceLines;
     DbgGate.UseDebugInfo := Settings.UseDebugInfo;
+    DbgGate.UseCacheFoExternalSymbols := Settings.UseCacheFoExternalSymbols;
     Core.UpdateAfterSettingsChange;
   end;
 

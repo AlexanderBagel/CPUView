@@ -1781,7 +1781,10 @@ begin
       Inc(I, ASelLength);
       Continue;
     end;
-    Inc(I, DefValueMetric(ByteViewMode).ByteCount);
+    if ByteViewMode = bvmAddress then
+      Inc(I, IfThen(AddressMode = am32bit, 4, 8))
+    else
+      Inc(I, DefValueMetric(ByteViewMode).ByteCount);
   end;
 end;
 
