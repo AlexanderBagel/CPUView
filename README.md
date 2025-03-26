@@ -58,7 +58,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Active jump highlighting
 * Highlighting of the selected register
 * Displays the names of called functions instead of their addresses
-* Offsets
+* Offsets (double-click on the address column)
 * Hinting on the selected instruction with a menu to jump to each block of the received information
 * Instruction coloring for easy code reading
 * Breakpoints (display and modify)
@@ -81,17 +81,18 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Debug information
 * Active and previous frames highlighting
 * Return address highlighting
-* Offsets
+* Offsets (double-click on the address column)
+* Selections of duplicates
 * Highlighting and hinting to validated addresses
 
 ### Dump supports:
-* Offsets
 * Multiple dump windows
 * 17 display mode (include Long Double 80 bit)
 * 6 text encoding mode
 * 5 Copy mode (include pascal array)
 * Highlighting and hinting to validated addresses
 * Quick jumps to found validated addresses (via Ctrl+Click)
+* Offsets (double-click on the address column)
 * Selections of duplicates
 * Address recognition and highlighting
 
