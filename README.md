@@ -22,6 +22,7 @@ posted so as not to break the current CPU-View behavior.
 3. Rebuild IDE
 4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
 5. Enjoy  
+
 If you want to make changes to the Cpu-View dialogs, you must also install the FWHexView_D.LCL.lpk package
 
 ### Debug Log and Crash Dump:
