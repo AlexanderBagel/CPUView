@@ -21,7 +21,8 @@ posted so as not to break the current CPU-View behavior.
 2. Open CPUView_win_x86_64_D.lpk (or CPUView_lin_x86_64_D.lpk for Linux) and install it in the IDE (menu: Package->Install/Uninstall Packages) 
 3. Rebuild IDE
 4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
-5. Enjoy
+5. Enjoy  
+If you want to make changes to the Cpu-View dialogs, you must also install the FWHexView_D.LCL.lpk package
 
 ### Debug Log and Crash Dump:
 The debug log is stored in the following path: “lazarus_path\config_lazarus\cpuview\debug.log”.  
@@ -73,6 +74,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * LastError and LastStatus code with description (Windows only)
 * Highlight of changed registers
 * Highlighting and hinting to validated addresses
+* Hints for some registers and flags from external database
 
 ### Stack supports:
 * Debug information
