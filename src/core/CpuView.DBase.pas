@@ -80,7 +80,7 @@ begin
         if Assigned(Attribute) then
         begin
           Value := Attribute.NodeValue;
-          if SameText(Value, 'CPUView_D') then
+          if Value.StartsWith('CPUView_') then
           begin
             FileNameNode := Node.FindNode('Filename');
             if Assigned(FileNameNode) then
