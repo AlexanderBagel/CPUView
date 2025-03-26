@@ -1258,7 +1258,7 @@ end;
 
 function TCustomAsmView.CopyCommandEnabled(Value: TCopyStyle): Boolean;
 begin
-  Result := Value in [csAsText, csAddress];
+  Result := Focused and (Value in [csAsText, csAddress]);
 end;
 
 procedure TCustomAsmView.DoBeforePaint(const ADiapason: TVisibleRowDiapason);
@@ -2391,7 +2391,7 @@ end;
 
 function TCustomStackView.CopyCommandEnabled(Value: TCopyStyle): Boolean;
 begin
-  Result := Value in [csAsText, csAddress, csBytes];
+  Result := Focused and (Value in [csAsText, csAddress, csBytes]);
 end;
 
 procedure TCustomStackView.CopySelected(CopyStyle: TCopyStyle);
@@ -2951,6 +2951,7 @@ begin
   else
     Result := False;
   end;
+  Result := Focused and Result;
 end;
 
 constructor TCustomRegView.Create(AOwner: TComponent);
