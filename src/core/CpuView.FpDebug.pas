@@ -125,6 +125,7 @@ type
 
   TLocalSymbol = record
     AddrVA, EndVA: Int64;
+    Duplicate: Boolean;
     Name: string;
   end;
 
@@ -551,8 +552,10 @@ function TCpuViewDebugGate.GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
 var
   I: Integer;
   Idx: SizeInt;
+  LocalLib: TLocalLibrary;
   LocalSymbol: TLocalSymbol;
   Found: Boolean;
+  Pfx: string;
 begin
   if UseDebugInfo and Assigned(FDbgController) then
   begin
@@ -560,23 +563,34 @@ begin
     if UseCacheFoExternalSymbols then
     begin
       for I := 0 to FLocalSymbols.Count - 1 do
-        if (AddrVA >= FLocalSymbols[I].LowAddr) and (AddrVA < FLocalSymbols[I].HighAddr) then
+      begin
+        LocalLib := FLocalSymbols[I];
+        if (AddrVA >= LocalLib.LowAddr) and (AddrVA < LocalLib.HighAddr) then
         begin
-          Found := SearchLocalSymbol(FLocalSymbols[I].Symbols, AddrVA, Idx);
+          Found := SearchLocalSymbol(LocalLib.Symbols, AddrVA, Idx);
           if Found then
-            LocalSymbol := FLocalSymbols[I].Symbols[Idx]
+            LocalSymbol := LocalLib.Symbols[Idx]
           else
           begin
             if Idx > 0 then Dec(Idx);
             if Idx >= 0 then
             begin
-              LocalSymbol := FLocalSymbols[I].Symbols[Idx];
+              LocalSymbol := LocalLib.Symbols[Idx];
               Found := (AddrVA >= LocalSymbol.AddrVA) and (AddrVA < LocalSymbol.EndVA);
             end;
           end;
           if Found then
-            Result := TFpSymbolTableProc.Create(LocalSymbol.Name, LocalSymbol.AddrVA);
+          begin
+            while LocalSymbol.Duplicate do
+            begin
+              Dec(Idx);
+              LocalSymbol := LocalLib.Symbols[Idx];
+            end;
+            Pfx := ChangeFileExt(ExtractFileName(LocalLib.Name), ':');
+            Result := TFpSymbolTableProc.Create(Pfx + LocalSymbol.Name, LocalSymbol.AddrVA);
+          end;
         end;
+      end;
     end;
     if Result = nil then
       Result := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
@@ -951,7 +965,11 @@ begin
         LocalLib.Symbols.Sort;
         LocalLib.LowAddr := LocalLib.Symbols.List[0].AddrVA;
         for I := 1 to L do
+        begin
+          LocalLib.Symbols.List[I].Duplicate :=
+            LocalLib.Symbols.List[I - 1].AddrVA = LocalLib.Symbols.List[I].AddrVA;
           LocalLib.Symbols.List[I - 1].EndVA := LocalLib.Symbols.List[I].AddrVA;
+        end;
         if Utils.QueryRegion(LocalLib.Symbols.List[L].AddrVA, RegionData) then
           LocalLib.Symbols.List[L].EndVA := RegionData.BaseAddr + RegionData.RegionSize;
         LocalLib.HighAddr := LocalLib.Symbols.List[L].EndVA;
