@@ -122,8 +122,8 @@ for example: "bc user32:MessageBoxA" output "user32:MessageBoxA" address: 7FFEFD
 For gpa/getprocaddress/bp/bc commands, the library name is optional.  
 for example: "gpa PeekMessageA" output "user32.dll:PeekMessageA" address: 7FFE289E3FC0
 
-It is allowed to use offsets after the function name:
-For example: "gpa Beep" output "KERNELBASE.dll:Beep" address: 7FFE26702B10
+It is allowed to use offsets after the function name:  
+For example: "gpa Beep" output "KERNELBASE.dll:Beep" address: 7FFE26702B10  
 Now let's specify the offset when setting the breakpoint - "bp Beep+12" output "KERNELBASE.dll:Beep+12" address: 7FFE26702B1C breakpoint set
 
 ### Appearance:
