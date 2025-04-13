@@ -61,7 +61,7 @@ type
     function ExecuteGetProcAddress(const Script: string; out ExecuteResult: string): Boolean;
     function ExecuteBreakPointSet(const Script: string; out ExecuteResult: string): Boolean;
     function ExecuteBreakPointClear(const Script: string; out ExecuteResult: string): Boolean;
-    procedure ExtractParams(const Script: string; out FirstParam, SecondParam: string);
+    procedure ExtractParams(const Script: string; out FirstParam, SecondParam, ThirdParam: string);
     function InternalGetProcAddress(const Script: string; out ExecuteResult: string; out AddrVA: Int64): Boolean;
   protected
     function DoExecute(const Script: string; out ExecuteResult: string): Boolean; virtual; abstract;
@@ -127,7 +127,7 @@ var
   RemoteModule: TRemoteModule;
 begin
   Result := False;
-  ExtractParams(Script, LibName, Dummee);
+  ExtractParams(Script, LibName, Dummee, Dummee);
   LibName := ConvertToLibName(LibName);
   RemoteModule := FDebugger.GetRemoteModuleHandle(LibName);
   if RemoteModule.hInstance = 0 then
@@ -187,34 +187,51 @@ begin
 end;
 
 procedure TAbstractScriptExecutor.ExtractParams(const Script: string; out
-  FirstParam, SecondParam: string);
+  FirstParam, SecondParam, ThirdParam: string);
 var
-  Idx1, Idx2: Integer;
+  Idx1, Idx2, Idx3: Integer;
 begin
   FirstParam := '';
   SecondParam := '';
+  ThirdParam := '';
   Idx1 := Pos(' ', Script);
   Idx2 := Pos(':', Script);
+  Idx3 := Pos('+', Script);
   if Idx1 = 0 then Exit;
   if Idx2 = 0 then
-    FirstParam := Copy(Script, Idx1 + 1, Length(Script))
+  begin
+    if Idx3 = 0 then
+      FirstParam := Copy(Script, Idx1 + 1, Length(Script))
+    else
+    begin
+      FirstParam:= Copy(Script, Idx1 + 1, Idx3 - Idx1 - 1);
+      ThirdParam := Copy(Script, Idx3, Length(Script));
+    end;
+  end
   else
   begin
     FirstParam := Copy(Script, Idx1 + 1, Idx2 - Idx1 - 1);
-    SecondParam:= Copy(Script, Idx2 + 1, Length(Script));
+    if Idx3 = 0 then
+      SecondParam:= Copy(Script, Idx2 + 1, Length(Script))
+    else
+    begin
+      SecondParam:= Copy(Script, Idx2 + 1, Idx3 - Idx2 - 1);
+      ThirdParam := Copy(Script, Idx3, Length(Script));
+    end;
   end;
 end;
 
 function TAbstractScriptExecutor.InternalGetProcAddress(const Script: string;
   out ExecuteResult: string; out AddrVA: Int64): Boolean;
 var
-  LibName, LibNameWithExt, ProcName: string;
+  LibName, LibNameWithExt, ProcName, Offset: string;
   RemoteModule: TRemoteModule;
   Libs: TList<TRemoteModule>;
   I: Integer;
+  OffsetValue: Int64;
 begin
   Result := False;
-  ExtractParams(Script, LibName, ProcName);
+  ExtractParams(Script, LibName, ProcName, Offset);
   if ProcName = '' then
   begin
     Libs := FDebugger.GetRemoteModules;
@@ -222,7 +239,7 @@ begin
       for I := 0 to Libs.Count - 1 do
       begin
         Result := InternalGetProcAddress(Format('gpa %s:%s',
-          [ExtractFileName(Libs[I].LibraryPath), LibName]), ExecuteResult, AddrVA);
+          [ExtractFileName(Libs[I].LibraryPath), LibName + Offset]), ExecuteResult, AddrVA);
         if Result then
           Exit;
       end;
@@ -243,7 +260,9 @@ begin
       ExecuteResult := Format('"%s:%s" not found.', [LibName, ProcName])
     else
     begin
-      ExecuteResult := Format('"%s:%s" address: %x', [LibName, ProcName, AddrVA]);
+      if TryStrToInt64(Offset, OffsetValue) then
+        Inc(AddrVA, OffsetValue);
+      ExecuteResult := Format('"%s:%s%s" address: %x', [LibName, ProcName, Offset, AddrVA]);
       CalculatedValue := AddrVA;
       Result := True;
     end;

@@ -18,6 +18,7 @@
 unit frmCpuViewOptions;
 
 {$mode ObjFPC}{$H+}
+{$WARN 5024 off : Parameter "$1" not used}
 
 interface
 
@@ -90,10 +91,10 @@ type
     procedure FillSettingsView;
     procedure SaveExpandedState;
     procedure tvSettingsGetImageIndex(Sender: TBaseVirtualTree;
-      Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex;
-      var Ghosted: Boolean; var ImageIndex: Integer);
+      Node: PVirtualNode; {%H-}Kind: TVTImageKind; {%H-}Column: TColumnIndex;
+      var {%H-}Ghosted: Boolean; var ImageIndex: Integer);
     procedure tvSettingsGetText(Sender: TBaseVirtualTree;
-      Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType;
+      Node: PVirtualNode; {%H-}Column: TColumnIndex; {%H-}TextType: TVSTTextType;
       var CellText: String);
     procedure UpdateCurrentFont(const AFontName: string);
     procedure UpdateDebugSymbolsIndepended;
@@ -102,7 +103,7 @@ type
     procedure DoReadSettings; override;
     procedure DoWriteSettings; override;
     function IsMainFrame: Boolean; override;
-    procedure CMFontChanged(var Message: TLMessage); message CM_FONTCHANGED;
+    procedure CMFontChanged(var {%H-}Message: TLMessage); message CM_FONTCHANGED;
   public
     function GetTitle: string; override;
     procedure Setup({%H-}ADialog: TAbstractOptionsEditorDialog); override;

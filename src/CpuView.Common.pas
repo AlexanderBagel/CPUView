@@ -73,7 +73,7 @@ type
     InDeepCount: Integer;
     IsUserCode: Boolean;
     ExtendedDataPresent: Boolean;
-    AsmLines, HintLines: string;
+    FirstAsmLine, AsmLines, HintLines: string;
     case Integer of
       0: (PointerValue: array [0..9] of Byte);
       1: (Linked: array [0..9] of Boolean);

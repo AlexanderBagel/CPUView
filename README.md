@@ -10,7 +10,7 @@ All core functionality has been added, only 4 steps remain,
 each of which will require a long development time and will not be  
 posted so as not to break the current CPU-View behavior.  
 
-1. SIMD register editor.
+1. SIMD register editor. (DONE)
 2. Window displaying function call parameters.
 3. Carbon/Cocoa widget support under macOS.
 4. Support for ARM architecture.
@@ -40,6 +40,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 3. Dump
 4. Stack
 5. Script and Hint
+6. Utils
 
 ### Common features:
 * OS: Windows and Linux support via Gtk2 or Qt5
@@ -69,7 +70,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Display SIMD registers (XMM and YMM) with 12 display mode
 * Three display modes for x87 registers (ST-R-M)
 * Bitwise representation of EFLAGS, TagWord, StatusWord, ControlWord, MxCsr flag registers (include decoded TagWord on x64)
-* Change ALL register value and fast flag switching (x87/SIMD change not yet implemented)
+* Change ALL register value and fast flag switching
 * Two display modes (full and compact)
 * Quick hint on active jump instructions
 * LastError and LastStatus code with description (Windows only)
@@ -96,6 +97,11 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Selections of duplicates
 * Address recognition and highlighting
 
+### Utils
+Started development of a set of built-in utilities.
+
+1. TraceLog - displays all instructions on which a stop occurred during debugging in CpuView
+
 ### Commands:
 
 "?" - calculates the result of the expression  
@@ -116,6 +122,10 @@ for example: "bc user32:MessageBoxA" output "user32:MessageBoxA" address: 7FFEFD
 For gpa/getprocaddress/bp/bc commands, the library name is optional.  
 for example: "gpa PeekMessageA" output "user32.dll:PeekMessageA" address: 7FFE289E3FC0
 
+It is allowed to use offsets after the function name:
+For example: "gpa Beep" output "KERNELBASE.dll:Beep" address: 7FFE26702B10
+Now let's specify the offset when setting the breakpoint - "bp Beep+12" output "KERNELBASE.dll:Beep+12" address: 7FFE26702B1C breakpoint set
+
 ### Appearance:
 
 Light theme:
@@ -129,6 +139,9 @@ Active jump, breakpoints, smart hints for selected instructions and their menus,
 RegView:
 
 <img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/regview.png"/>
+
+RegEditors:
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/regeditors.png"/>
 
 Stack:
 

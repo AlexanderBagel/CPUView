@@ -5,7 +5,7 @@
 //  * Unit Name : CpuView.Windows.pas
 //  * Purpose   : Implementing Windows-specific code.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2024.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
@@ -60,7 +60,6 @@ type
   function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 
 implementation
-
 
 const
   SIZE_OF_80387_REGISTERS = 80;
@@ -143,7 +142,7 @@ type
   TThreadBasicInformation = THREAD_BASIC_INFORMATION;
   PThreadBasicInformation = ^TThreadBasicInformation;
 
-  TWow64FloatingSaveArea = record
+  TWow64FloatingSaveArea = packed record
     ControlWord: DWORD;
     StatusWord: DWORD;
     TagWord: DWORD;
@@ -155,8 +154,36 @@ type
     Cr0NpxState: DWORD;
   end;
 
+  {$IFDEF CPUX86}
+  M128A = packed record
+    Low: ULONGLONG;
+    High: LONGLONG;
+  end;
+  {$ENDIF}
+
+  // https://www.vergiliusproject.com/kernels/x64/windows-xp/sp2/_XMM_SAVE_AREA32
+  _XMM_SAVE_AREA32 = packed record
+       ControlWord: WORD;
+       StatusWord: WORD;
+       TagWord: BYTE;
+       Reserved1: BYTE;
+       ErrorOpcode: WORD;
+       ErrorOffset: DWORD;
+       ErrorSelector: WORD;
+       Reserved2: WORD;
+       DataOffset: DWORD;
+       DataSelector: WORD;
+       Reserved3: WORD;
+       MxCsr: DWORD;
+       MxCsr_Mask: DWORD;
+       FloatRegisters: array[0..7] of M128A;
+       XmmRegisters: array[0..15] of M128A;
+       Reserved4: array[0..95] of BYTE;
+    end;
+  PXmmSaveArea32 = ^_XMM_SAVE_AREA32;
+
   PWow64Context = ^TWow64Context;
-  TWow64Context = record
+  TWow64Context = packed record
     ContextFlags: DWORD;
     Dr0: DWORD;
     Dr1: DWORD;
@@ -181,7 +208,9 @@ type
     EFlags: DWORD;
     Esp: DWORD;
     SegSs: DWORD;
-    ExtendedRegisters: array[0..MAXIMUM_SUPPORTED_EXTENSION-1] of Byte;
+    case Integer of
+      0: (ExtendedRegisters: array[0..MAXIMUM_SUPPORTED_EXTENSION-1] of Byte);
+      1: (XmmSaveArea32: _XMM_SAVE_AREA32);
   end;
 
   {$IFDEF CPUX86}
@@ -198,6 +227,12 @@ const
 
   CONTEXT_i386 = $10000;
   CONTEXT_EXTENDED_REGISTERS = $20;
+
+  {$IFDEF CPUX86}
+  CONTEXT_XSTATE = $00010040;
+  {$ELSE}
+  CONTEXT_XSTATE = $00100040;
+  {$ENDIF}
 
   XSTATE_LEGACY_SSE = 1;
   XSTATE_AVX = 2;
@@ -240,15 +275,9 @@ begin
   Result := {%H-}Pointer(({%H-}NativeUInt(Src) + 15) and not NativeUInt(15));
 end;
 
-function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
-const
-  {$IFDEF CPUX86}
-  CONTEXT_XSTATE = $00010040;
-  {$ELSE}
-  CONTEXT_XSTATE = $00100040;
-  {$ENDIF}
+procedure LoadAVX(hThread: THandle; var AContext: TIntelThreadContext;
+  Wow64: Boolean);
 var
-  hThread: THandle;
   Ctx: PContext;
   ContextBuff: array of Byte;
   ContextFlags: DWORD;
@@ -257,22 +286,128 @@ var
   SimdReg: PXMMRegister;
   I: Integer;
 begin
+  FeatureMask := GetEnabledXStateFeatures;
+  if FeatureMask and XSTATE_MASK_AVX = 0 then
+    Exit;
+
+  ContextSize := 0;
+  ContextFlags := CONTEXT_ALL or CONTEXT_XSTATE;
+  if InitializeContext(nil, ContextFlags, nil, ContextSize) and
+    (GetLastError <> ERROR_INSUFFICIENT_BUFFER) then
+    Exit;
+
+  SetLength(ContextBuff{%H-}, ContextSize + $10);
+  if not InitializeContext(ContextBuff, ContextFlags,
+    @Ctx, ContextSize) then
+    Exit;
+
+  if not GetThreadContext(hThread, Ctx) then Exit;
+
+  SimdReg := LocateXStateFeature(Ctx, XSTATE_LEGACY_SSE, @FeatureLength);
+  if SimdReg = nil then
+    Exit;
+
+  AContext.XmmCount := FeatureLength div SizeOf(AContext.Ymm[0].Low);
+  if Wow64 and (AContext.XmmCount > 8) then
+    AContext.XmmCount := 8;
+
+  for I := 0 to AContext.XmmCount - 1 do
+  begin
+    AContext.Ymm[I].Low := SimdReg^;
+    Inc(SimdReg);
+  end;
+
+  SimdReg := LocateXStateFeature(Ctx, XSTATE_AVX, nil);
+  if SimdReg = nil then
+    Exit;
+
+  AContext.YmmPresent := True;
+  if not GetXStateFeaturesMask(Ctx, FeatureMask) then
+    Exit;
+  if FeatureMask and XSTATE_MASK_AVX = XSTATE_MASK_AVX then
+    for I := 0 to AContext.XmmCount - 1 do
+    begin
+      AContext.Ymm[I].High := SimdReg^;
+      Inc(SimdReg);
+    end;
+end;
+
+function SaveAVX(hThread: THandle; const AContext: TIntelThreadContext;
+  UpdateAVXRegister: Boolean): Boolean;
+var
+  Ctx: PContext;
+  ContextBuff: array of Byte;
+  ContextFlags: DWORD;
+  XmmCount: Integer;
+  ContextSize, FeatureLength: DWORD;
+  SimdReg: PXMMRegister;
+  I: Integer;
+begin
+  ContextSize := 0;
+  ContextFlags := CONTEXT_ALL or CONTEXT_XSTATE;
+
+  if InitializeContext(nil, ContextFlags, nil, ContextSize) and
+    (GetLastError <> ERROR_INSUFFICIENT_BUFFER) then
+    Exit;
+
+  SetLength(ContextBuff{%H-}, ContextSize + $10);
+  if not InitializeContext(ContextBuff, ContextFlags,
+    @Ctx, ContextSize) then
+    Exit;
+
+  if not GetThreadContext(hThread, Ctx) then Exit;
+
+  SimdReg := LocateXStateFeature(Ctx, XSTATE_LEGACY_SSE, @FeatureLength);
+  if SimdReg = nil then
+    Exit;
+
+  XmmCount := FeatureLength div SizeOf(AContext.Ymm[0].Low);
+  if XmmCount > AContext.XmmCount then
+    XmmCount := AContext.XmmCount;
+
+  for I := 0 to XmmCount - 1 do
+  begin
+    SimdReg^ := AContext.Ymm[I].Low;
+    Inc(SimdReg);
+  end;
+
+  SimdReg := LocateXStateFeature(Ctx, XSTATE_AVX, nil);
+  if SimdReg = nil then
+    Exit;
+
+  for I := 0 to XmmCount - 1 do
+  begin
+    SimdReg^ := AContext.Ymm[I].High;
+    Inc(SimdReg);
+  end;
+
+  if UpdateAVXRegister and not SetXStateFeaturesMask(Ctx, XSTATE_MASK_AVX) then
+    Exit;
+
+  Result := SetThreadContext(hThread, Windows.PContext(Ctx)^);
+end;
+
+function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
+var
+  hThread: THandle;
+  Ctx: PContext;
+  ContextBuff: array of Byte;
+  ContextFlags: DWORD;
+begin
   Result := Default(TIntelThreadContext);
   if ThreadID = 0 then Exit;
   hThread := OpenThread(THREAD_GET_CONTEXT or
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
   if hThread = 0 then Exit;
   try
-    ContextFlags := CONTEXT_ALL;
-
     {$IFDEF CPUX86}
-    ContextFlags := ContextFlags or CONTEXT_EXTENDED_REGISTERS;
+    ContextFlags := CONTEXT_ALL or CONTEXT_EXTENDED_REGISTERS;
     SetLength(ContextBuff, SizeOf(TContext) + $10);
     Ctx := Amd64Align(@ContextBuff[0]);
     {$ENDIF}
 
     {$IFDEF CPUX64}
-    ContextFlags := ContextFlags and not CONTEXT_i386 or $100000;
+    ContextFlags := CONTEXT_ALL;
     SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
     Ctx := Amd64Align(@ContextBuff[0]);
     {$ENDIF}
@@ -298,7 +433,7 @@ begin
     Result.ErrorSelector := Ctx.FloatSave.ErrorSelector;
     Result.DataOffset := Ctx.FloatSave.DataOffset;
     Result.DataSelector := Ctx.FloatSave.DataSelector;
-    Result.MxCsr := PDWORD(@Ctx.ExtendedRegisters[$18])^;
+    Result.MxCsr := Ctx.XmmSaveArea32.Mxcsr;
     Move(Ctx.FloatSave.RegisterArea[0], Result.FloatRegisters[0], SIZE_OF_80387_REGISTERS);
     {$ENDIF}
 
@@ -346,58 +481,7 @@ begin
     Result.Dr6 := Ctx.Dr6;
     Result.Dr7 := Ctx.Dr7;
 
-    FeatureMask := GetEnabledXStateFeatures;
-    if FeatureMask and XSTATE_MASK_AVX = 0 then
-      Exit;
-
-    ContextSize := 0;
-
-    {$IFDEF CPUX86}
-    ContextFlags := WOW64_CONTEXT_ALL or CONTEXT_XSTATE;
-    {$ENDIF}
-
-    {$IFDEF CPUX64}
-    ContextFlags := ContextFlags or CONTEXT_XSTATE;
-    {$ENDIF}
-
-    if InitializeContext(nil, ContextFlags, nil, ContextSize) and
-      (GetLastError <> ERROR_INSUFFICIENT_BUFFER) then
-      Exit;
-
-    SetLength(ContextBuff, ContextSize + $10);
-    if not InitializeContext(ContextBuff, ContextFlags,
-      @Ctx, ContextSize) then
-      Exit;
-
-    if not SetXStateFeaturesMask(Ctx, XSTATE_MASK_AVX) then
-      Exit;
-
-    if not GetThreadContext(hThread, Ctx) then Exit;
-
-    if not GetXStateFeaturesMask(Ctx, FeatureMask) then
-      Exit;
-
-    SimdReg := LocateXStateFeature(Ctx, XSTATE_LEGACY_SSE, @FeatureLength);
-    if SimdReg = nil then
-      Exit;
-
-    Result.XmmCount := FeatureLength div SizeOf(Result.Ymm[0].Low);
-    for I := 0 to Result.XmmCount - 1 do
-    begin
-      Result.Ymm[I].Low := SimdReg^;
-      Inc(SimdReg);
-    end;
-
-    SimdReg := LocateXStateFeature(Ctx, XSTATE_AVX, nil);
-    if SimdReg = nil then
-      Exit;
-
-    Result.YmmPresent := True;
-    for I := 0 to Result.XmmCount - 1 do
-    begin
-      Result.Ymm[I].High := SimdReg^;
-      Inc(SimdReg);
-    end;
+    LoadAVX(hThread, Result, False);
 
   finally
     CloseHandle(hThread);
@@ -416,66 +500,86 @@ begin
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
   if hThread = 0 then Exit;
   try
-    ContextFlags := CONTEXT_FULL;
-
     {$IFDEF CPUX86}
-    ContextFlags := ContextFlags or CONTEXT_EXTENDED_REGISTERS;
-    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
-    Ctx := Amd64Align(@ContextBuff[0]);
+    ContextFlags := CONTEXT_ALL or CONTEXT_EXTENDED_REGISTERS;
     {$ENDIF}
 
     {$IFDEF CPUX64}
-    ContextFlags := ContextFlags and not CONTEXT_i386 or $100000;
-    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
-    Ctx := Amd64Align(@ContextBuff[0]);
+    ContextFlags := CONTEXT_ALL;
     {$ENDIF}
+    case AContext.ContextLevel of
+      0, 1:
+      begin
+        SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
+        Ctx := Amd64Align(@ContextBuff[0]);
 
-    Ctx.ContextFlags := ContextFlags;
-    if not GetThreadContext(hThread, Ctx) then Exit;
+        Ctx.ContextFlags := ContextFlags;
+        if not GetThreadContext(hThread, Ctx) then Exit;
 
-    {$IFDEF CPUX86}
-    Ctx.Eax := AContext.Rax;
-    Ctx.Ebx := AContext.Rbx;
-    Ctx.Ecx := AContext.Rcx;
-    Ctx.Edx := AContext.Rdx;
-    Ctx.Esp := AContext.Rsp;
-    Ctx.Ebp := AContext.Rbp;
-    Ctx.Esi := AContext.Rsi;
-    Ctx.Edi := AContext.Rdi;
-    Ctx.Eip := AContext.Rip;
-    Ctx.FloatSave.ControlWord := AContext.ControlWord;
-    Ctx.FloatSave.StatusWord := AContext.StatusWord;
-    Ctx.FloatSave.TagWord := AContext.TagWord;
-    PDWORD(@Ctx.ExtendedRegisters[$18])^ := AContext.MxCsr;
-    {$ENDIF}
+        {$IFDEF CPUX86}
+        Ctx.Eax := AContext.Rax;
+        Ctx.Ebx := AContext.Rbx;
+        Ctx.Ecx := AContext.Rcx;
+        Ctx.Edx := AContext.Rdx;
+        Ctx.Esp := AContext.Rsp;
+        Ctx.Ebp := AContext.Rbp;
+        Ctx.Esi := AContext.Rsi;
+        Ctx.Edi := AContext.Rdi;
+        Ctx.Eip := AContext.Rip;
+        Ctx.FloatSave.ControlWord := AContext.ControlWord;
+        Ctx.FloatSave.StatusWord := AContext.StatusWord;
+        Ctx.FloatSave.TagWord := AContext.TagWord;
+        PDWORD(@Ctx.ExtendedRegisters[$18])^ := AContext.MxCsr;
+        Move(AContext.FloatRegisters[0], Ctx.FloatSave.RegisterArea[0], SIZE_OF_80387_REGISTERS);
+        {$ENDIF}
 
-    {$IFDEF CPUX64}
-    Ctx.Rax := AContext.Rax;
-    Ctx.Rbx := AContext.Rbx;
-    Ctx.Rcx := AContext.Rcx;
-    Ctx.Rdx := AContext.Rdx;
-    Ctx.Rsp := AContext.Rsp;
-    Ctx.Rbp := AContext.Rbp;
-    Ctx.Rsi := AContext.Rsi;
-    Ctx.Rdi := AContext.Rdi;
-    Ctx.Rip := AContext.Rip;
-    Ctx.R8 := AContext.R[8];
-    Ctx.R9 := AContext.R[9];
-    Ctx.R10 := AContext.R[10];
-    Ctx.R11 := AContext.R[11];
-    Ctx.R12 := AContext.R[12];
-    Ctx.R13 := AContext.R[13];
-    Ctx.R14 := AContext.R[14];
-    Ctx.R15 := AContext.R[15];
-    Ctx.FltSave.ControlWord := AContext.ControlWord;
-    Ctx.FltSave.StatusWord := AContext.StatusWord;
-    Ctx.FltSave.TagWord := GetFXSaveTagWordFromTagWord(AContext.TagWord);
-    Ctx.MxCsr := AContext.MxCsr;
-    {$ENDIF}
-    Ctx.EFlags := AContext.EFlags;
+        {$IFDEF CPUX64}
+        Ctx.Rax := AContext.Rax;
+        Ctx.Rbx := AContext.Rbx;
+        Ctx.Rcx := AContext.Rcx;
+        Ctx.Rdx := AContext.Rdx;
+        Ctx.Rsp := AContext.Rsp;
+        Ctx.Rbp := AContext.Rbp;
+        Ctx.Rsi := AContext.Rsi;
+        Ctx.Rdi := AContext.Rdi;
+        Ctx.Rip := AContext.Rip;
+        Ctx.R8 := AContext.R[8];
+        Ctx.R9 := AContext.R[9];
+        Ctx.R10 := AContext.R[10];
+        Ctx.R11 := AContext.R[11];
+        Ctx.R12 := AContext.R[12];
+        Ctx.R13 := AContext.R[13];
+        Ctx.R14 := AContext.R[14];
+        Ctx.R15 := AContext.R[15];
+        Ctx.FltSave.ControlWord := AContext.ControlWord;
+        Ctx.FltSave.StatusWord := AContext.StatusWord;
+        Ctx.FltSave.TagWord := GetFXSaveTagWordFromTagWord(AContext.TagWord);
+        Move(AContext.FloatRegisters[0], Ctx.FltSave.FloatRegisters[0], SizeOf(TFloatRegisters));
+        Ctx.MxCsr := AContext.MxCsr;
+        {$ENDIF}
+        Ctx.EFlags := AContext.EFlags;
 
-    Ctx.ContextFlags := ContextFlags;
-    Result := SetThreadContext(hThread, Windows.PContext(Ctx)^);
+        Ctx.SegGs := AContext.SegGs;
+        Ctx.SegFs := AContext.SegFs;
+        Ctx.SegEs := AContext.SegEs;
+        Ctx.SegDs := AContext.SegDs;
+        Ctx.SegCs := AContext.SegCs;
+        Ctx.SegSs := AContext.SegSs;
+
+        Ctx.Dr0 := AContext.Dr0;
+        Ctx.Dr1 := AContext.Dr1;
+        Ctx.Dr2 := AContext.Dr2;
+        Ctx.Dr3 := AContext.Dr3;
+        Ctx.Dr6 := AContext.Dr6;
+        Ctx.Dr7 := AContext.Dr7;
+
+        Ctx.ContextFlags := ContextFlags;
+        Result := SetThreadContext(hThread, Windows.PContext(Ctx)^);
+      end;
+      2: Result := SaveAVX(hThread, AContext, False);
+      3: Result := SaveAVX(hThread, AContext, True);
+    end;
+
   finally
     CloseHandle(hThread);
   end;
@@ -484,12 +588,10 @@ end;
 function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
 var
   hThread: THandle;
-  Ctx: PWow64Context;
+  Wow64Ctx: PWow64Context;
   ContextBuff: array of Byte;
-  FeatureMask: Int64;
   SimdReg: PXMMRegister;
   I: Integer;
-  ExtentedDisabled: Boolean;
 begin
   Result := Default(TIntelThreadContext);
   if ThreadID = 0 then Exit;
@@ -498,60 +600,53 @@ begin
   if hThread = 0 then Exit;
   try
     SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
-    Ctx := Amd64Align(@ContextBuff[0]);
-    Ctx.ContextFlags := WOW64_CONTEXT_ALL;
-    ExtentedDisabled := False;
-    if not Wow64GetThreadContext(hThread, Ctx) then
+    Wow64Ctx := Amd64Align(@ContextBuff[0]);
+    Wow64Ctx.ContextFlags := WOW64_CONTEXT_ALL;
+    if not Wow64GetThreadContext(hThread, Wow64Ctx) then
     begin
-      Ctx.ContextFlags := WOW64_CONTEXT_WITHOUT_EXTENDED;
-      ExtentedDisabled := True;
-      if not Wow64GetThreadContext(hThread, Ctx) then
+      Wow64Ctx.ContextFlags := WOW64_CONTEXT_WITHOUT_EXTENDED;
+      if not Wow64GetThreadContext(hThread, Wow64Ctx) then
         Exit;
     end;
 
     Result.x86Context := True;
-    Result.Rax := Ctx.Eax;
-    Result.Rbx := Ctx.Ebx;
-    Result.Rcx := Ctx.Ecx;
-    Result.Rdx := Ctx.Edx;
-    Result.Rsp := Ctx.Esp;
-    Result.Rbp := Ctx.Ebp;
-    Result.Rsi := Ctx.Esi;
-    Result.Rdi := Ctx.Edi;
-    Result.Rip := Ctx.Eip;
-    Result.ControlWord := Ctx.FloatSave.ControlWord;
-    Result.StatusWord := Ctx.FloatSave.StatusWord;
-    Result.TagWord := Ctx.FloatSave.TagWord;
-    Result.ErrorOffset := Ctx.FloatSave.ErrorOffset;
-    Result.ErrorSelector := Ctx.FloatSave.ErrorSelector;
-    Result.DataOffset := Ctx.FloatSave.DataOffset;
-    Result.DataSelector := Ctx.FloatSave.DataSelector;
-    Result.MxCsr := PDWORD(@Ctx.ExtendedRegisters[$18])^;
-    Move(Ctx.FloatSave.RegisterArea[0], Result.FloatRegisters[0], WOW64_SIZE_OF_80387_REGISTERS);
+    Result.Rax := Wow64Ctx.Eax;
+    Result.Rbx := Wow64Ctx.Ebx;
+    Result.Rcx := Wow64Ctx.Ecx;
+    Result.Rdx := Wow64Ctx.Edx;
+    Result.Rsp := Wow64Ctx.Esp;
+    Result.Rbp := Wow64Ctx.Ebp;
+    Result.Rsi := Wow64Ctx.Esi;
+    Result.Rdi := Wow64Ctx.Edi;
+    Result.Rip := Wow64Ctx.Eip;
+    Result.ControlWord := Wow64Ctx.FloatSave.ControlWord;
+    Result.StatusWord := Wow64Ctx.FloatSave.StatusWord;
+    Result.TagWord := Wow64Ctx.FloatSave.TagWord;
+    Result.ErrorOffset := Wow64Ctx.FloatSave.ErrorOffset;
+    Result.ErrorSelector := Wow64Ctx.FloatSave.ErrorSelector;
+    Result.DataOffset := Wow64Ctx.FloatSave.DataOffset;
+    Result.DataSelector := Wow64Ctx.FloatSave.DataSelector;
+    Result.MxCsr := Wow64Ctx.XmmSaveArea32.Mxcsr;
+    Move(Wow64Ctx.FloatSave.RegisterArea[0], Result.FloatRegisters[0], WOW64_SIZE_OF_80387_REGISTERS);
 
-    Result.EFlags := Ctx.EFlags;
-    Result.SegGs := Ctx.SegGs;
-    Result.SegFs := Ctx.SegFs;
-    Result.SegEs := Ctx.SegEs;
-    Result.SegDs := Ctx.SegDs;
-    Result.SegCs := Ctx.SegCs;
-    Result.SegSs := Ctx.SegSs;
+    Result.EFlags := Wow64Ctx.EFlags;
+    Result.SegGs := Wow64Ctx.SegGs;
+    Result.SegFs := Wow64Ctx.SegFs;
+    Result.SegEs := Wow64Ctx.SegEs;
+    Result.SegDs := Wow64Ctx.SegDs;
+    Result.SegCs := Wow64Ctx.SegCs;
+    Result.SegSs := Wow64Ctx.SegSs;
 
-    Result.Dr0 := Ctx.Dr0;
-    Result.Dr1 := Ctx.Dr1;
-    Result.Dr2 := Ctx.Dr2;
-    Result.Dr3 := Ctx.Dr3;
-    Result.Dr6 := Ctx.Dr6;
-    Result.Dr7 := Ctx.Dr7;
-
-    if ExtentedDisabled then Exit;
-
-    FeatureMask := GetEnabledXStateFeatures;
-    if FeatureMask and XSTATE_MASK_AVX = 0 then
-      Exit;
+    Result.Dr0 := Wow64Ctx.Dr0;
+    Result.Dr1 := Wow64Ctx.Dr1;
+    Result.Dr2 := Wow64Ctx.Dr2;
+    Result.Dr3 := Wow64Ctx.Dr3;
+    Result.Dr6 := Wow64Ctx.Dr6;
+    Result.Dr7 := Wow64Ctx.Dr7;
 
     // https://maximumcrack.wordpress.com/2011/08/07/fpu-mmx-xmm-and-bbq/
-    SimdReg := @Ctx.ExtendedRegisters[160];
+    // https://www.vergiliusproject.com/kernels/x64/windows-xp/sp2/_XMM_SAVE_AREA32
+    SimdReg := @Wow64Ctx.XmmSaveArea32.XmmRegisters[0];
 
     Result.XmmCount := 8;
     for I := 0 to Result.XmmCount - 1 do
@@ -560,12 +655,7 @@ begin
       Inc(SimdReg);
     end;
 
-    Result.YmmPresent := True;
-    for I := 0 to Result.XmmCount - 1 do
-    begin
-      Result.Ymm[I].High := SimdReg^;
-      Inc(SimdReg);
-    end;
+    LoadAVX(hThread, Result, True);
 
   finally
     CloseHandle(hThread);
@@ -577,34 +667,66 @@ var
   hThread: THandle;
   Ctx: PWow64Context;
   ContextBuff: array of Byte;
+  ContextFlags: DWORD;
 begin
   Result := False;
   hThread := OpenThread(THREAD_GET_CONTEXT or THREAD_SET_CONTEXT or
     THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
   if hThread = 0 then Exit;
   try
-    SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
-    Ctx := Amd64Align(@ContextBuff[0]);
-    Ctx.ContextFlags := WOW64_CONTEXT_WITHOUT_EXTENDED;
-    if not Wow64GetThreadContext(hThread, Ctx) then Exit;
+    case AContext.ContextLevel of
+      0, 1:
+      begin
+        SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
+        Ctx := Amd64Align(@ContextBuff[0]);
 
-    Ctx.Eax := AContext.Rax;
-    Ctx.Ebx := AContext.Rbx;
-    Ctx.Ecx := AContext.Rcx;
-    Ctx.Edx := AContext.Rdx;
-    Ctx.Esp := AContext.Rsp;
-    Ctx.Ebp := AContext.Rbp;
-    Ctx.Esi := AContext.Rsi;
-    Ctx.Edi := AContext.Rdi;
-    Ctx.Eip := AContext.Rip;
-    Ctx.FloatSave.ControlWord := AContext.ControlWord;
-    Ctx.FloatSave.StatusWord := AContext.StatusWord;
-    Ctx.FloatSave.TagWord := AContext.TagWord;
-    PDWORD(@Ctx.ExtendedRegisters[$18])^ := AContext.MxCsr;
-    Ctx.EFlags := AContext.EFlags;
+        ContextFlags := WOW64_CONTEXT_ALL;
+        Ctx.ContextFlags := WOW64_CONTEXT_ALL;
+        if not Wow64GetThreadContext(hThread, Ctx) then
+        begin
+          ContextFlags := WOW64_CONTEXT_WITHOUT_EXTENDED;
+          Ctx.ContextFlags := WOW64_CONTEXT_WITHOUT_EXTENDED;
+          if not Wow64GetThreadContext(hThread, Ctx) then
+            Exit;
+        end;
 
-    Ctx.ContextFlags := WOW64_CONTEXT_WITHOUT_EXTENDED;
-    Result := Wow64SetThreadContext(hThread, Ctx^);
+        Ctx.Eax := AContext.Rax;
+        Ctx.Ebx := AContext.Rbx;
+        Ctx.Ecx := AContext.Rcx;
+        Ctx.Edx := AContext.Rdx;
+        Ctx.Esp := AContext.Rsp;
+        Ctx.Ebp := AContext.Rbp;
+        Ctx.Esi := AContext.Rsi;
+        Ctx.Edi := AContext.Rdi;
+        Ctx.Eip := AContext.Rip;
+        Ctx.FloatSave.ControlWord := AContext.ControlWord;
+        Ctx.FloatSave.StatusWord := AContext.StatusWord;
+        Ctx.FloatSave.TagWord := AContext.TagWord;
+        Ctx.XmmSaveArea32.MxCsr := AContext.MxCsr;
+        Move(AContext.FloatRegisters[0], Ctx.FloatSave.RegisterArea[0], WOW64_SIZE_OF_80387_REGISTERS);
+        Ctx.EFlags := AContext.EFlags;
+
+        Ctx.SegGs := AContext.SegGs;
+        Ctx.SegFs := AContext.SegFs;
+        Ctx.SegEs := AContext.SegEs;
+        Ctx.SegDs := AContext.SegDs;
+        Ctx.SegCs := AContext.SegCs;
+        Ctx.SegSs := AContext.SegSs;
+
+        Ctx.Dr0 := AContext.Dr0;
+        Ctx.Dr1 := AContext.Dr1;
+        Ctx.Dr2 := AContext.Dr2;
+        Ctx.Dr3 := AContext.Dr3;
+        Ctx.Dr6 := AContext.Dr6;
+        Ctx.Dr7 := AContext.Dr7;
+
+        Ctx.ContextFlags := ContextFlags;
+        Result := Wow64SetThreadContext(hThread, Ctx^);
+      end;
+      2: Result := SaveAVX(hThread, AContext, False);
+      3: Result := SaveAVX(hThread, AContext, True);
+    end;
+
   finally
     CloseHandle(hThread);
   end;
@@ -827,8 +949,8 @@ var
   ModulePath: UnicodeString;
   ALength: DWORD;
 begin
-  SetLength(ModulePath, MAX_PATH);
-  ALength := GetMappedFileNameW(FProcessHandle, Pointer(AddrVA), @ModulePath[1], MAX_PATH);
+  SetLength(ModulePath{%H-}, MAX_PATH);
+  ALength := GetMappedFileNameW(FProcessHandle, {%H-}Pointer(AddrVA), @ModulePath[1], MAX_PATH);
   Result := ALength > 0;
   SetLength(ModulePath, ALength);
   AModuleName := string(ModulePath);
@@ -887,13 +1009,14 @@ begin
   Result := 0;
   if FProcessHandle = 0 then Exit;
   dwLength := SizeOf(TMemoryBasicInformation);
+  MBI := Default(TMemoryBasicInformation);
   if VirtualQueryEx(FProcessHandle,
     AddrVA, MBI, dwLength) <> dwLength then Exit;
 
-  if NativeInt(MBI.BaseAddress) > 0 then
+  if {%H-}NativeInt(MBI.BaseAddress) > 0 then
   begin
     RegionSize := NativeInt(MBI.RegionSize) -
-      (NativeInt(AddrVA) - NativeInt(MBI.BaseAddress));
+      ({%H-}NativeInt(AddrVA) - {%H-}NativeInt(MBI.BaseAddress));
     if ASize > RegionSize then
       ASize := RegionSize;
   end
@@ -915,6 +1038,7 @@ begin
     Exit(ASize);
   end;
 
+  ReadCount := 0;
   if ReadProcessMemory(FProcessHandle, AddrVA, @Buff, ASize, ReadCount) then
     Result := Longint(ReadCount);
 end;

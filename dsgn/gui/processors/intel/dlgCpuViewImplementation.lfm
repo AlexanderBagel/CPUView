@@ -19,17 +19,40 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   end
   inherited ToolBar: TToolBar
     inherited tbSep1: TToolButton
-      Left = 71
+      Left = 47
+      Height = 22
+    end
+    inherited tbBreakPoint: TToolButton
+      Left = 55
+    end
+    inherited tbSep2: TToolButton
+      Left = 101
+      Height = 22
     end
     inherited tbRunTillRet: TToolButton
-      Left = 79
+      Left = 78
+    end
+    inherited tbRunTo: TToolButton
+      Left = 109
+    end
+    inherited tbRunToUserCode: TToolButton
+      Left = 132
+    end
+    inherited tbSep3: TToolButton
+      Left = 155
+      Height = 22
+    end
+    inherited tbTraceLog: TToolButton
+      Left = 163
     end
   end
   inherited pnDumps: TPanel
-    inherited memHints: TMemo
-      Lines.Strings = (
-        'Hint text display here'
-      )
+    inherited pnDumpStack: TPanel
+      inherited pcDumps: TPageControl
+        inherited tabDump0: TTabSheet
+          ClientHeight = 255
+        end
+      end
     end
   end
   inherited pmRegSelected: TPopupMenu
@@ -188,6 +211,8 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     inherited acSBCopyScriptorValue: TAction[79]
     end
     inherited acSaveRawDump: TAction[80]
+    end
+    inherited acUtilTraceLog: TAction[81]
     end
   end
   inherited pmDump: TPopupMenu

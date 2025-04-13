@@ -193,7 +193,7 @@ procedure TExtendedHintWindow.CalculateExecute(MaxWidth: Integer);
 var
   I, SeparatorWidth: Integer;
 begin
-  FAsm.Text := FDisplayedItem.AsmLines;
+  FAsm.Text := FDisplayedItem.FirstAsmLine + sLineBreak + FDisplayedItem.AsmLines;
   FHints.Text := FDisplayedItem.HintLines;
   for I := 0 to FAsm.Count - 1 do
   begin

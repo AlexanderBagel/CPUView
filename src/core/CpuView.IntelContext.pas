@@ -606,6 +606,7 @@ begin
   end;
 
   // DR0..DR7
+  {$IFNDEF LINUX}
   if ShowDebug then
   begin
     AddSeparator;
@@ -617,6 +618,7 @@ begin
     Add(Map, 28);
     Add(Map, 29);
   end;
+  {$ENDIF}
 end;
 
 constructor TIntelCpuContext.Create(AOwner: TComponent);
@@ -806,19 +808,18 @@ procedure TIntelCpuContext.InitKnownRegs;
   var
     R: TRegParam;
   begin
+    R := Default(TRegParam);
     R.RowIndex := -1;
     R.ColIndex := -1;
     R.RegType := RegType;
-    R.Modifyed := False;
     R.Flags := AFlags;
     R.SupportedViewMode := SupportedViewMode;
-    R.ViewMode := rvmHex;
     KnownRegs.Add(R);
   end;
 
 var
   vmDefRegMod: TRegViewModes;
-  I: Integer;
+  I, MxCsrContextLevel: Integer;
 begin
   KnownRegs.Clear;
 
@@ -850,18 +851,18 @@ begin
 
   if Context.x86Context then
   begin
-    Add(crtValue, vmDefOnly);               // 018 - SegGs
-    Add(crtValue, vmDefOnly, [rfHint]);     // 019 - SegFs
+    Add(crtValue, vmDefOnly, [rfChangeValue]);                // 018 - SegGs
+    Add(crtValue, vmDefOnly, [rfHint, rfChangeValue]);        // 019 - SegFs
   end
   else
   begin
-    Add(crtValue, vmDefOnly, [rfHint]);     // 018 - SegGs
-    Add(crtValue, vmDefOnly);               // 019 - SegFs
+    Add(crtValue, vmDefOnly, [rfHint, rfChangeValue]);        // 018 - SegGs
+    Add(crtValue, vmDefOnly, [rfChangeValue]);                // 019 - SegFs
   end;
-  Add(crtValue, vmDefOnly);                 // 020 - SegEs
-  Add(crtValue, vmDefOnly);                 // 021 - SegDs
-  Add(crtValue, vmDefOnly);                 // 022 - SegCs
-  Add(crtValue, vmDefOnly);                 // 023 - SegSs
+  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 020 - SegEs
+  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 021 - SegDs
+  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 022 - SegCs
+  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 023 - SegSs
 
   Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 024 - DR0
   Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 025 - DR1
@@ -874,68 +875,80 @@ begin
   Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 031 - StatusWord
   Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 032 - TagWord
 
-  Add(crtValue, vmX87Reg64);    // 033 - MM0
-  Add(crtValue, vmX87Reg64);    // 034 - MM1
-  Add(crtValue, vmX87Reg64);    // 035 - MM2
-  Add(crtValue, vmX87Reg64);    // 036 - MM3
-  Add(crtValue, vmX87Reg64);    // 037 - MM4
-  Add(crtValue, vmX87Reg64);    // 038 - MM5
-  Add(crtValue, vmX87Reg64);    // 039 - MM6
-  Add(crtValue, vmX87Reg64);    // 040 - MM7
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 033 - MM0
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 034 - MM1
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 035 - MM2
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 036 - MM3
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 037 - MM4
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 038 - MM5
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 039 - MM6
+  Add(crtValue, vmX87Reg64, [rfZero, rfChangeValue]);    // 040 - MM7
 
-  Add(crtValue, vmX87Reg80);    // 041 - R0
-  Add(crtValue, vmX87Reg80);    // 042 - R1
-  Add(crtValue, vmX87Reg80);    // 043 - R2
-  Add(crtValue, vmX87Reg80);    // 044 - R3
-  Add(crtValue, vmX87Reg80);    // 045 - R4
-  Add(crtValue, vmX87Reg80);    // 046 - R5
-  Add(crtValue, vmX87Reg80);    // 047 - R6
-  Add(crtValue, vmX87Reg80);    // 048 - R7
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 041 - R0
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 042 - R1
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 043 - R2
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 044 - R3
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 045 - R4
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 046 - R5
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 047 - R6
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 048 - R7
 
-  Add(crtValue, vmX87Reg80);    // 049 - ST0
-  Add(crtValue, vmX87Reg80);    // 050 - ST1
-  Add(crtValue, vmX87Reg80);    // 051 - ST2
-  Add(crtValue, vmX87Reg80);    // 052 - ST3
-  Add(crtValue, vmX87Reg80);    // 053 - ST4
-  Add(crtValue, vmX87Reg80);    // 054 - ST5
-  Add(crtValue, vmX87Reg80);    // 055 - ST6
-  Add(crtValue, vmX87Reg80);    // 056 - ST7
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 049 - ST0
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 050 - ST1
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 051 - ST2
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 052 - ST3
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 053 - ST4
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 054 - ST5
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 055 - ST6
+  Add(crtValue, vmX87Reg80, [rfZero, rfChangeValue]);    // 056 - ST7
 
   Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 057 - MxCsr
 
-  Add(crtValue, vmSimdReg);     // 058 - XMM0
-  Add(crtValue, vmSimdReg);     // 059 - XMM1
-  Add(crtValue, vmSimdReg);     // 060 - XMM2
-  Add(crtValue, vmSimdReg);     // 061 - XMM3
-  Add(crtValue, vmSimdReg);     // 062 - XMM4
-  Add(crtValue, vmSimdReg);     // 063 - XMM5
-  Add(crtValue, vmSimdReg);     // 064 - XMM6
-  Add(crtValue, vmSimdReg);     // 065 - XMM7
-  Add(crtValue, vmSimdReg);     // 066 - XMM8
-  Add(crtValue, vmSimdReg);     // 067 - XMM9
-  Add(crtValue, vmSimdReg);     // 068 - XMM10
-  Add(crtValue, vmSimdReg);     // 069 - XMM11
-  Add(crtValue, vmSimdReg);     // 070 - XMM12
-  Add(crtValue, vmSimdReg);     // 071 - XMM13
-  Add(crtValue, vmSimdReg);     // 072 - XMM14
-  Add(crtValue, vmSimdReg);     // 073 - XMM15
+  // set ContextLevel 1 for x87/MMX regs
+  for I := 30 to 56 do
+    KnownRegs.List[I].ContextLevel := 1;
 
-  Add(crtValue, vmSimdReg);     // 074 - YMM0
-  Add(crtValue, vmSimdReg);     // 075 - YMM1
-  Add(crtValue, vmSimdReg);     // 076 - YMM2
-  Add(crtValue, vmSimdReg);     // 077 - YMM3
-  Add(crtValue, vmSimdReg);     // 078 - YMM4
-  Add(crtValue, vmSimdReg);     // 079 - YMM5
-  Add(crtValue, vmSimdReg);     // 080 - YMM6
-  Add(crtValue, vmSimdReg);     // 081 - YMM7
-  Add(crtValue, vmSimdReg);     // 082 - YMM8
-  Add(crtValue, vmSimdReg);     // 083 - YMM9
-  Add(crtValue, vmSimdReg);     // 084 - YMM10
-  Add(crtValue, vmSimdReg);     // 085 - YMM11
-  Add(crtValue, vmSimdReg);     // 086 - YMM12
-  Add(crtValue, vmSimdReg);     // 087 - YMM13
-  Add(crtValue, vmSimdReg);     // 088 - YMM14
-  Add(crtValue, vmSimdReg);     // 089 - YMM15
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 058 - XMM0
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 059 - XMM1
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 060 - XMM2
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 061 - XMM3
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 062 - XMM4
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 063 - XMM5
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 064 - XMM6
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 065 - XMM7
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 066 - XMM8
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 067 - XMM9
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 068 - XMM10
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 069 - XMM11
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 070 - XMM12
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 071 - XMM13
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 072 - XMM14
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 073 - XMM15
+
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 074 - YMM0
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 075 - YMM1
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 076 - YMM2
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 077 - YMM3
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 078 - YMM4
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 079 - YMM5
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 080 - YMM6
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 081 - YMM7
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 082 - YMM8
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 083 - YMM9
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 084 - YMM10
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 085 - YMM11
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 086 - YMM12
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 087 - YMM13
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 088 - YMM14
+  Add(crtValue, vmSimdReg, [rfZero, rfChangeValue]);     // 089 - YMM15
+
+  // set ContextLevel 2 for SSE regs
+  for I := 58 to 73 do
+    KnownRegs.List[I].ContextLevel := 2;
+
+  // set ContextLevel 3 for AVX regs
+  for I := 74 to 89 do
+    KnownRegs.List[I].ContextLevel := 3;
 
   // EFlags Hint
 
@@ -1015,6 +1028,19 @@ begin
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 145 - DAZ
   Add(crtBitValue, vmDefOnly, [rfToggle, rfHint]);        // 146 - FTZ
   Add(crtEnumValue, vmDefOnly, [rfChangeValue, rfHint]);  // 147 - RC
+
+  // set ContextLevel 1 for x87/MMX flags/enums
+  for I := 102 to 132 do
+    KnownRegs.List[I].ContextLevel := 1;
+
+  // MxCsr + Flags
+  if Context.x86Context then
+    MxCsrContextLevel := 2
+  else
+    MxCsrContextLevel := 1;
+  KnownRegs.List[57].ContextLevel := MxCsrContextLevel;
+  for I := 133 to 147 do
+    KnownRegs.List[I].ContextLevel := MxCsrContextLevel;
 
   // x87 Hint regs
 
@@ -1379,7 +1405,17 @@ begin
     30: FContext.ControlWord := ANewRegValue.WordValue;
     31: FContext.StatusWord := ANewRegValue.WordValue;
     32: FContext.TagWord := ANewRegValue.WordValue;
+    33..40:
+      FContext.FloatRegisters[ARegID - 33].MM.Value := ANewRegValue.QwordValue;
+    41..48:
+      Move(ANewRegValue.Ext10[0], FContext.FloatRegisters[ARegID - 41], 10);
+    49..56:
+      Move(ANewRegValue.Ext10[0], FContext.FloatRegisters[ARegID - 49], 10);
     57: FContext.MxCsr := ANewRegValue.DwordValue;
+    58..73:
+      Move(ANewRegValue.Ext16[0], FContext.Ymm[ARegID - 58], 16);
+    74..89:
+      Move(ANewRegValue.Ext32[0], FContext.Ymm[ARegID - 74], 32);
     91: SetBitValue(FContext.EFlags, 0, ANewRegValue.ByteValue);        // CF
     92: SetBitValue(FContext.EFlags, 2, ANewRegValue.ByteValue);        // PF
     93: SetBitValue(FContext.EFlags, 4, ANewRegValue.ByteValue);        // AF
@@ -1437,6 +1473,8 @@ begin
   else
     Exit(False);
   end;
+
+  FContext.ContextLevel := KnownRegs.List[ARegID].ContextLevel;
 
   {$IFDEF CPUX64}
   if AddressMode = am32bit then
@@ -2025,14 +2063,14 @@ begin
       AHint := '';
       if RegQueryValue(ARegID - 158, ARegValue) then
         DoQueryRegHint(ARegValue.QwordValue, AHint);
-      FillReg('', AHint, 0, Length(AHint));
+      FillReg('', AHint, 0);
     end;
     175, 176:
     begin
       AHint := '';
       if RegQueryValue(ARegID - 75 {yes 75, cos 100..101 is real reg}, ARegValue) then
         DoQueryExternalRegHint(ARegValue, TExternalRegType(ARegID - 175), AHint);
-      FillReg('', AHint, 0, Length(AHint));
+      FillReg('', AHint, 0);
     end
   else
     FillSeparator;

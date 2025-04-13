@@ -19,6 +19,7 @@ unit CpuView.FpDebug;
 
 {$IFDEF FPC}
   {$MODE Delphi}
+  {$WARN 5024 off : Parameter "$1" not used}
 {$ENDIF}
 
 {$DEFINE DEBUG_LOG}
@@ -75,9 +76,6 @@ uses
   CodeCache,
   CodeToolManager,
 
-  {$IFDEF MSWINDOWS}
-  CpuView.Windows,
-  {$ENDIF}
   {$IFDEF LINUX}
   CpuView.Linux,
   {$ENDIF}
@@ -230,7 +228,7 @@ type
     procedure TraceTilReturn; override;
     procedure TraceTo(AddrVA: Int64); override;
     procedure TraceToList(AddrVA: array of Int64); override;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean; override;
+    function UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue): Boolean; override;
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); override;
     property Debugger: TDebuggerIntf read FDebugger;
     property DbgController: TDbgController read FDbgController;
@@ -420,13 +418,13 @@ end;
 function TCpuViewDebugGate.CurrentInstruction: TInstruction;
 var
   CurrentIP: Int64;
-  ALen, I: Integer;
+  ALen: Integer;
   InstructionOpcode: array of Byte;
   List: TListEx<TInstruction>;
 begin
   Result := Default(TInstruction);
   CurrentIP := CurrentInstructionPoint;
-  SetLength(InstructionOpcode, 16);
+  SetLength(InstructionOpcode{%H-}, 16);
   FSupportStream.Position := CurrentIP;
   ALen := FSupportStream.Read(InstructionOpcode[0], 16);
   if ALen = 0 then Exit;
@@ -667,6 +665,7 @@ var
 
 
 begin
+  Result := '';
   Len := Length(Value);
   SetLength(Result, Len shl 1);
   I := 1;
@@ -1058,7 +1057,6 @@ var
   LibraryMap: TLibraryMap;
   Iterator: TMapIterator;
   Lib: TDbgLibrary;
-  AName: string;
   Item: TRemoteModule;
 begin
   Result := TList<TRemoteModule>.Create;
@@ -1216,7 +1214,6 @@ begin
       dsInit: Result := adsStart;
       dsPause: Result := adsPaused;
       dsRun: Result := adsRunning;
-      {$message 'for debug'}
       dsInternalPause: Result := adsRunning;
       dsStop: Result := adsStoped;
     else
@@ -1499,10 +1496,14 @@ begin
 end;
 
 procedure TCpuViewDebugGate.SetNewIP(AddrVA: Int64);
+var
+  RegIP: TRegValue;
 begin
   CpuViewDebugLog.Log(Format('DebugGate: SetNewIP(0x%x)', [AddrVA]), True);
 
-  UpdateRegValue(Context.InstructonPointID, AddrVA);
+  RegIP := Default(TRegValue);
+  RegIP.QwordValue := AddrVA;
+  UpdateRegValue(Context.InstructonPointID, RegIP);
 
   CpuViewDebugLog.Log('DebugGate: SetNewIP end', False);
 end;
@@ -1660,38 +1661,33 @@ begin
   CpuViewDebugLog.Log('DebugGate: TraceToList end', False);
 end;
 
-function TCpuViewDebugGate.UpdateRegValue(RegID: Integer; ANewRegValue: Int64
-  ): Boolean;
+function TCpuViewDebugGate.UpdateRegValue(RegID: Integer;
+  ANewRegValue: TRegValue): Boolean;
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerChangeThreadContext;
-  RegValue: TRegValue;
 begin
   if not CheckCanWork then Exit;
 
-  CpuViewDebugLog.Log(Format('DebugGate: UpdateRegValue(RegID: %d, ANewRegValue: 0x%x)', [RegID, ANewRegValue]), True);
+  CpuViewDebugLog.Log(Format('DebugGate: UpdateRegValue(RegID: %d, ANewRegValue: 0x%x)', [RegID, ANewRegValue.QwordValue]), True);
 
   StopAllWorkers;
 
   WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
-    RegValue := Default(TRegValue);
-    RegValue.QwordValue := ANewRegValue;
     WorkItem := TThreadWorkerChangeThreadContext.Create(Self);
     WorkQueue.PushItem(WorkItem);
     WorkQueue.WaitForItem(WorkItem, True);
     WorkItem.DecRef;
   end;
 
-  RegValue := Default(TRegValue);
-  RegValue.QwordValue := ANewRegValue;
   Context.ThreadID := ThreadID;
   Context.BeginUpdate;
   try
-    Result := Context.RegSetValue(RegID, RegValue);
+    Result := Context.RegSetValue(RegID, ANewRegValue);
     if Result and (RegID = Context.InstructonPointID) then
-      FTemporaryIP.AddOrSetValue(ThreadID, ANewRegValue);
+      FTemporaryIP.AddOrSetValue(ThreadID, ANewRegValue.QwordValue);
   finally
     Context.EndUpdate;
   end;

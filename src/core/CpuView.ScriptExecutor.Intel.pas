@@ -362,8 +362,9 @@ var
   UpCaseScript: string;
 begin
   UpCaseScript := UpperCase(Script);
-  if Script.StartsWith('? ') then
-    UpCaseScript := Copy(UpCaseScript, 3,  Length(Script) - 2);
+  if Script.StartsWith('?') then
+    UpCaseScript := Trim(Copy(UpCaseScript, 2,  Length(Script) - 1));
+  UpCaseScript := StringReplace(UpCaseScript, '0X', '0x', [rfReplaceAll]);
   Result := CalculateRegValue(@UpCaseScript[1], Length(UpCaseScript), ExecuteResult);
 end;
 

@@ -30,6 +30,8 @@ interface
   Run to user code (detect IsRetAddr via previos Call)
 }
 
+{$message 'Need ASLR Breakpoints'}
+
 uses
   {$IFDEF FPC}
   LCLType,
@@ -136,10 +138,11 @@ type
     FExtendedHints: Boolean;
     FFindSymbolsDepth: Integer;
     FForceFindSymbols: Boolean;
-    FGenerateCacheOnScroll: Boolean;
+    FForceGotoAddress: Boolean;
     FInvalidReg: TRegionData;
     FLastStackLimit: TStackLimit;
     FLockSelChange: Boolean;
+    FLastAddrVA: Int64;
     FLastCachedAddrVA: Int64;
     FLastCtx: TCommonCpuContext;
     FMinimumStringLength: Integer;
@@ -156,6 +159,7 @@ type
     FOldAsmSelect: TNotifyEvent;
     FUtils: TCommonUtils;
     FReset: TNotifyEvent;
+    procedure BuildTraceLine(ACurrentAddrVA: Int64);
     function CanWork: Boolean;
     function DisasmBuffSize: Integer;
     procedure DoReset;
@@ -225,7 +229,7 @@ type
     procedure ShowStackAtAddr(AddrVA: Int64);
     procedure TraceToUserCode;
     procedure UpdateAfterSettingsChange;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean;
+    function UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue): Boolean;
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
     property DBase: TCpuViewDBase read FDBase;
@@ -250,7 +254,19 @@ type
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
 
+  function TraceLog: TStringList;
+
 implementation
+
+var
+  _TraceLog: TStringList;
+
+function TraceLog: TStringList;
+begin
+  if _TraceLog = nil then
+    _TraceLog := TStringList.Create;
+  Result := _TraceLog;
+end;
 
 { TDumpViewList }
 
@@ -510,7 +526,7 @@ var
       begin
         if PWord(pCursor)^ <> 0 then
           Exit;
-        SetLength(UBuff, Len);
+        SetLength(UBuff{%H-}, Len);
         Move(pStartChar^, UBuff[1], Len * 2);
         AItem.Symbol := 'L"' + string(UBuff) + '"';
       end
@@ -518,7 +534,7 @@ var
       begin
         if pCursor^ <> 0 then
           Exit;
-        SetLength(ABuff, Len);
+        SetLength(ABuff{%H-}, Len);
         Move(pStartChar^, ABuff[1], Len);
         AItem.Symbol := '"' + string(ABuff) + '"';
       end;
@@ -764,7 +780,13 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
       List.Free;
     end;
 
-    if (BufSize > 0) and not FGenerateCacheOnScroll then
+    // Этот код нужен только тогда, когда пользователь указал адрес вручную,
+    // в этом случае можно прыгнуть в середину инструкции
+
+    // This code is only needed when the user entered the address manually,
+    // in which case you can jump to the middle of the instructions
+
+    if (BufSize > 0) and FForceGotoAddress then
     begin
       AsmLine.AddrVA := FromAddr;
       AsmLine.DecodedStr := '???';
@@ -779,6 +801,7 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
   end;
 
 const
+  LastInstructionReserve = 15;
   TopCacheMinLimit = 128;
   TopCacheMaxLimit = 1024;
 var
@@ -814,7 +837,20 @@ begin
       Missed := BuildCacheFromBuff(WindowAddr, @Buff[0], TopCacheSize);
     Result := FCacheList.Count;
     Dec(TopCacheSize, Missed);
-    BuildCacheFromBuff(AAddress, @Buff[TopCacheSize], Count - TopCacheSize);
+    Dec(AAddress, Missed);
+
+    // LastInstructionReserve в конце резервирует гарантированные 16 байт
+    // в конце стрима для последней инструкции.
+    // Необходимо для движка дизассемблера, так как в нем не контролируется
+    // размер переданного на дизассемблирование буфера.
+
+    // LastInstructionReserve at the end reserves a guaranteed 16 bytes
+    // at the end of the stream for the last instruction.
+    // It is necessary for the disassembler engine because it does not control
+    // the size of the buffer passed to the disassembly.
+
+    BuildCacheFromBuff(AAddress, @Buff[TopCacheSize],
+      Count - TopCacheSize - LastInstructionReserve);
   end;
 end;
 
@@ -868,6 +904,48 @@ begin
     AsmView.BreakPoints.Add(Int64(BP.AddrVA), BP.Active);
   end;
   AsmView.Invalidate;
+end;
+
+procedure TCpuViewCore.BuildTraceLine(ACurrentAddrVA: Int64);
+var
+  FS: TFormatSettings;
+  AItem: TAddrCacheItem;
+begin
+  if (FLastAddrVA = ACurrentAddrVA) then Exit;
+  try
+    FS := FormatSettings;
+    FS.LongDateFormat := 'hh:nn:ss:zzz';
+
+    if (ACurrentAddrVA = 0) and (FDebugger.DebugState = adsFinished) then
+    begin
+      TraceLog.Add(TimeToStr(Now, FS) + ': debug stop');
+      Exit;
+    end;
+
+    if FDebugger.DebugState <> adsPaused then Exit;
+
+    if FLastAddrVA = 0 then
+      TraceLog.Add(TimeToStr(Now, FS) + ': debug start');
+
+    if not QueryDisasmAtAddr(ACurrentAddrVA, AItem) then Exit;
+
+    TraceLog.Add(Format('%s | %.16x | %s (%s)',
+      [
+      TimeToStr(Now, FS),
+      ACurrentAddrVA,
+      AItem.FirstAsmLine,
+      QuerySymbolAtAddr(ACurrentAddrVA, False)
+      ]));
+
+    if TraceLog.Count > 500 then
+    begin
+      while TraceLog.Count > 250 do
+        TraceLog.Delete(0);
+    end;
+
+  finally
+    FLastAddrVA := ACurrentAddrVA;
+  end;
 end;
 
 function TCpuViewCore.CanWork: Boolean;
@@ -954,37 +1032,32 @@ var
   NewCacheIndex: Integer;
 begin
   if FCacheList.Count = 0 then Exit;
-  FGenerateCacheOnScroll := True;
-  try
-    NewCacheIndex := FCacheListIndex;
-    case AStep of
-      ssdLineUp: Dec(NewCacheIndex);
-      ssdWheelUp: Dec(NewCacheIndex, FAsmView.WheelRowCount);
-      ssdPageUp: Dec(NewCacheIndex, FAsmView.VisibleRowCount);
-      ssdLineDown: Inc(NewCacheIndex);
-      ssdWheelDown: Inc(NewCacheIndex, FAsmView.WheelRowCount);
-      ssdPageDown: Inc(NewCacheIndex, FAsmView.VisibleRowCount);
-    end;
-    if NewCacheIndex < 0 then
-      NewCacheIndex := GenerateCache(FCacheList[0].AddrVA);
-    if NewCacheIndex >= FCacheList.Count - FAsmView.VisibleRowCount then
-    begin
-      if NewCacheIndex < FCacheList.Count then
-        NewCacheIndex := GenerateCache(FCacheList[NewCacheIndex].AddrVA)
-      else
-        NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - FAsmView.VisibleRowCount].AddrVA);
-    end;
-    FLockSelChange := True;
-    if (NewCacheIndex >= 0) and (NewCacheIndex < FCacheList.Count) then
-      BuildAsmWindow(FCacheList[NewCacheIndex].AddrVA)
-    else
-      FLockSelChange := False; // dbg...
-    FLockSelChange := False;
-    if Assigned(FOldAsmScroll) then
-      FOldAsmScroll(Sender, AStep);
-  finally
-    FGenerateCacheOnScroll := False;
+  NewCacheIndex := FCacheListIndex;
+  case AStep of
+    ssdLineUp: Dec(NewCacheIndex);
+    ssdWheelUp: Dec(NewCacheIndex, FAsmView.WheelRowCount);
+    ssdPageUp: Dec(NewCacheIndex, FAsmView.VisibleRowCount);
+    ssdLineDown: Inc(NewCacheIndex);
+    ssdWheelDown: Inc(NewCacheIndex, FAsmView.WheelRowCount);
+    ssdPageDown: Inc(NewCacheIndex, FAsmView.VisibleRowCount);
   end;
+  if NewCacheIndex < 0 then
+    NewCacheIndex := GenerateCache(FCacheList[0].AddrVA);
+  if NewCacheIndex >= FCacheList.Count - FAsmView.VisibleRowCount then
+  begin
+    if NewCacheIndex < FCacheList.Count then
+      NewCacheIndex := GenerateCache(FCacheList[NewCacheIndex].AddrVA)
+    else
+      NewCacheIndex := GenerateCache(FCacheList[FCacheList.Count - FAsmView.VisibleRowCount].AddrVA);
+  end;
+  FLockSelChange := True;
+  if (NewCacheIndex >= 0) and (NewCacheIndex < FCacheList.Count) then
+    BuildAsmWindow(FCacheList[NewCacheIndex].AddrVA)
+  else
+    FLockSelChange := False; // dbg...
+  FLockSelChange := False;
+  if Assigned(FOldAsmScroll) then
+    FOldAsmScroll(Sender, AStep);
 end;
 
 procedure TCpuViewCore.OnAsmSelectionChange(Sender: TObject);
@@ -1013,6 +1086,8 @@ begin
 end;
 
 procedure TCpuViewCore.OnDebugerStateChange(Sender: TObject);
+var
+  CurrentIP: Int64;
 begin
   case FDebugger.DebugState of
     adsError:
@@ -1022,7 +1097,9 @@ begin
       UpdateStreamsProcessID;
     adsPaused:
     begin
-      if Assigned(FDebugger) and (FThreadChange or (FDebugger.CurrentInstructionPoint <> FAsmView.InstructionPoint)) then
+      CurrentIP := FDebugger.CurrentInstructionPoint;
+      BuildTraceLine(CurrentIP);
+      if Assigned(FDebugger) and (FThreadChange or (CurrentIP <> FAsmView.InstructionPoint)) then
       begin
         FThreadChange := False;
         FUtils.Update;
@@ -1052,6 +1129,7 @@ begin
     end;
     adsFinished:
     begin
+      BuildTraceLine(0);
       if Assigned(FAsmView) then
         FAsmView.SetDataStream(nil, 0);
       if Assigned(FRegView) then
@@ -1141,7 +1219,7 @@ begin
       end;
     end;
     Param.HintInfo.HintData := @FExtendedHintData;
-    if GetCursorPos(P) then
+    if GetCursorPos(P{%H-}) then
       Param.HintInfo.HintPos.Y := P.Y + GetSystemMetrics(SM_CYCURSOR) shr 1;
   end;
 end;
@@ -1273,7 +1351,7 @@ begin
   if not Result then Exit;
   if not AItem.ExtendedDataPresent then
   begin
-    SetLength(Buff, BuffSize);
+    SetLength(Buff{%H-}, BuffSize);
     if Debugger.ReadMemory(AddrVA, Buff[0], BuffSize) then
     begin
       List := Debugger.Disassembly(AddrVA, @Buff[0], BuffSize, False);
@@ -1281,7 +1359,10 @@ begin
         for I := 0 to Min(9, List.Count - 1) do
         begin
           AsmLine := FormatInstructionToAsmLine(List[I]);
-          AItem.AsmLines := AItem.AsmLines + AsmLine.DecodedStr + sLineBreak;
+          if I = 0 then
+            AItem.FirstAsmLine := AsmLine.DecodedStr
+          else
+            AItem.AsmLines := AItem.AsmLines + AsmLine.DecodedStr + sLineBreak;
           AItem.HintLines := AItem.HintLines + AsmLine.HintStr + sLineBreak;
           AItem.Linked[I] := AsmLine.JmpTo <> 0;
           if Trim(AsmLine.DecodedStr) = 'RET' then Break;
@@ -1462,7 +1543,11 @@ begin
       FAsmSelStart := 0;
       FAsmSelEnd := 0;
       if not FAsmView.IsAddrVisible(AddrVA) then
+      begin
+        FForceGotoAddress := True;
         BuildAsmWindow(AddrVA);
+        FForceGotoAddress := False;
+      end;
     except
       RefreshView;
       raise;
@@ -1502,9 +1587,8 @@ begin
   case UserCodeAddrVA of
     UserCodeAddrVANotFound:
     begin
-      SetLength(AStack, FLastStackLimit.Base - FLastCtx.StackPoint);
+      SetLength(AStack{%H-}, FLastStackLimit.Base - FLastCtx.StackPoint);
       FDebugger.ReadMemory(FLastCtx.StackPoint, AStack[0], Length(AStack));
-      UserCodeAddrVA := 0;
       APointerSize := Debugger.PointerSize;
       Cnt := 0;
       I := 0;
@@ -1519,7 +1603,7 @@ begin
         if AItem.IsUserCode then
         begin
           Inc(Cnt);
-          SetLength(AddrVAList, Cnt + 1);
+          SetLength(AddrVAList{%H-}, Cnt + 1);
           AddrVAList[Cnt] := UserCodeAddrVA;
           Inc(Cnt);
         end;
@@ -1539,8 +1623,8 @@ begin
   RefreshView(True);
 end;
 
-function TCpuViewCore.UpdateRegValue(RegID: Integer;
-  ANewRegValue: Int64): Boolean;
+function TCpuViewCore.UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue
+  ): Boolean;
 begin
   Result := False;
   if CanWork then
@@ -1557,5 +1641,13 @@ begin
     ResetCache;
   end;
 end;
+
+initialization
+
+  _TraceLog := TStringList.Create;
+
+finalization
+
+  FreeAndNil(_TraceLog);
 
 end.

@@ -24,8 +24,8 @@ unit dlgCpuViewImplementation;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, Menus, ActnList,
-  ExtCtrls, Generics.Collections,
+  LCLIntf, LCLType, Messages, Classes, SysUtils, Forms, Controls, Graphics,
+  Dialogs, Menus, ActnList, ExtCtrls, Generics.Collections,
 
   dlgCpuView,
 
@@ -124,7 +124,11 @@ end;
 
 procedure TfrmCpuViewImpl.acRegShowDebugUpdate(Sender: TObject);
 begin
+  {$IFDEF LINUX}
+  TAction(Sender).Visible := False;
+  {$ELSE}
   TAction(Sender).Checked := FContext.ShowDebug;
+  {$ENDIF}
 end;
 
 procedure TfrmCpuViewImpl.acRegShowFPUExecute(Sender: TObject);
@@ -273,11 +277,12 @@ begin
   finally
     memHints.Lines.EndUpdate;
   end;
+  SendMessage(memHints.Handle, WM_VSCROLL, SB_TOP, 0);
 end;
 
 procedure TfrmCpuViewImpl.edCommandsKeyPress(Sender: TObject; var Key: char);
 var
-  ExecuteResult: string;
+  ExecuteResult, ValueAccess, Symbol, MemValueAccess, MemSymbol: string;
   Expression: TExpression;
 begin
   if Key <> #13 then Exit;
@@ -286,13 +291,24 @@ begin
   if FScript.Execute(edCommands.Text, ExecuteResult) and (FScript.CalculatedList.Count > 0) then
   begin
     Expression := FScript.CalculatedList[0];
+    ValueAccess := Core.QueryAccessStr(Expression.Value);
+    Symbol := Core.QuerySymbolAtAddr(Expression.Value, Expression.MemSize = 0);
+    if Symbol <> '' then
+      Symbol := ' ' + Symbol;
     if Expression.MemSize > 0 then
     begin
-      ExecuteResult := Format('%s = [%x] -> %x', [Expression.Data, Expression.Value, Expression.MemValue]);
+      MemValueAccess := Core.QueryAccessStr(Expression.Value);
+      MemSymbol := Core.QuerySymbolAtAddr(Expression.Value, True);
+      if MemSymbol <> '' then
+        MemSymbol := ' ' + Symbol;
+      ExecuteResult := Format('%s = [0x%x (%s)%s] -> 0x%x (%s)%s',
+        [Expression.Data, Expression.Value, ValueAccess, Symbol,
+        Expression.MemValue, MemValueAccess, MemSymbol]);
       FScryptExecutorMemValue := Expression.MemValue;
     end
     else
-      ExecuteResult := Format('%s = %x', [Expression.Data, Expression.Value]);
+      ExecuteResult := Format('%s = 0x%x (%s)%s',
+        [Expression.Data, Expression.Value, ValueAccess, Symbol]);
   end;
   FScryptExecutorValue := FScript.CalculatedValue;
   StatusBar.Panels[3].Text := ExecuteResult;

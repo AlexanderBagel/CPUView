@@ -100,6 +100,10 @@ const
   xmlBookmarkTextColor = 'bookmarkText';
   xmlCaretColor = 'caret';
   xmlCaretTextColor = 'caretText';
+  xmlEditBackgroundColor = 'editBackground';
+  xmlEditBorderColor = 'editBorder';
+  xmlEditErrorBorderColor = 'editErrorBorder';
+  xmlEditTextColor = 'editText';
   xmlGroupColor = 'group';
   xmlInfoBackgroundColor = 'infoBack';
   xmlInfoBorderColor = 'infoBorder';
@@ -786,6 +790,10 @@ begin
   FColors.Add(xmlBookmarkTextColor, Value.BookmarkTextColor);
   FColors.Add(xmlCaretColor, Value.CaretColor);
   FColors.Add(xmlCaretTextColor, Value.CaretTextColor);
+  FColors.Add(xmlEditBackgroundColor, Value.EditBackgroundColor);
+  FColors.Add(xmlEditBorderColor, Value.EditBorderColor);
+  FColors.Add(xmlEditErrorBorderColor, Value.EditErrorBorderColor);
+  FColors.Add(xmlEditTextColor, Value.EditTextColor);
   FColors.Add(xmlGroupColor, Value.GroupColor);
   FColors.Add(xmlInfoBackgroundColor, Value.InfoBackgroundColor);
   FColors.Add(xmlInfoBorderColor, Value.InfoBorderColor);
@@ -1106,6 +1114,10 @@ begin
   Value.BookmarkTextColor := Color[xmlBookmarkTextColor];
   Value.CaretColor := Color[xmlCaretColor];
   Value.CaretTextColor := Color[xmlCaretTextColor];
+  Value.EditBackgroundColor := Color[xmlEditBackgroundColor];
+  Value.EditBorderColor := Color[xmlEditBorderColor];
+  Value.EditErrorBorderColor := Color[xmlEditErrorBorderColor];
+  Value.EditTextColor := Color[xmlEditTextColor];
   Value.GroupColor := Color[xmlGroupColor];
   Value.InfoBackgroundColor := Color[xmlInfoBackgroundColor];
   Value.InfoBorderColor := Color[xmlInfoBorderColor];
@@ -1356,6 +1368,10 @@ begin
   Add(xmlBookmarkTextColor, 'Bookmark Text');
   Add(xmlCaretColor, 'Caret');
   Add(xmlCaretTextColor, 'Caret Text');
+  Add(xmlEditBackgroundColor, 'Edit Background');
+  Add(xmlEditBorderColor, 'Edit Border');
+  Add(xmlEditErrorBorderColor, 'Edit Error Border');
+  Add(xmlEditTextColor, 'Edit Text');
   Add(xmlGroupColor, 'Group');
   Add(xmlInfoBackgroundColor, 'Info Background');
   Add(xmlInfoBorderColor, 'Info Border');
@@ -1437,7 +1453,7 @@ begin
   AAsmView.Font.Height := DoubleToDpi(FAsmSettings.FontHeight, AAsmView);
   for I := Low(TColumnType) to High(TColumnType) do
     if I in AAsmView.Header.Columns then
-      FAsmSettings.ColumnWidth[I] := DoubleToDpi(AAsmView.Header.ColumnWidth[I], AAsmView);
+      AAsmView.Header.ColumnWidth[I] := DoubleToDpi(FAsmSettings.ColumnWidth[I], AAsmView);
   if not FAsmSettings.ShowJumps then
     AAsmView.Header.Columns := AAsmView.Header.Columns - [ctJmpLine];
   if not FAsmSettings.ShowOpcodes then

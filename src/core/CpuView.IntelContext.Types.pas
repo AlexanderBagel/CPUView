@@ -51,6 +51,7 @@ type
   PIntelThreadContext = ^TIntelThreadContext;
   TIntelThreadContext = packed record
     x86Context: Boolean;
+    ContextLevel: Integer;
     Rax, Rbx, Rcx, Rdx, Rsp, Rbp, Rsi, Rdi, Rip: Int64;
     R: array [8..15] of Int64; // x64 specific
     EFlags: Cardinal;

@@ -164,6 +164,14 @@
         <Filename Value="dsgn\gui\dlgInputBox.pas"/>
         <UnitName Value="dlgInputBox"/>
       </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgTraceLog.pas"/>
+        <UnitName Value="dlgTraceLog"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgSimd87Editor.pas"/>
+        <UnitName Value="dlgSimd87Editor"/>
+      </Item>
     </Files>
     <RequiredPkgs>
       <Item>

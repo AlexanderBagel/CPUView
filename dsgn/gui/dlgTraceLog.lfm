@@ -1,0 +1,55 @@
+object frmTraceLog: TfrmTraceLog
+  Left = 1039
+  Height = 749
+  Top = 541
+  Width = 1065
+  Caption = 'CpuView - Trace Log'
+  ClientHeight = 749
+  ClientWidth = 1065
+  DesignTimePPI = 144
+  Position = poScreenCenter
+  LCLVersion = '4.99.0.0'
+  OnClose = FormClose
+  OnDestroy = FormDestroy
+  object memLog: TMemo
+    Left = 0
+    Height = 749
+    Top = 0
+    Width = 1065
+    Align = alClient
+    Lines.Strings = (
+      'memLog'
+    )
+    PopupMenu = pmTraceLog
+    ScrollBars = ssBoth
+    TabOrder = 0
+  end
+  object SaveDialog: TSaveDialog
+    DefaultExt = '.txt'
+    Filter = 'Text File (*.txt)|*.txt|All Files (*.*)|*.*'
+    Options = [ofOverwritePrompt, ofPathMustExist, ofEnableSizing, ofViewDetail]
+    Left = 120
+    Top = 80
+  end
+  object pmTraceLog: TPopupMenu
+    Left = 304
+    Top = 88
+    object mnuCopy: TMenuItem
+      Caption = 'Copy'
+      ShortCut = 16451
+      OnClick = mnuCopyClick
+    end
+    object miClear: TMenuItem
+      Caption = 'Clear'
+      OnClick = miClearClick
+    end
+    object Separator1: TMenuItem
+      Caption = '-'
+    end
+    object miSave: TMenuItem
+      Caption = 'Save to File...'
+      ShortCut = 16467
+      OnClick = miSaveClick
+    end
+  end
+end

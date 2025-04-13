@@ -23,15 +23,14 @@ unit dlgCpuView;
 interface
 
 uses
-  LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
-  ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Clipbrd,
+  LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics,
+  Dialogs, ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Clipbrd,
 
   IDEImagesIntf,
   BaseDebugManager,
 
   FWHexView,
   FWHexView.Actions,
-  FWHexView.MappedView,
 
   CpuView.Core,
   CpuView.CPUContext,
@@ -46,6 +45,8 @@ uses
 
   dlgCpuView.TemporaryLocker,
   dlgInputBox,
+  dlgTraceLog,
+  dlgSimd87Editor,
 
   uni_profiler;
 
@@ -86,6 +87,7 @@ type
     acSBCopyPanelText: TAction;
     acSBCopyScriptorValue: TAction;
     acSaveRawDump: TAction;
+    acUtilTraceLog: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
     ActionList: TActionList;
@@ -286,7 +288,9 @@ type
     tbSep2: TToolButton;
     tbRunTillRet: TToolButton;
     tbRunTo: TToolButton;
-    ToolButton1: TToolButton;
+    tbRunToUserCode: TToolButton;
+    tbSep3: TToolButton;
+    tbTraceLog: TToolButton;
     procedure acAsmReturnToIPExecute(Sender: TObject);
     procedure acAsmReturnToIPUpdate(Sender: TObject);
     procedure acAsmSetNewIPExecute(Sender: TObject);
@@ -329,6 +333,7 @@ type
     procedure acTEAnsiExecute(Sender: TObject);
     procedure acTEAnsiUpdate(Sender: TObject);
     procedure ActionRegModifyUpdate(Sender: TObject);
+    procedure acUtilTraceLogExecute(Sender: TObject);
     procedure acViewFitColumnToBestSizeExecute(Sender: TObject);
     procedure acViewGotoExecute(Sender: TObject);
     procedure AsmViewSelectionChange(Sender: TObject);
@@ -346,7 +351,7 @@ type
     procedure pmStatusBarPopup(Sender: TObject);
     procedure RegViewDblClick(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
-      RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
+      {%H-}RowIndex: Int64; ColIndex: Integer; var Handled: Boolean);
     procedure RegViewSelectionChange(Sender: TObject);
     procedure StackViewSelectionChange(Sender: TObject);
     procedure tmpZOrderLockTimer(Sender: TObject);
@@ -359,9 +364,9 @@ type
     FSBPanelValue: string;
     FSettings: TCpuViewSettins;
     FAsmViewSelectedAddr,
-    FContextRegValue,
     FDumpSelectedValue,
     FStackSelectedValue: Int64;
+    FContextRegValue: TRegValue;
     FDumpNameIdx: Integer;
     FContextRegName, FSourcePath: string;
     FContextRegister: TRegister;
@@ -373,7 +378,7 @@ type
     FExit1ShortCut, FExit2ShortCut: TShortCut;
     function ActiveViewerSelectedValue: Int64;
     function CheckAddressCallback(ANewAddrVA: Int64): Boolean;
-    function CheckRegCallback(ANewAddrVA: Int64): Boolean;
+    function CheckRegCallback({%H-}ANewAddrVA: Int64): Boolean;
     procedure InternalShowInDump(AddrVA: Int64);
   protected
     function ActiveDumpView: TDumpView;
@@ -388,7 +393,9 @@ type
     procedure LockZOrder;
     function MeasureCanvas: TBitmap;
     procedure UnlockZOrder;
+    function UpdateContextRegData: Boolean;
     procedure UpdateStatusBar;
+    procedure UpdateTraceLog;
     property SBPanelText: string read FSBPanelText write FSBPanelText;
     property SBPanelValue: string read FSBPanelValue write FSBPanelValue;
   public
@@ -431,7 +438,8 @@ begin
   acStackFollowRSP.ImageIndex := IDEImages.LoadImage('evaluate_up');
   acViewGoto.ImageIndex := IDEImages.LoadImage('address');
   acDumpsClosePage.ImageIndex := IDEImages.LoadImage('menu_exit');
-  acDbgRunToUserCode.ImageIndex := IDEImages.LoadImage('menu_run_withdebugging');  ;
+  acDbgRunToUserCode.ImageIndex := IDEImages.LoadImage('menu_run_withdebugging');
+  acUtilTraceLog.ImageIndex := IDEImages.LoadImage('debugger_call_stack');
   ToolBar.Images := IDEImages.Images_16;
   pmAsm.Images := IDEImages.Images_16;
   pmDump.Images := IDEImages.Images_16;
@@ -509,11 +517,7 @@ var
   Handled: Boolean;
 begin
   if FDbgGate.DebugState <> adsPaused then Exit;
-  FContextRegName := RegView.SelectedRegName;
-  FContextRegister := RegView.SelectedRegister;
-  if FContextRegister.RegID < 0 then Exit;
-  Handled := RegView.Context.RegParam(FContextRegister.RegID, FContextRegisterParam) and
-    (RegView.ReadDataAtSelStart(FContextRegValue, SizeOf(FContextRegValue)) > 0);
+  Handled := UpdateContextRegData;
   if not Handled then Exit;
   if rfToggle in FContextRegisterParam.Flags then
   begin
@@ -529,11 +533,7 @@ procedure TfrmCpuView.RegViewSelectedContextPopup(Sender: TObject;
 begin
   if ColIndex >= 0 then
   begin
-    FContextRegValue := 0;
-    FContextRegName := RegView.SelectedRegName;
-    FContextRegister := RegView.SelectedRegister;
-    Handled := RegView.Context.RegParam(FContextRegister.RegID, FContextRegisterParam) and
-      (RegView.ReadDataAtSelStart(FContextRegValue, SizeOf(FContextRegValue)) > 0);
+    Handled := UpdateContextRegData;
     if Handled then
     begin
       MousePos := TWinControl(Sender).ClientToScreen(MousePos);
@@ -544,9 +544,7 @@ end;
 
 procedure TfrmCpuView.RegViewSelectionChange(Sender: TObject);
 begin
-  FContextRegName := RegView.SelectedRegName;
-  FContextRegValue := 0;
-  RegView.ReadDataAtSelStart(FContextRegValue, FDbgGate.PointerSize);
+  UpdateContextRegData;
   UpdateStatusBar;
 end;
 
@@ -569,13 +567,13 @@ end;
 
 function TfrmCpuView.ActiveViewerSelectedValue: Int64;
 begin
-  Result := 0;
+  Result := FAsmViewSelectedAddr;
   if AsmView.Focused then
-    Exit(FAsmViewSelectedAddr);
+    Exit;
   if ActiveDumpView.Focused then
     Exit(FDumpSelectedValue);
-  if RegView.Focused then
-    Exit(FContextRegValue);
+  if RegView.Focused and (FContextRegValue.ValueSize = FDbgGate.PointerSize) then
+    Exit(FContextRegValue.QwordValue);
   if StackView.Focused then
     Result := FStackSelectedValue;
 end;
@@ -634,6 +632,13 @@ begin
   finally
     AMeasureCanvas.Free;
   end;
+  UpdateTraceLog;
+end;
+
+procedure TfrmCpuView.UpdateTraceLog;
+begin
+  if frmTraceLog <> nil then
+    frmTraceLog.UpdateTraceLog(TraceLog);
 end;
 
 procedure TfrmCpuView.LoadSettings;
@@ -739,6 +744,9 @@ begin
   ExitShortCut := Settings.ShotCut[sctCloseCpuView];
   FExit1ShortCut := ShortCut(ExitShortCut.Key1, ExitShortCut.Shift1);
   FExit2ShortCut := ShortCut(ExitShortCut.Key2, ExitShortCut.Shift2);
+
+  if frmTraceLog <> nil then
+    frmTraceLog.memLog.Font.Name := Settings.FontName;
 end;
 
 procedure TfrmCpuView.SaveSettings;
@@ -838,12 +846,35 @@ begin
   InterceptorActive := False;
 end;
 
+function TfrmCpuView.UpdateContextRegData: Boolean;
+begin
+  FContextRegName := RegView.SelectedRegName;
+  FContextRegister := RegView.SelectedRegister;
+  if FContextRegister.RegID < 0 then Exit(False);
+  FContextRegValue := RegView.SelectedRegValue;
+  Result := RegView.Context.RegParam(FContextRegister.RegID, FContextRegisterParam) and
+    (FContextRegValue.ValueSize > 0);
+end;
+
 procedure TfrmCpuView.ActionRegModifyUpdate(Sender: TObject);
 begin
   TAction(Sender).Visible :=
     (FDbgGate.DebugState = adsPaused) and
     (FContextRegister.RegID >= 0) and
     (TRegisterFlag(TAction(Sender).Tag) in FContextRegisterParam.Flags);
+end;
+
+procedure TfrmCpuView.acUtilTraceLogExecute(Sender: TObject);
+begin
+  if frmTraceLog = nil then
+  begin
+    frmTraceLog := TfrmTraceLog.Create(Self);
+    frmTraceLog.memLog.Font.Name := Settings.FontName;
+    frmTraceLog.Show;
+  end
+  else
+    frmTraceLog.BringToFront;
+  UpdateTraceLog;
 end;
 
 procedure TfrmCpuView.acViewFitColumnToBestSizeExecute(Sender: TObject);
@@ -1012,13 +1043,13 @@ end;
 
 procedure TfrmCpuView.acRegModifyDecExecute(Sender: TObject);
 begin
-  Dec(FContextRegValue);
+  Dec(FContextRegValue.QwordValue);
   FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
 end;
 
 procedure TfrmCpuView.acRegModifyIncExecute(Sender: TObject);
 begin
-  Inc(FContextRegValue);
+  Inc(FContextRegValue.QwordValue);
   FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
 end;
 
@@ -1029,8 +1060,24 @@ var
 begin
   {%H-}case FContextRegister.ValueType of
     crtValue, crtExtra:
-      if QueryAddress('Edit ' + FContextRegName, 'New value:', FContextRegValue, CheckRegCallback) then
+    begin
+      I := -1;
+      // map to TEditViewMode
+      case FContextRegValue.ValueSize of
+        8: if FContextRegisterParam.ContextLevel = 1 then I := 0;
+        10: I := 1;
+        16: I := 2;
+        32: I := 3;
+      end;
+      if I >= 0 then
+      begin
+        if QuerySimd87RegValue('Edit ' + FContextRegName, TEditViewMode(I), FContextRegValue) then
+          FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
+        Exit;
+      end;
+      if QueryAddress('Edit ' + FContextRegName, 'New value:', FContextRegValue.QwordValue, CheckRegCallback) then
         FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
+    end;
     crtEnumValue:
     begin
       ACount := FDbgGate.Context.RegQueryEnumValuesCount(FContextRegister.RegID);
@@ -1038,25 +1085,21 @@ begin
       SetLength(SetValues{%H-}, ACount);
       for I := 0 to ACount - 1 do
         SetValues[I] := FDbgGate.Context.RegQueryEnumString(FContextRegister.RegID, I);
-      I := Integer(FContextRegValue);
-      if QuerySetList('Edit ' + FContextRegName, 'New value:', SetValues, I) then
-      begin
-        FContextRegValue := Int64(I);
+      if QuerySetList('Edit ' + FContextRegName, 'New value:', SetValues, FContextRegValue.IntValue) then
         FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
-      end;
     end;
   end;
 end;
 
 procedure TfrmCpuView.acRegModifyToggleExecute(Sender: TObject);
 begin
-  FContextRegValue := FContextRegValue xor 1;
+  FContextRegValue.ByteValue := FContextRegValue.ByteValue xor 1;
   FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
 end;
 
 procedure TfrmCpuView.acRegModifyZeroExecute(Sender: TObject);
 begin
-  FContextRegValue := 0;
+  FContextRegValue := Default(TRegValue);
   FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
 end;
 
@@ -1142,8 +1185,12 @@ begin
 end;
 
 procedure TfrmCpuView.acAsmSetNewIPExecute(Sender: TObject);
+var
+  RegIP: TRegValue;
 begin
-  Core.UpdateRegValue(DbgGate.Context.InstructonPointID, FAsmViewSelectedAddr);
+  RegIP := Default(TRegValue);
+  RegIP.QwordValue := FAsmViewSelectedAddr;
+  Core.UpdateRegValue(DbgGate.Context.InstructonPointID, RegIP);
 end;
 
 procedure TfrmCpuView.acDbgRunToExecute(Sender: TObject);

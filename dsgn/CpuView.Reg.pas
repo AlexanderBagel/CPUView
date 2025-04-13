@@ -111,7 +111,8 @@ begin
   RegisterSelectionEditor(TCpuContextRegViewModeAction, TCpuContextActionsSelectionEditor);
   {$ENDIF}
   RegisterActions('HexView Actions', [TCpuContextRegViewModeAction], nil);
-  RegisterComponents('FWControls', [TAsmView, TDumpView, TStackView, TRegView]);
+  // when TCallParamView appears, register in "sacred" order (or "scared") :))))
+  RegisterComponents('FWControls', [TAsmView, TDumpView, TStackView, TRegView, TEditView]);
 end;
 
 {$IFNDEF FPC}

@@ -1,0 +1,116 @@
+object frmSimd87Editor: TfrmSimd87Editor
+  Left = 1168
+  Height = 266
+  Top = 539
+  Width = 624
+  BorderStyle = bsDialog
+  Caption = 'frmSimd87Editor'
+  ClientHeight = 266
+  ClientWidth = 624
+  DesignTimePPI = 144
+  KeyPreview = True
+  Position = poScreenCenter
+  LCLVersion = '4.99.0.0'
+  OnKeyDown = FormKeyDown
+  OnShow = FormShow
+  object pnBottom: TPanel
+    Left = 0
+    Height = 54
+    Top = 212
+    Width = 624
+    Align = alBottom
+    BevelOuter = bvNone
+    ClientHeight = 54
+    ClientWidth = 624
+    TabOrder = 0
+    object rbHex: TRadioButton
+      Left = 16
+      Height = 29
+      Top = 4
+      Width = 125
+      Caption = 'Hexadecimal'
+      Checked = True
+      TabOrder = 2
+      TabStop = True
+      OnClick = rbHexClick
+    end
+    object rbSigned: TRadioButton
+      Tag = 1
+      AnchorSideLeft.Control = rbHex
+      AnchorSideLeft.Side = asrBottom
+      AnchorSideTop.Control = rbHex
+      AnchorSideTop.Side = asrCenter
+      Left = 156
+      Height = 29
+      Top = 4
+      Width = 80
+      BorderSpacing.Left = 15
+      Caption = 'Signed'
+      TabOrder = 0
+      OnClick = rbHexClick
+    end
+    object rbUnsigned: TRadioButton
+      Tag = 2
+      AnchorSideLeft.Control = rbSigned
+      AnchorSideLeft.Side = asrBottom
+      AnchorSideTop.Control = rbSigned
+      AnchorSideTop.Side = asrCenter
+      Left = 252
+      Height = 29
+      Top = 4
+      Width = 100
+      BorderSpacing.Left = 16
+      Caption = 'Unsigned'
+      TabOrder = 1
+      OnClick = rbHexClick
+    end
+    object btnCancel: TButton
+      Left = 498
+      Height = 38
+      Top = 2
+      Width = 112
+      Anchors = [akTop, akRight]
+      Caption = 'Cancel'
+      ModalResult = 2
+      TabOrder = 3
+      OnClick = btnCancelClick
+    end
+    object mbOk: TButton
+      Left = 378
+      Height = 38
+      Top = 2
+      Width = 112
+      Anchors = [akTop, akRight]
+      Caption = 'OK'
+      TabOrder = 4
+      OnClick = mbOkClick
+    end
+  end
+  object pnEditViewMargins: TPanel
+    Left = 0
+    Height = 212
+    Top = 0
+    Width = 624
+    Align = alClient
+    BevelOuter = bvNone
+    BorderWidth = 8
+    Caption = 'pnEditViewMargins'
+    ClientHeight = 212
+    ClientWidth = 624
+    TabOrder = 1
+    object EditView: TEditView
+      Left = 8
+      Height = 196
+      Top = 8
+      Width = 608
+      Align = alClient
+      PopupMenu = pmEditView
+      ScrollBars = ssNone
+      TabOrder = 0
+    end
+  end
+  object pmEditView: TPopupMenu
+    Left = 233
+    Top = 80
+  end
+end

@@ -83,6 +83,7 @@ type
   TRegParam = record
     RowIndex, ColIndex: Integer; // link to Map
     RegType: TContextRegType;
+    ContextLevel: Integer;
     Modifyed: Boolean;
     Flags: TRegisterFlags;
     SupportedViewMode: TRegViewModes;

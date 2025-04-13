@@ -19,6 +19,7 @@ unit CpuView.Viewers;
 
 {$IFDEF FPC}
   {$MODE Delphi}
+  {$WARN 5024 off : Parameter "$1" not used}
 {$ENDIF}
 
 interface
@@ -43,6 +44,7 @@ uses
   Math,
   Clipbrd,
   Generics.Collections,
+  Forms,
   FWHexView,
   FWHexView.Common,
   FWHexView.MappedView,
@@ -195,6 +197,7 @@ type
     procedure SetInstructionPoint(const Value: Int64);
     procedure SetHighlightReg(const Value: string);
   protected
+    function CalculateColumnBestSize(Value: TColumnType): Integer; override;
     function CalculateJmpToRow(JmpFromRow: Int64): Int64; override;
     function CopyCommandEnabled(Value: TCopyStyle): Boolean; override;
     procedure DoBeforePaint(const ADiapason: TVisibleRowDiapason); override;
@@ -217,14 +220,13 @@ type
     // Lock Vertical Scroll
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
-      MousePos: TPoint): Boolean; override;
-    procedure UpdateScrollY(AOffset: Int64); override;
+      {%H-}MousePos: TPoint): Boolean; override;
+    procedure UpdateScrollY({%H-}AOffset: Int64); override;
     procedure UpdateVerticalScrollPos; override;
     procedure WMVScroll(var Msg: TWMVScroll); message WM_VSCROLL;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure FitColumnToBestSize(Value: TColumnType); override;
     function SelectedInstructionAddr: Int64;
     property BreakPoints: TDictionary<Int64, Boolean> read FBreakPoints;
     property CurrentIPIsActiveJmp: Boolean read FCurrentIPIsActiveJmp write SetCurrentIPIsActiveJmp;
@@ -266,6 +268,7 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
+    property ScrollBars;
     property ShortCuts;
     property ShowHint;
     property TabOrder;
@@ -363,6 +366,7 @@ type
     property ValidateAddress: Boolean read FValidateAddress write SetValidateAddress default True;
     property OnQueryAddressType: TOnQueryAddrType read FOnQueryAddr write FOnQueryAddr;
   public
+    constructor Create(AOwner: TComponent); override;
     property ValidateType[Index: TAddrValidationType]: Boolean read GetValidateType write SetValidateType;
   published
     property Font;
@@ -372,18 +376,18 @@ type
   { TAddressViewPainter }
 
   TAddressViewPainter = class(TRowHexPainter)
-  private
+  strict private
     FCacheAddrType: TAddrType;
     FCacheIndex, FCacheAddrIndex: Integer;
     FCacheData: TBytes;
-    procedure CheckCache;
-    function GetAddrAtIndex(AIndex: Integer): Int64;
-    function QueryAddrType(AIndex: Integer): TAddrType;
   protected
+    procedure CheckCache;
     function GetAddressAtCursor(const AMouseHitInfo: TMouseHitInfo;
       var AddrIndex: Integer): Int64;
+    function GetAddrAtIndex(AIndex: Integer): Int64;
     function GetBounds(AIndex: Integer): TBoundaries;
     function GetSelBounds: TBoundaries;
+    function QueryAddrType(AIndex: Integer): TAddrType;
     function View: TCustomAddressView;
   end;
 
@@ -445,6 +449,7 @@ type
     property ParentShowHint;
     property PopupMenu;
     property SeparateGroupByColor;
+    property ScrollBars;
     property ShortCuts;
     property ShowHint;
     property TabOrder;
@@ -549,6 +554,7 @@ type
     procedure UpdateFrameDescriptions;
   protected
     function ByteViewModeCommandEnabled(Value: TByteViewMode; var AChecked: Boolean): Boolean; override;
+    function CalculateColumnBestSize(Value: TColumnType): Integer; override;
     function CopyCommandEnabled(Value: TCopyStyle): Boolean; override;
     procedure DoChange(ChangeCode: Integer); override;
     procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
@@ -562,7 +568,6 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure CopySelected(CopyStyle: TCopyStyle); override;
-    procedure FitColumnToBestSize(Value: TColumnType); override;
     procedure FramesUpdated;
     function IsAddrPCRow(AIndex: Int64; out AddrVA: Int64): Boolean;
     property Frames: TListEx<TStackFrame> read FFrames;
@@ -599,6 +604,7 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
+    property ScrollBars;
     property ShortCuts;
     property ShowHint;
     property TabOrder;
@@ -651,6 +657,7 @@ type
   TRegisterPainter = class(TRowHexPainter)
   strict private
     FContext: TAbstractCPUContext;
+    function View: TCustomRegView;
   protected
     function AcceptSelection: Boolean; override;
     function CaretEditMode(AColumn: TColumnType): TCaretEditMode; override;
@@ -660,7 +667,6 @@ type
     function GetBounds(const AHitInfo: TMouseHitInfo; out ABounds: TBoundaries): Integer;
     procedure GetHitInfo(var AHitInfo: TMouseHitInfo); override;
     function GetTextMetricClass: TAbstractTextMetricClass; override;
-    function View: TCustomRegView;
   end;
 
   { TRegistersRawData }
@@ -668,8 +674,7 @@ type
   TRegistersRawData = class(TRawData)
   strict private
     FContext: TAbstractCPUContext;
-  protected
-    function Owner: TCustomRegView;
+    function View: TCustomRegView;
   public
     function AddressToRowIndex(Value: Int64): Int64; override;
     function Count: Int64; override;
@@ -724,6 +729,7 @@ type
     procedure SetContext(const Value: TAbstractCPUContext);
   protected
     function ByteViewModeCommandEnabled(Value: TByteViewMode; var AChecked: Boolean): Boolean; override;
+    function CalculateColumnBestSize(Value: TColumnType): Integer; override;
     function ContextViewModeCommandEnabled(Value: TRegViewMode; var AChecked: Boolean): Boolean;
     function ContextViewModeCommandHandled(Value: TRegViewMode): Boolean;
     procedure ContextViewModeCommandExecute(Value: TRegViewMode);
@@ -744,12 +750,12 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     procedure CopySelected(CopyStyle: TCopyStyle); override;
-    procedure FitColumnToBestSize(Value: TColumnType); override;
     function RawData: TRegistersRawData;
     function ReadDataAtSelStart(var pBuffer; nSize: Integer): Integer; override;
     property Context: TAbstractCPUContext read FContext write SetContext;
     property SelectedRegister: TRegister read FSelectedRegister;
     property SelectedRegName: string read FSelectedRegName;
+    property SelectedRegValue: TRegValue read FSelectedRegValue;
   protected
     property ColorMap: TRegistersColorMap read GetColorMap write SetColorMap stored IsColorMapStored;
     property HintForReg: Boolean read FHintsReg write FHintsReg default True;
@@ -787,6 +793,7 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
+    property ScrollBars;
     property ShowHint;
     property TabOrder;
     property TabStop;
@@ -819,6 +826,154 @@ type
     property OnQueryComment;
     property OnQueryExternalHint;
     property OnSelectedContextPopup;
+    property OnSelectionChange;
+    property OnStartDock;
+    property OnStartDrag;
+  end;
+
+  TCustomEditView = class;
+
+  TEditTextMetric = class(TAbstractTextMetric)
+  strict private
+    FByteViewMode: TByteViewMode;
+  protected
+    procedure UpdateCharPosition(BytesInRow, CharWidth: Integer); override;
+  public
+    function ValueMetric: TValueMetric; override;
+    property OverloadByteViewMode: TByteViewMode read FByteViewMode write FByteViewMode;
+  end;
+
+  TEditViewPainter = class(TRowHexPainter)
+  strict private
+    function View: TCustomEditView;
+  protected
+    function ByteViewMode: TByteViewMode; override;
+    function CaretEditMode({%H-}AColumn: TColumnType): TCaretEditMode; override;
+    function ColumnAsString(AColumn: TColumnType): string; override;
+    function DrawRowColumnBackground(ACanvas: TCanvas;
+      AColumn: TColumnType; const ARect: TRect): Boolean; override;
+    function FormatMode: TFormatMode; override;
+    function GetTextMetricClass: TAbstractTextMetricClass; override;
+  public
+    function TextMetric: TAbstractTextMetric; override;
+  end;
+
+  TRegEditCommentPainter = class(TSecondaryRowPainter)
+  strict private
+    FFullRowRect: TRect;
+    function View: TCustomEditView;
+  protected
+    function ColumnAsString(AColumn: TColumnType): string; override;
+    procedure DrawColumn(ACanvas: TCanvas; AColumn: TColumnType;
+      var ARect: TRect); override;
+  end;
+
+  TEditViewMode = (evmMM, evmX87, evmXMM, evmYMM);
+  TPartViewType = (pvtHex, pvtSigned, pvtUnsigned);
+
+  { TEditViewRawData }
+
+  TEditViewRawData = class(TRawData)
+  strict private
+    FRowCount: Integer;
+    FEditMode: TEditViewMode;
+    FRegBuff: TBytes;
+    FPartViewType: TPartViewType;
+    function GetRegBuff(RowIndex: Integer): TBytes;
+    procedure SetEditMode(const Value: TEditViewMode);
+    procedure SetPartViewType(const Value: TPartViewType);
+    function View: TCustomEditView;
+  protected
+    procedure OnEdit(Sender: TObject; const ACursor: TDrawParam;
+      const AData: TEditParam; var Handled: Boolean);
+  public
+    constructor Create(AOwner: TFWCustomHexView); override;
+    function Address: Int64; override;
+    function AddressToRowIndex(Value: Int64): Int64; override;
+    function Count: Int64; override;
+    procedure InitRegBuff(const Buffer; ASize: Integer);
+    procedure GetBuff(var Buffer; ASize: Integer);
+    function RawLength: Int64; override;
+    procedure Update; override;
+    property EditMode: TEditViewMode read FEditMode write SetEditMode;
+    property PartViewType: TPartViewType read FPartViewType write SetPartViewType;
+    property RegBuff[RowIndex: Integer]: TBytes read GetRegBuff;
+  end;
+
+  TCustomEditView = class(TFWCustomHexView)
+  private
+    FExtended: TDictionary<TByteViewMode, TAbstractTextMetric>;
+  protected
+    function CalculateColumnBestSize(Value: TColumnType): Integer; override;
+    function ColumnResetSelection(AColumn: TColumnType): Boolean; override;
+    function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
+    function GetMetricAtByteView(AByteViewMode: TByteViewMode): TAbstractTextMetric;
+    function GetRawDataClass: TRawDataClass; override;
+    procedure GetRawBuff(ARowIndex: Int64; var Data: TBytes); override;
+    procedure InitDefault; override;
+    procedure InitPainters; override;
+    function InternalGetRowPainter(ARowIndex: Int64): TAbstractPrimaryRowPainter; override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    function RawData: TEditViewRawData;
+    property Header;
+  end;
+
+  TEditView = class(TCustomEditView)
+  published
+    property Align;
+    property Anchors;
+    property AutoSize;
+    {$IFNDEF FPC}
+    property BevelEdges;
+    property BevelInner;
+    property BevelKind default bkNone;
+    property BevelOuter;
+    property BevelWidth;
+    {$ENDIF}
+    property BiDiMode;
+    property BorderStyle;
+    property ColorMap;
+    property Constraints;
+    property Cursor;
+    property Enabled;
+    property Encoder;
+    property Font;
+    property HideSelection;
+    property NoDataText;
+    property ParentFont;
+    property ParentShowHint;
+    property PopupMenu;
+    property ScrollBars;
+    property ShowHint;
+    property TabOrder;
+    property TabStop;
+    property Visible;
+    property WheelMultiplier;
+    property OnClick;
+    property OnContextPopup;
+    property OnDblClick;
+    property OnDragDrop;
+    property OnDragOver;
+    property OnDrawToken;
+    property OnEndDock;
+    property OnEndDrag;
+    property OnEnter;
+    property OnExit;
+    property OnHint;
+    property OnKeyDown;
+    property OnKeyPress;
+    property OnKeyUp;
+    {$IFNDEF FPC}
+    property OnMouseActivate;
+    {$ENDIF}
+    property OnMouseDown;
+    property OnMouseEnter;
+    property OnMouseLeave;
+    property OnMouseMove;
+    property OnMouseUp;
+    property OnQueryComment;
     property OnSelectionChange;
     property OnStartDock;
     property OnStartDrag;
@@ -1235,6 +1390,16 @@ end;
 
 { TCustomAsmView }
 
+function TCustomAsmView.CalculateColumnBestSize(Value: TColumnType): Integer;
+begin
+  case Value of
+    ctOpcode: Result := ToDpi(170);
+    ctDescription: Result := ToDpi(250);
+  else
+    Result := inherited;
+  end;
+end;
+
 function TCustomAsmView.CalculateJmpToRow(JmpFromRow: Int64): Int64;
 begin
   Result := inherited;
@@ -1286,6 +1451,7 @@ begin
   FTokenizer := TAsmTokenizer.Create;
   DrawIncomingJmp := True;
   FBreakPoints := TDictionary<Int64, Boolean>.Create;
+  BorderStyle := bsNone;
 end;
 
 destructor TCustomAsmView.Destroy;
@@ -1293,16 +1459,6 @@ begin
   FTokenizer.Free;
   FBreakPoints.Free;
   inherited;
-end;
-
-procedure TCustomAsmView.FitColumnToBestSize(Value: TColumnType);
-begin
-  case Value of
-    ctOpcode: Header.ColumnWidth[ctOpcode] := ToDpi(170);
-    ctDescription: Header.ColumnWidth[ctDescription] := ToDpi(250);
-  else
-    inherited;
-  end;
 end;
 
 procedure TCustomAsmView.DoDrawToken(ACanvas: TCanvas;
@@ -1696,9 +1852,7 @@ end;
 
 procedure TCustomAddressView.RestoreViewParam;
 begin
-  // колонки пересчитываются автоматически
-
-  // columns are recalculated automatically
+  FitColumnsToBestSize;
 end;
 
 procedure TCustomAddressView.SetColorMap(AValue: TAddressViewColorMap);
@@ -1749,13 +1903,13 @@ begin
   ASelStart := Min(SelStart, SelEnd);
   ASelEnd := Max(SelStart, SelEnd);
   ASelLength := ASelEnd - ASelStart + 1;
-  SetLength(SelBuf, ASelLength);
+  SetLength(SelBuf{%H-}, ASelLength);
   ASelLength := ReadDataAtSelStart(SelBuf[0], ASelLength);
   if ASelLength = 0 then Exit;
-  SetLength(CheckBuff, ASelLength);
+  SetLength(CheckBuff{%H-}, ASelLength);
   if CompareMem(@CheckBuff[0], @SelBuf[0], ASelLength) then Exit;
   SetLength(SelBuf, ASelLength);
-  SetLength(DisplayBuff, (VisibleRowCount + 1) * BytesInRow);
+  SetLength(DisplayBuff{%H-}, (VisibleRowCount + 1) * BytesInRow);
   if DataStream = nil then Exit;
   ADisplayStart := RowToAddress(CurrentVisibleRow, 0);
   DataStream.Position := ADisplayStart - StartAddress;
@@ -1793,6 +1947,12 @@ begin
   inherited;
   if HightLightSelected then
     UpdateSelectionList;
+end;
+
+constructor TCustomAddressView.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  BorderStyle := bsNone;
 end;
 
 function TCustomAddressView.CanDrawValidation(AAddrType: TAddrType): Boolean;
@@ -2389,6 +2549,21 @@ begin
   Result := False;
 end;
 
+function TCustomStackView.CalculateColumnBestSize(Value: TColumnType): Integer;
+begin
+  case Value of
+    ctOpcode:
+    begin
+      Result := inherited;
+      if ValidateAddress then
+        Inc(Result, RowHeight shr 1);
+    end;
+    ctComment: Result := ToDpi(350);
+  else
+    Result := inherited;
+  end;
+end;
+
 function TCustomStackView.CopyCommandEnabled(Value: TCopyStyle): Boolean;
 begin
   Result := Focused and (Value in [csAsText, csAddress, csBytes]);
@@ -2406,21 +2581,6 @@ begin
       ReadDataAtSelStart(AValue, IfThen(AddressMode = am32bit, 4, 8));
       Clipboard.AsText := IntToHex(AValue, 1);
     end;
-  end;
-end;
-
-procedure TCustomStackView.FitColumnToBestSize(Value: TColumnType);
-begin
-  case Value of
-    ctOpcode:
-    begin
-      inherited;
-      if ValidateAddress then
-        Header.ColumnWidth[Value] := Header.ColumnWidth[Value] + RowHeight shr 1;
-    end;
-    ctComment: Header.ColumnWidth[Value] := ToDpi(350);
-  else
-    inherited;
   end;
 end;
 
@@ -2681,8 +2841,7 @@ begin
         ACanvas.Font.Color := View.ColorMap.ValueColor;
     end;
     ACanvas.Brush.Style := bsClear;
-    DrawTextBlock(ACanvas, AColumn, DrawR, FContext.RegQueryString(Info.RegID, rqstValue),
-      TextMetric.CharPointer(AColumn, 0));
+    DrawAlignedTextPart(ACanvas, AColumn, FContext.RegQueryString(Info.RegID, rqstValue), DrawR);
     Inc(DrawR.Left, TextMetric.CharLength(AColumn, 1,
       Info.ValueSize + Info.ValueSeparatorSize));
 
@@ -2796,7 +2955,7 @@ begin
     Result := FContext.Count;
 end;
 
-function TRegistersRawData.Owner: TCustomRegView;
+function TRegistersRawData.View: TCustomRegView;
 begin
   Result := TCustomRegView(inherited Owner);
 end;
@@ -2821,7 +2980,7 @@ end;
 
 procedure TRegistersRawData.Update;
 begin
-  FContext := Owner.Context;
+  FContext := View.Context;
 end;
 
 { TRegistersColorMap }
@@ -2900,6 +3059,29 @@ begin
   Result := False;
 end;
 
+function TCustomRegView.CalculateColumnBestSize(Value: TColumnType): Integer;
+var
+  I, A, RowLen, MaxLen: Integer;
+  R: TRegister;
+begin
+  if Context = nil then Exit(ClientWidth);
+  MaxLen := 0;
+  for I := 0 to Context.Count - 1 do
+  begin
+    if Context.EmptyRow(I) then Continue;
+    RowLen := 0;
+    for A := 0 to Context.RegCount(I) - 1 do
+    begin
+      R := Context.RegInfo(I, A);
+      Inc(RowLen, R.RegNameSize + R.ValueSize + R.ValueSeparatorSize);
+    end;
+    MaxLen := Max(MaxLen, RowLen);
+  end;
+  MaxLen := MaxLen * CharWidth;
+  Inc(MaxLen, TextMargin shl 1);
+  Result := MaxLen;
+end;
+
 procedure TCustomRegView.ContextUpdate(Sender: TObject;
   AChangeType: TContextChangeType);
 begin
@@ -2908,8 +3090,8 @@ begin
     ClearSelection;
     RawData.Update;
     UpdateTextBoundary;
-    UpdateScrollPos;
     FitColumnsToBestSize;
+    UpdateScrollPos;
   end
   else
   begin
@@ -3044,9 +3226,9 @@ begin
   if RegID >= 0 then
   begin
     // проверка типа поля для подсветки
-    // работать можно только с реальными регистрами, флаги и прочее игнорируются
+    // работать можно только с реальными регистрами, и их флагами
     // field type check, for selection
-    // you can work only with real registers, flags and other things are ignored
+    // you can work only with real registers and their flags
     FSelectedRegister := Context.RegInfo(RegID);
     if not (FSelectedRegister.ValueType in [crtValue..crtEnumValue]) then
       RegID := -1;
@@ -3063,29 +3245,6 @@ begin
     FSelectedRegName := '';
   end;
   inherited;
-end;
-
-procedure TCustomRegView.FitColumnToBestSize(Value: TColumnType);
-var
-  I, A, RowLen, MaxLen: Integer;
-  R: TRegister;
-begin
-  if Context = nil then Exit;
-  MaxLen := 0;
-  for I := 0 to Context.Count - 1 do
-  begin
-    if Context.EmptyRow(I) then Continue;
-    RowLen := 0;
-    for A := 0 to Context.RegCount(I) - 1 do
-    begin
-      R := Context.RegInfo(I, A);
-      Inc(RowLen, R.RegNameSize + R.ValueSize + R.ValueSeparatorSize);
-    end;
-    MaxLen := Max(MaxLen, RowLen);
-  end;
-  MaxLen := TextMetric.SelectionLength(Value, 0, MaxLen - 1);
-  Inc(MaxLen, TextMargin shl 1);
-  Header.ColumnWidth[Value] := MaxLen;
 end;
 
 function TCustomRegView.GetCaretChangeMode(
@@ -3195,6 +3354,531 @@ begin
     end;
     ContextUpdate(Value, cctRemaped);
   end;
+end;
+
+{ TEditTextMetric }
+
+procedure TEditTextMetric.UpdateCharPosition(BytesInRow, CharWidth: Integer);
+begin
+  if FByteViewMode = bvmHex8 then
+    UpdateCharPositionText(BytesInRow, CharWidth)
+  else
+    UpdateCharPositionDef(BytesInRow, CharWidth);
+end;
+
+function TEditTextMetric.ValueMetric: TValueMetric;
+begin
+  Result := DefValueMetric(FByteViewMode);
+  case FByteViewMode of
+    bvmHex16, bvmInt16, bvmUInt16: Result.CharCount := 8;
+    bvmHex32, bvmInt32, bvmUInt32: Result.CharCount := 17;
+    bvmHex64, bvmInt64, bvmUInt64: Result.CharCount := 35;
+    bvmFloat32: Result.CharCount := 17;
+    bvmFloat64: Result.CharCount := 35;
+    bvmFloat80: Result.CharCount := 20;
+  end;
+end;
+
+{ TEditViewPainter }
+
+{ TEditViewPainter }
+
+function TEditViewPainter.ByteViewMode: TByteViewMode;
+begin
+  case View.RawData.EditMode of
+    evmMM, evmXMM:
+    begin
+      case RowIndex of
+        2:
+        begin
+          case View.RawData.PartViewType of
+            pvtHex: Result := bvmHex16;
+            pvtSigned: Result := bvmInt16;
+          else
+            Result := bvmUInt16;
+          end;
+        end;
+        3:
+        begin
+          case View.RawData.PartViewType of
+            pvtHex: Result := bvmHex32;
+            pvtSigned: Result := bvmInt32;
+          else
+            Result := bvmUInt32;
+          end;
+        end;
+        4: Result := bvmFloat32;
+        5: Result := bvmFloat64;
+        6:
+        begin
+          case View.RawData.PartViewType of
+            pvtHex: Result := bvmHex64;
+            pvtSigned: Result := bvmInt64;
+          else
+            Result := bvmUInt64;
+          end;
+        end;
+      else
+        Result := bvmHex8;
+      end;
+    end;
+    evmX87:
+    begin
+      if RowIndex = 0 then
+        Result := bvmHex8
+      else
+        Result := bvmFloat80;
+    end;
+    evmYMM:
+    begin
+      case RowIndex of
+        3, 11:
+        begin
+          case View.RawData.PartViewType of
+            pvtHex: Result := bvmHex16;
+            pvtSigned: Result := bvmInt16;
+          else
+            Result := bvmUInt16;
+          end;
+        end;
+        4, 12:
+        begin
+          case View.RawData.PartViewType of
+            pvtHex: Result := bvmHex32;
+            pvtSigned: Result := bvmInt32;
+          else
+            Result := bvmUInt32;
+          end;
+        end;
+        5, 13: Result := bvmFloat32;
+        6, 14: Result := bvmFloat64;
+        7, 15:
+        begin
+          case View.RawData.PartViewType of
+            pvtHex: Result := bvmHex64;
+            pvtSigned: Result := bvmInt64;
+          else
+            Result := bvmUInt64;
+          end;
+        end;
+      else
+        Result := bvmHex8;
+      end;
+    end;
+  else
+    Result := inherited;
+  end;
+end;
+
+function TEditViewPainter.CaretEditMode(AColumn: TColumnType): TCaretEditMode;
+begin
+  if ByteViewMode = bvmHex8 then
+    Result := cemSingleChar
+  else
+    Result := cemValueEditor;
+end;
+
+function TEditViewPainter.ColumnAsString(AColumn: TColumnType): string;
+const
+  strRaw =    '   Raw:';
+  strWord =   '  Word:';
+  strDWord =  ' DWord:';
+  strFloat =  'Single:';
+  strDouble = 'Double:';
+  strQWord =  ' QWord:';
+  strExt =    ' Ext80:';
+begin
+  if AColumn = ctWorkSpace then
+  begin
+    Result := '';
+    case View.RawData.EditMode of
+      evmMM, evmXMM:
+      begin
+        case RowIndex of
+          0: Result := strRaw;
+          2: Result := strWord;
+          3: Result := strDWord;
+          4: Result := strFloat;
+          5: Result := strDouble;
+          6: Result := strQWord;
+        end;
+      end;
+      evmX87:
+      begin
+        case RowIndex of
+          0: Result := strRaw;
+          1: Result := strExt;
+        end;
+      end;
+      evmYMM:
+      begin
+        case RowIndex of
+          1, 9: Result := strRaw;
+          3, 11: Result := strWord;
+          4, 12: Result := strDWord;
+          5, 13: Result := strFloat;
+          6, 14: Result := strDouble;
+          7, 15: Result := strQWord;
+        end;
+      end;
+    end;
+  end
+  else
+    Result := inherited;
+end;
+
+function TEditViewPainter.DrawRowColumnBackground(ACanvas: TCanvas;
+  AColumn: TColumnType; const ARect: TRect): Boolean;
+const
+  DefRowSet = [2, 4, 6, 9, 11, 13];
+  YmmRowSet = [3, 5, 7, 11, 13, 15];
+var
+  R: TRect;
+  RowSet: set of Byte;
+begin
+  Result := False;
+  if AColumn <> ctOpcode then Exit;
+  if View.RawData.EditMode = evmYMM then
+    RowSet := YmmRowSet
+  else
+    RowSet := DefRowSet;
+  if Byte(RowIndex) in RowSet then
+  begin
+    ACanvas.Brush.Style := bsSolid;
+    ACanvas.Brush.Color := ColorMap.GroupColor;
+    R := ARect;
+    R.Width := Min(ARect.Width, View.GetMetricAtByteView(
+      bvmFloat32).SelectionLength(ctOpcode, 0, BytesInRow - 1));
+    ACanvas.FillRect(R);
+  end;
+end;
+
+function TEditViewPainter.FormatMode: TFormatMode;
+const
+  DefRowSet = [0];
+  YmmRowSet = [1, 9];
+var
+  RowSet: set of Byte;
+begin
+  if View.RawData.EditMode = evmYMM then
+    RowSet := YmmRowSet
+  else
+    RowSet := DefRowSet;
+  if Byte(RowIndex) in RowSet then
+    Result := RegFormatMode
+  else
+  begin
+    Result := DefFormatMode;
+    Result.AlignChar := ' ';
+  end;
+end;
+
+function TEditViewPainter.GetTextMetricClass: TAbstractTextMetricClass;
+begin
+  Result := TEditTextMetric;
+end;
+
+function TEditViewPainter.TextMetric: TAbstractTextMetric;
+begin
+  Result := View.GetMetricAtByteView(ByteViewMode);
+end;
+
+function TEditViewPainter.View: TCustomEditView;
+begin
+  Result := TCustomEditView(Owner);
+end;
+
+{ TRegEditCommentPainter }
+
+function TRegEditCommentPainter.ColumnAsString(AColumn: TColumnType): string;
+const
+  s07 =
+    '     0-1      2-3      4-5      6-7';
+  s0F =
+    '     0-1      2-3      4-5      6-7       8-9      A-B      C-D      E-F';
+  s1F =
+    '   10-11    12-13    14-15    16-17     18-19    1A-1B    1C-1D    1E-1F';
+  sLowPart =
+    '                               LOW PART                                 ';
+  sHiPart =
+    '                              HIGH  PART                                ';
+begin
+  case AColumn of
+    ctWorkSpace:
+      if Byte(RowIndex) in [1, 2, 10] then
+        Result := '  Byte:'
+      else
+        Result := '       ';
+    ctComment:
+    begin
+      case View.RawData.EditMode of
+        evmMM: Result := s07;
+        evmXMM: Result := s0F;
+        evmYMM:
+        begin
+          case RowIndex of
+            0: Result := sHiPart;
+            2: Result := s1F;
+            8: Result := sLowPart;
+            10: Result := s0F;
+          end;
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure TRegEditCommentPainter.DrawColumn(ACanvas: TCanvas;
+  AColumn: TColumnType; var ARect: TRect);
+begin
+  case AColumn of
+    ctNone: FFullRowRect := ARect;
+    ctWorkSpace: DrawWorkSpace(ACanvas, ARect);
+    ctOpcode:
+    begin
+      DrawComment(ACanvas, ARect);
+      if Byte(RowIndex) in [1, 2, 10] then
+      begin
+        ACanvas.Brush.Style := bsSolid;
+        ACanvas.Brush.Color := clBlack;
+        PatBlt(ACanvas, 0, FFullRowRect.Top, FFullRowRect.Right, 1, PATCOPY);
+        PatBlt(ACanvas, 0, FFullRowRect.Bottom - 2, FFullRowRect.Right, 1, PATCOPY);
+      end;
+    end;
+  end;
+end;
+
+function TRegEditCommentPainter.View: TCustomEditView;
+begin
+  Result := TCustomEditView(Owner);
+end;
+
+{ TEditViewRawData }
+
+function TEditViewRawData.Address: Int64;
+begin
+  Result := 0;
+  if (EditMode = evmYMM) and (RowIndex < 8 ) then
+    Result := 16;
+end;
+
+function TEditViewRawData.AddressToRowIndex(Value: Int64): Int64;
+begin
+  if EditMode = evmYMM then
+  begin
+    if Value > 16 then
+      Result := 1
+    else
+      Result := 9;
+  end
+  else
+    Result := 0;
+end;
+
+function TEditViewRawData.Count: Int64;
+begin
+  Result := FRowCount;
+end;
+
+constructor TEditViewRawData.Create(AOwner: TFWCustomHexView);
+begin
+  inherited;
+  View.OnEdit := OnEdit;
+end;
+
+function TEditViewRawData.GetRegBuff(RowIndex: Integer): TBytes;
+begin
+  Result := nil;
+  SetLength(Result, View.BytesInRow);
+  case EditMode of
+    evmMM, evmX87, evmXMM:
+      Move(FRegBuff[0], Result[0], View.BytesInRow);
+    evmYMM:
+    begin
+      SetLength(Result, 16);
+      if RowIndex in [0..7] then
+        Move(FRegBuff[16], Result[0], 16)
+      else
+        Move(FRegBuff[0], Result[0], 16);
+    end;
+  end;
+end;
+
+procedure TEditViewRawData.InitRegBuff(const Buffer; ASize: Integer);
+begin
+  if ASize > 0 then
+  begin
+    SetLength(FRegBuff, ASize);
+    Move(Buffer, FRegBuff[0], ASize);
+    Update;
+    Owner.Invalidate;
+  end;
+end;
+
+procedure TEditViewRawData.GetBuff(var Buffer; ASize: Integer);
+begin
+  Move(FRegBuff[0], Buffer, ASize);
+end;
+
+procedure TEditViewRawData.OnEdit(Sender: TObject; const ACursor: TDrawParam;
+  const AData: TEditParam; var Handled: Boolean);
+begin
+  if (AData.ValueSize > 0) and (AData.ValueSize + ACursor.AddrVA <= Length(FRegBuff)) then
+  begin
+    Move(AData.NewExtValue[0], FRegBuff[ACursor.AddrVA], AData.ValueSize);
+    Owner.Invalidate;
+    Handled := True;
+  end;
+end;
+
+function TEditViewRawData.View: TCustomEditView;
+begin
+  Result := TCustomEditView(inherited Owner);
+end;
+
+function TEditViewRawData.RawLength: Int64;
+begin
+  Result := View.BytesInRow;
+end;
+
+procedure TEditViewRawData.SetEditMode(const Value: TEditViewMode);
+begin
+  if EditMode <> Value then
+  begin
+    FEditMode := Value;
+    Update;
+  end;
+end;
+
+procedure TEditViewRawData.SetPartViewType(const Value: TPartViewType);
+begin
+  if PartViewType <> Value then
+  begin
+    FPartViewType := Value;
+    Owner.Invalidate;
+  end;
+end;
+
+procedure TEditViewRawData.Update;
+begin
+  if RawLength = 0 then
+  begin
+    FRowCount := 0;
+    Exit;
+  end;
+  case EditMode of
+    evmMM: FRowCount := 7;
+    evmX87: FRowCount := 2;
+    evmXMM: FRowCount := 7;
+    evmYMM: FRowCount := 16;
+  end;
+  case EditMode of
+    evmMM: View.BytesInRow := 8;
+    evmX87: View.BytesInRow := 10;
+    evmXMM: View.BytesInRow := 16;
+    evmYMM: View.BytesInRow := 16;
+  end;
+  if View.BytesInRow > RawLength then
+    FRowCount := 0;
+end;
+
+{ TCustomEditView }
+
+function TCustomEditView.CalculateColumnBestSize(Value: TColumnType): Integer;
+begin
+  case Value of
+    ctWorkSpace: Result := MeasureCanvas.TextWidth('Double:');
+    ctOpcode:
+      if RawData.EditMode = evmX87 then
+        Result :=
+          GetMetricAtByteView(bvmFloat80).SelectionLength(Value, 0, BytesInRow - 1)
+      else
+        Result :=
+          GetMetricAtByteView(bvmFloat32).SelectionLength(Value, 0, BytesInRow - 1);
+  else
+    Result := inherited;
+  end;
+  Inc(Result, TextMargin shl 1);
+end;
+
+function TCustomEditView.ColumnResetSelection(AColumn: TColumnType): Boolean;
+begin
+  Result := AColumn = ctNone;
+end;
+
+constructor TCustomEditView.Create(AOwner: TComponent);
+var
+  I: TByteViewMode;
+  AMetric: TEditTextMetric;
+begin
+  inherited;
+  FExtended := TDictionary<TByteViewMode, TAbstractTextMetric>.Create;
+  for I in [bvmHex16..bvmHex64, bvmInt16..bvmInt64, bvmUInt16..bvmFloat80] do
+  begin
+    AMetric := TEditTextMetric.Create(Self);
+    AMetric.OverloadByteViewMode := I;
+    FExtended.Add(I, AMetric);
+  end;
+end;
+
+destructor TCustomEditView.Destroy;
+begin
+  FExtended.Free;
+  inherited;
+end;
+
+function TCustomEditView.GetDefaultPainterClass: TPrimaryRowPainterClass;
+begin
+  Result := TEditViewPainter;
+end;
+
+function TCustomEditView.GetMetricAtByteView(
+  AByteViewMode: TByteViewMode): TAbstractTextMetric;
+begin
+  if AByteViewMode = bvmHex8 then
+    Result := TextMetric
+  else
+    FExtended.TryGetValue(AByteViewMode, Result);
+end;
+
+procedure TCustomEditView.GetRawBuff(ARowIndex: Int64; var Data: TBytes);
+begin
+  Data := RawData.RegBuff[ARowIndex];
+end;
+
+function TCustomEditView.GetRawDataClass: TRawDataClass;
+begin
+  Result := TEditViewRawData;
+end;
+
+procedure TCustomEditView.InitDefault;
+begin
+  inherited;
+  Header.Visible := False;
+  Header.Columns := [ctWorkSpace, ctOpcode];
+  SeparateGroupByColor := False;
+  ReadOnly := False;
+end;
+
+procedure TCustomEditView.InitPainters;
+begin
+  inherited;
+  Painters.Add(GetOverloadPainterClass(TRegEditCommentPainter).Create(Self));
+end;
+
+function TCustomEditView.InternalGetRowPainter(
+  ARowIndex: Int64): TAbstractPrimaryRowPainter;
+begin
+  case RawData.EditMode of
+    evmMM, evmXMM: if ARowIndex = 1 then Exit(Painters[1]);
+    evmYMM: if Byte(ARowIndex) in [0, 2, 8, 10] then Exit(Painters[1]);
+  end;
+  Result := DefaultPainter;
+end;
+
+function TCustomEditView.RawData: TEditViewRawData;
+begin
+  Result := TEditViewRawData(inherited RawData);
 end;
 
 end.

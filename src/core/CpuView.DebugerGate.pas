@@ -133,7 +133,7 @@ type
     procedure TraceTilReturn; virtual; abstract;
     procedure TraceTo(AddrVA: Int64); virtual; abstract;
     procedure TraceToList(AddrVA: array of Int64); virtual; abstract;
-    function UpdateRegValue(RegID: Integer; ANewRegValue: Int64): Boolean; virtual; abstract;
+    function UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue): Boolean; virtual; abstract;
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); virtual; abstract;
     property BreakPointList: TListEx<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
@@ -238,7 +238,7 @@ begin
     AFrames.Add(AFrame);
     AFrame.AddrStack := AFrame.AddrPC + Int64(PointerSize);
     AStream.Position := AFrame.AddrFrame;
-    AStream.ReadBuffer(NewAddrFrame, PointerSize);
+    AStream.ReadBuffer(NewAddrFrame{%H-}, PointerSize);
     if AFrame.AddrFrame >= NewAddrFrame then
       Break;
     AFrame.AddrFrame := NewAddrFrame;

@@ -18,6 +18,7 @@
 unit frmCpuViewShortCuts;
 
 {$mode ObjFPC}{$H+}
+{$WARN 5024 off : Parameter "$1" not used}
 
 interface
 
