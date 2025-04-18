@@ -76,6 +76,7 @@ object frmCpuView: TfrmCpuView
       Top = 1
       Width = 917
       Align = alClient
+      BorderStyle = bsNone
       PopupMenu = pmAsm
       TabOrder = 0
       OnSelectionChange = AsmViewSelectionChange
@@ -86,7 +87,9 @@ object frmCpuView: TfrmCpuView
       Top = 1
       Width = 473
       Align = alRight
+      BorderStyle = bsNone
       ParentShowHint = False
+      ScrollBars = ssVertical
       ShowHint = True
       TabOrder = 1
       OnDblClick = RegViewDblClick
@@ -132,14 +135,14 @@ object frmCpuView: TfrmCpuView
       Style = tbsSeparator
     end
     object tbBreakPoint: TToolButton
-      Left = 75
+      Left = 78
       Top = 2
       Action = acDbgToggleBp
       ParentShowHint = False
       ShowHint = True
     end
     object tbSep2: TToolButton
-      Left = 98
+      Left = 101
       Height = 22
       Top = 2
       Caption = 'tbSep2'
@@ -153,28 +156,28 @@ object frmCpuView: TfrmCpuView
       ShowHint = True
     end
     object tbRunTo: TToolButton
-      Left = 103
+      Left = 109
       Top = 2
       Action = acDbgRunTo
       ParentShowHint = False
       ShowHint = True
     end
     object tbRunToUserCode: TToolButton
-      Left = 126
+      Left = 132
       Top = 2
       Action = acDbgRunToUserCode
       ParentShowHint = False
       ShowHint = True
     end
     object tbSep3: TToolButton
-      Left = 149
+      Left = 155
       Height = 22
       Top = 2
       Caption = 'tbSep3'
       Style = tbsSeparator
     end
     object tbTraceLog: TToolButton
-      Left = 154
+      Left = 163
       Top = 2
       Action = acUtilTraceLog
       ParentShowHint = False
@@ -237,6 +240,7 @@ object frmCpuView: TfrmCpuView
             Width = 755
             PopupMenu = pmDump
             Align = alClient
+            BorderStyle = bsNone
             BytesInGroup = 4
             TabOrder = 0
             OnSelectionChange = DumpViewSelectionChange
@@ -250,6 +254,8 @@ object frmCpuView: TfrmCpuView
         Width = 629
         PopupMenu = pmStack
         Align = alRight
+        BorderStyle = bsNone
+        ScrollBars = ssVertical
         TabOrder = 1
         OnSelectionChange = StackViewSelectionChange
       end
@@ -761,16 +767,6 @@ object frmCpuView: TfrmCpuView
       OnExecute = acDbgRunToUserCodeExecute
       OnUpdate = acDbgRunToUserCodeUpdate
     end
-    object acSBCopyPanelText: TAction
-      Category = 'StatusBar'
-      Caption = 'Copy as Text'
-      OnExecute = acSBCopyPanelTextExecute
-    end
-    object acSBCopyScriptorValue: TAction
-      Category = 'StatusBar'
-      Caption = 'Copy Value'
-      OnExecute = acSBCopyScriptorValueExecute
-    end
     object acSaveRawDump: TAction
       Category = 'Copy Actions'
       Caption = 'Save Raw as Dump...'
@@ -782,6 +778,28 @@ object frmCpuView: TfrmCpuView
       Caption = 'Trace Log'
       Hint = 'Show Trace Log Window...'
       OnExecute = acUtilTraceLogExecute
+    end
+    object acSBShowInDump: TAction
+      Category = 'StatusBar'
+      Caption = 'Follow in Dump'
+      OnExecute = acSBShowInDumpExecute
+      OnUpdate = acSBShowInDumpUpdate
+    end
+    object acSBShowInAsm: TAction
+      Category = 'StatusBar'
+      Caption = 'Follow in Disassembler'
+      OnExecute = acSBShowInAsmExecute
+      OnUpdate = acSBShowInAsmUpdate
+    end
+    object acSBCopyPanelText: TAction
+      Category = 'StatusBar'
+      Caption = 'Copy as Text'
+      OnExecute = acSBCopyPanelTextExecute
+    end
+    object acSBCopyScriptorValue: TAction
+      Category = 'StatusBar'
+      Caption = 'Copy Value'
+      OnExecute = acSBCopyScriptorValueExecute
     end
   end
   object pmStack: TPopupMenu
@@ -1068,6 +1086,15 @@ object frmCpuView: TfrmCpuView
     OnPopup = pmStatusBarPopup
     Left = 1003
     Top = 768
+    object miSBShowInDasm: TMenuItem
+      Action = acSBShowInAsm
+    end
+    object miSBFollowInDump: TMenuItem
+      Action = acSBShowInDump
+    end
+    object miSBSep1: TMenuItem
+      Caption = '-'
+    end
     object miSBCopyText: TMenuItem
       Action = acSBCopyPanelText
     end

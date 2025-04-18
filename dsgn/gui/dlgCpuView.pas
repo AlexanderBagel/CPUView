@@ -87,6 +87,8 @@ type
     acSBCopyPanelText: TAction;
     acSBCopyScriptorValue: TAction;
     acSaveRawDump: TAction;
+    acSBShowInDump: TAction;
+    acSBShowInAsm: TAction;
     acUtilTraceLog: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
@@ -134,6 +136,8 @@ type
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
     memHints: TMemo;
+    miSBFollowInDump: TMenuItem;
+    miSBShowInDasm: TMenuItem;
     miStackDump: TMenuItem;
     miDumpSave: TMenuItem;
     miAsmDump: TMenuItem;
@@ -273,6 +277,7 @@ type
     miDumpSep0: TMenuItem;
     miStackSep0: TMenuItem;
     SaveDialog: TSaveDialog;
+    miSBSep1: TMenuItem;
     splitAsmDumps: TSplitter;
     splitDumpStack: TSplitter;
     splitAsmReg: TSplitter;
@@ -319,6 +324,10 @@ type
     procedure acSaveRawDumpUpdate(Sender: TObject);
     procedure acSBCopyPanelTextExecute(Sender: TObject);
     procedure acSBCopyScriptorValueExecute(Sender: TObject);
+    procedure acSBShowInAsmExecute(Sender: TObject);
+    procedure acSBShowInAsmUpdate(Sender: TObject);
+    procedure acSBShowInDumpExecute(Sender: TObject);
+    procedure acSBShowInDumpUpdate(Sender: TObject);
     procedure acShowInAsmExecute(Sender: TObject);
     procedure acShowInAsmUpdate(Sender: TObject);
     procedure acShowInDumpExecute(Sender: TObject);
@@ -362,6 +371,7 @@ type
     FDbgGate: TCpuViewDebugGate;
     FSBPanelText: string;
     FSBPanelValue: string;
+    FSBPanelValueAddrVA: Int64;
     FSettings: TCpuViewSettins;
     FAsmViewSelectedAddr,
     FDumpSelectedValue,
@@ -510,6 +520,8 @@ begin
   SBPanelText := '';
   SBPanelValue := '';
   InitStatusBarValues(StatusBar.GetPanelIndexAt(P.X, P.Y));
+  if not TryStrToInt64('$' + SBPanelValue, FSBPanelValueAddrVA) then
+    FSBPanelValueAddrVA := 0;
 end;
 
 procedure TfrmCpuView.RegViewDblClick(Sender: TObject);
@@ -1131,6 +1143,31 @@ end;
 procedure TfrmCpuView.acSBCopyScriptorValueExecute(Sender: TObject);
 begin
   Clipboard.AsText := SBPanelValue;
+end;
+
+procedure TfrmCpuView.acSBShowInAsmExecute(Sender: TObject);
+begin
+  Core.ShowDisasmAtAddr(FSBPanelValueAddrVA);
+  ActiveControl := AsmView;
+end;
+
+procedure TfrmCpuView.acSBShowInAsmUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled :=
+    (DbgGate.DebugState = adsPaused) and
+    Core.AddrInAsm(FSBPanelValueAddrVA);
+end;
+
+procedure TfrmCpuView.acSBShowInDumpExecute(Sender: TObject);
+begin
+  InternalShowInDump(FSBPanelValueAddrVA);
+end;
+
+procedure TfrmCpuView.acSBShowInDumpUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled :=
+    (DbgGate.DebugState = adsPaused) and
+    Core.AddrInDump(FSBPanelValueAddrVA);
 end;
 
 procedure TfrmCpuView.acHighlightRegExecute(Sender: TObject);
