@@ -908,6 +908,7 @@ begin
           end;
         end;
         Utils.ProcessID := ProcessID;
+        Utils.ThreadID := ThreadID;
         if ADebugger.State = dsPause then
           UpdateContext;
         CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);

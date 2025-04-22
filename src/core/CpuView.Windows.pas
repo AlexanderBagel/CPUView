@@ -45,12 +45,12 @@ type
     procedure SetProcessID(const Value: Integer); override;
   public
     destructor Destroy; override;
-    function GetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
-    function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
+    function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
-    function SetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
+    function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
     procedure Update; override;
   end;
 
@@ -914,33 +914,33 @@ begin
   inherited;
 end;
 
-function TCommonUtils.GetThreadExtendedData(ThreadID: Integer;
+function TCommonUtils.GetThreadExtendedData(AThreadID: Integer;
   ThreadIs32: Boolean): TThreadExtendedData;
 begin
   if FProcessHandle = 0 then Exit(Default(TThreadExtendedData));
   {$IFDEF CPUX86}
-  Result := GetThreadNativeExtendedData(FProcessHandle, ThreadID);
+  Result := GetThreadNativeExtendedData(FProcessHandle, AThreadID);
   {$ENDIF}
   {$IFDEF CPUX64}
   if ThreadIs32 then
-    Result := GetThreadWow64ExtendedData(FProcessHandle, ThreadID)
+    Result := GetThreadWow64ExtendedData(FProcessHandle, AThreadID)
   else
-    Result := GetThreadNativeExtendedData(FProcessHandle, ThreadID);
+    Result := GetThreadNativeExtendedData(FProcessHandle, AThreadID);
   {$ENDIF}
 end;
 
-function TCommonUtils.GetThreadStackLimit(ThreadID: Integer;
+function TCommonUtils.GetThreadStackLimit(AThreadID: Integer;
   ThreadIs32: Boolean): TStackLimit;
 begin
   if FProcessHandle = 0 then Exit(Default(TStackLimit));
   {$IFDEF CPUX86}
-  Result := GetThreadNativeStackLimit(FProcessHandle, ThreadID);
+  Result := GetThreadNativeStackLimit(FProcessHandle, AThreadID);
   {$ENDIF}
   {$IFDEF CPUX64}
   if ThreadIs32 then
-    Result := GetThreadWow64StackLimit(FProcessHandle, ThreadID)
+    Result := GetThreadWow64StackLimit(FProcessHandle, AThreadID)
   else
-    Result := GetThreadNativeStackLimit(FProcessHandle, ThreadID);
+    Result := GetThreadNativeStackLimit(FProcessHandle, AThreadID);
   {$ENDIF}
 end;
 
@@ -1043,18 +1043,18 @@ begin
     Result := Longint(ReadCount);
 end;
 
-function TCommonUtils.SetThreadExtendedData(ThreadID: Integer;
+function TCommonUtils.SetThreadExtendedData(AThreadID: Integer;
   ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean;
 begin
   if FProcessHandle = 0 then Exit(False);
   {$IFDEF CPUX86}
-  Result := SetThreadNativeExtendedData(FProcessHandle, ThreadID, AData);
+  Result := SetThreadNativeExtendedData(FProcessHandle, AThreadID, AData);
   {$ENDIF}
   {$IFDEF CPUX64}
   if ThreadIs32 then
-    Result := SetThreadWow64ExtendedData(FProcessHandle, ThreadID, AData)
+    Result := SetThreadWow64ExtendedData(FProcessHandle, AThreadID, AData)
   else
-    Result := SetThreadNativeExtendedData(FProcessHandle, ThreadID, AData);
+    Result := SetThreadNativeExtendedData(FProcessHandle, AThreadID, AData);
   {$ENDIF}
 end;
 

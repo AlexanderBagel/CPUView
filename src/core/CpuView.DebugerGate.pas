@@ -262,6 +262,7 @@ begin
   if Assigned(Context) then
   begin
     Context.ThreadID := ThreadID;
+    Utils.ThreadID := ThreadID;
     Context.Utils := Utils;
     case PointerSize of
       4: Context.AddressMode := am32bit;

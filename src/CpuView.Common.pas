@@ -84,18 +84,21 @@ type
   TCommonAbstractUtils = class
   private
     FProcessID: Integer;
+    FThreadID: TThreadID;
   protected
     procedure SetProcessID(const Value: Integer); virtual;
+    procedure SetThreadID(AValue: TThreadID); virtual;
   public
-    function GetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; virtual; abstract;
-    function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; virtual; abstract;
+    function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; virtual; abstract;
+    function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; virtual; abstract;
     function NeedUpdateReadData: Boolean; virtual;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; virtual; abstract;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; virtual; abstract;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; virtual; abstract;
-    function SetThreadExtendedData(ThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; virtual; abstract;
+    function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; virtual; abstract;
     procedure Update; virtual; abstract;
     property ProcessID: Integer read FProcessID write SetProcessID;
+    property ThreadID: TThreadID read FThreadID write SetThreadID;
   end;
 
   TCommonAbstractUtilsClass = class of TCommonAbstractUtils;
@@ -124,6 +127,15 @@ end;
 function TCommonAbstractUtils.NeedUpdateReadData: Boolean;
 begin
   Result := True;
+end;
+
+procedure TCommonAbstractUtils.SetThreadID(AValue: TThreadID);
+begin
+  if ThreadID <> AValue then
+  begin
+    FThreadID := AValue;
+    Update;
+  end;
 end;
 
 procedure TCommonAbstractUtils.SetProcessID(const Value: Integer);

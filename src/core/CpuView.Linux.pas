@@ -67,13 +67,13 @@ type
       MBI: TMemoryBasicInformation): Boolean;
   public
     destructor Destroy; override;
-    function GetThreadExtendedData({%H-}ThreadID: Integer; {%H-}ThreadIs32: Boolean): TThreadExtendedData; override;
-    function GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function GetThreadExtendedData({%H-}AThreadID: Integer; {%H-}ThreadIs32: Boolean): TThreadExtendedData; override;
+    function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function NeedUpdateReadData: Boolean; override;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
-    function SetThreadExtendedData({%H-}ThreadID: Integer; {%H-}ThreadIs32: Boolean; const {%H-}AData: TThreadExtendedData): Boolean; override;
+    function SetThreadExtendedData({%H-}AThreadID: Integer; {%H-}ThreadIs32: Boolean; const {%H-}AData: TThreadExtendedData): Boolean; override;
     procedure Update; override;
   end;
 
@@ -289,7 +289,7 @@ begin
       Result := 1;
 end;
 
-function LoadVirtualMemoryInformation(AProcessID: Integer): TMemoryBasicInformationList;
+function LoadVirtualMemoryInformation(AProcessID, AThreadID: Integer): TMemoryBasicInformationList;
 var
   MapsPath, Line: string;
   VMData: TStringList;
@@ -302,7 +302,7 @@ var
   Delimiter: Char;
 begin
   Result := TMemoryBasicInformationList.Create(TComparer<TMemoryBasicInformation>.Construct(@DefaultMBIComparer));
-  MapsPath := '/proc/' + IntToStr(AProcessID) + '/maps';
+  MapsPath := '/proc/' + IntToStr(AProcessID) + '/task/' + IntToStr(AThreadID) + '/maps';
   if not FileExists(MapsPath) then Exit;
 
   VMData := TStringList.Create;
@@ -982,7 +982,7 @@ end;
 function TCommonUtils.GetMemList: TMemoryBasicInformationList;
 begin
   if FMemList = nil then
-    FMemList := LoadVirtualMemoryInformation(ProcessID);
+    FMemList := LoadVirtualMemoryInformation(ProcessID, ThreadID);
   Result := FMemList;
 end;
 
@@ -1025,14 +1025,14 @@ begin
   inherited Destroy;
 end;
 
-function TCommonUtils.GetThreadExtendedData(ThreadID: Integer;
+function TCommonUtils.GetThreadExtendedData(AThreadID: Integer;
   ThreadIs32: Boolean): TThreadExtendedData;
 begin
   Result := Default(TThreadExtendedData);
 end;
 
-function TCommonUtils.GetThreadStackLimit(ThreadID: Integer; ThreadIs32: Boolean
-  ): TStackLimit;
+function TCommonUtils.GetThreadStackLimit(AThreadID: Integer;
+  ThreadIs32: Boolean): TStackLimit;
 var
   io: iovec;
   Regs: TUserRegs;
@@ -1042,7 +1042,7 @@ begin
   Result := Default(TStackLimit);
   io.iov_base := @(Regs.regs32[0]);
   io.iov_len := SizeOf(Regs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
   {$IFDEF CPUX32}
   StackPointer := Regs.regs32[UESP];
@@ -1132,7 +1132,7 @@ begin
   end;
 end;
 
-function TCommonUtils.SetThreadExtendedData(ThreadID: Integer;
+function TCommonUtils.SetThreadExtendedData(AThreadID: Integer;
   ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean;
 begin
   Result := False;
@@ -1142,7 +1142,8 @@ procedure TCommonUtils.Update;
 begin
   FreeAndNil(FMemList);
   if ProcessID = 0 then Exit;
-  FMemList := LoadVirtualMemoryInformation(ProcessID);
+  if ThreadID = 0 then Exit;
+  FMemList := LoadVirtualMemoryInformation(ProcessID, ThreadID);
 end;
 
 { TThreadWorkerFpTrace }
