@@ -26,9 +26,7 @@ interface
 uses
   {$IFDEF FPC}
   LCLIntf,
-  DOM,
-  XMLRead,
-  XMLWrite
+  DOM
   {$ELSE}
   Windows,
   XMLIntf, xmldom, XMLDoc
@@ -68,7 +66,7 @@ begin
     {$IFDEF FPC}
     begin
       for I := 0 to ANode.ChildNodes.Count - 1 do
-        if ANode.ChildNodes[I].NodeName = ANodeName then
+        if ANode.ChildNodes[I].NodeName = DOMString(ANodeName) then
         begin
           Result := ANode.ChildNodes[I];
           Break;
@@ -86,7 +84,7 @@ var
 {$ENDIF}
 begin
   {$IFDEF FPC}
-  NamedAttr := Node.Attributes.GetNamedItem(Attr);
+  NamedAttr := Node.Attributes.GetNamedItem(DOMString(Attr));
   if NamedAttr = nil then
     Result := null
   else
@@ -110,7 +108,7 @@ end;
 procedure SetNodeAttr(Node: IXMLNode; const Attr: string; Value: OleVariant);
 begin
   {$IFDEF FPC}
-  TDOMElement(Node).SetAttribute(Attr, Value);
+  TDOMElement(Node).SetAttribute(DOMString(Attr), Value);
   {$ELSE}
   Node.Attributes[Attr] := Value;
   {$ENDIF}
@@ -153,7 +151,7 @@ end;
 function NewChild(Node: IXMLNode; const ChildName: string): IXMLNode;
 begin
   {$IFDEF FPC}
-  Result := Node.OwnerDocument.CreateElement(ChildName);
+  Result := Node.OwnerDocument.CreateElement(DOMString(ChildName));
   Node.AppendChild(Result);
   {$ELSE}
   Result := Node.AddChild(ChildName);

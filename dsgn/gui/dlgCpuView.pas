@@ -924,8 +924,6 @@ var
       Bitmap.Canvas.Font.Style := [fsBold];
       Bitmap.Canvas.Font.Height := imgSize;
       textExt := Bitmap.Canvas.TextExtent(AChar);
-      textExt.cx := Min(textExt.cx, imgSize);
-      textExt.cy := Min(textExt.cy, imgSize);
       Bitmap.Canvas.TextOut((imgSize - textExt.cx) shr 1,
         (imgSize - textExt.cy) shr 1, AChar);
       ilToolBarChars.AddMasked(Bitmap, clWindow);
