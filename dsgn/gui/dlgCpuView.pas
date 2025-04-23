@@ -421,8 +421,6 @@ type
     function ActiveView: TFWCustomHexView;
     function ActiveViewIndex: Integer;
     procedure AfterDbgGateCreate; virtual; abstract;
-    procedure AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy; const AFromPPI,
-      AToPPI, AOldFormWidth, ANewFormWidth: Integer); override;
     procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
     procedure GenerateToolBarImages;
@@ -438,6 +436,8 @@ type
     property SBPanelText: string read FSBPanelText write FSBPanelText;
     property SBPanelValue: string read FSBPanelValue write FSBPanelValue;
   public
+    procedure AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy; const AFromPPI,
+      AToPPI, AOldFormWidth, ANewFormWidth: Integer); override;
     procedure LoadSettings;
     procedure SaveSettings;
     property Core: TCpuViewCore read FCore;
@@ -728,6 +728,14 @@ begin
     frmTraceLog.UpdateTraceLog(TraceLog);
 end;
 
+procedure TfrmCpuView.AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy;
+  const AFromPPI, AToPPI, AOldFormWidth, ANewFormWidth: Integer);
+begin
+  inherited AutoAdjustLayout(AMode, AFromPPI, AToPPI, AOldFormWidth,
+    ANewFormWidth);
+  GenerateToolBarImages;
+end;
+
 procedure TfrmCpuView.LoadSettings;
 
   procedure AddActionShortCut(AAction: TAction; const AShortCut: TCpuViewShortCut);
@@ -891,14 +899,6 @@ begin
     Exit(2);
   if ActiveDumpView.Focused then
     Exit(3);
-end;
-
-procedure TfrmCpuView.AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy;
-  const AFromPPI, AToPPI, AOldFormWidth, ANewFormWidth: Integer);
-begin
-  inherited AutoAdjustLayout(AMode, AFromPPI, AToPPI, AOldFormWidth,
-    ANewFormWidth);
-  GenerateToolBarImages;
 end;
 
 procedure TfrmCpuView.GenerateToolBarImages;
