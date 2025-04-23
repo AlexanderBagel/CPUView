@@ -14,16 +14,19 @@ type
 
   TfrmTraceLog = class(TForm)
     memLog: TMemo;
+    miSelectAll: TMenuItem;
     miSave: TMenuItem;
     miClear: TMenuItem;
     mnuCopy: TMenuItem;
     pmTraceLog: TPopupMenu;
     SaveDialog: TSaveDialog;
     Separator1: TMenuItem;
+    Separator2: TMenuItem;
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormDestroy(Sender: TObject);
     procedure miClearClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
+    procedure miSelectAllClick(Sender: TObject);
     procedure mnuCopyClick(Sender: TObject);
   private
     FTraceLog: TStringList;
@@ -73,6 +76,11 @@ procedure TfrmTraceLog.miSaveClick(Sender: TObject);
 begin
   if SaveDialog.Execute then
     memLog.Lines.SaveToFile(SaveDialog.FileName);
+end;
+
+procedure TfrmTraceLog.miSelectAllClick(Sender: TObject);
+begin
+  memLog.SelectAll;
 end;
 
 end.

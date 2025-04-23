@@ -21,6 +21,7 @@ object frmTraceLog: TfrmTraceLog
       'memLog'
     )
     PopupMenu = pmTraceLog
+    ReadOnly = True
     ScrollBars = ssBoth
     TabOrder = 0
   end
@@ -44,6 +45,13 @@ object frmTraceLog: TfrmTraceLog
       OnClick = miClearClick
     end
     object Separator1: TMenuItem
+      Caption = '-'
+    end
+    object miSelectAll: TMenuItem
+      Caption = 'Select All'
+      OnClick = miSelectAllClick
+    end
+    object Separator2: TMenuItem
       Caption = '-'
     end
     object miSave: TMenuItem

@@ -25,6 +25,7 @@ interface
 uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics,
   Dialogs, ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Clipbrd,
+  ImgList, GraphType, Math, Types,
 
   IDEImagesIntf,
   BaseDebugManager,
@@ -51,6 +52,30 @@ uses
   uni_profiler;
 
 type
+
+  { TScaledControlHelper }
+
+  TScaledControlHelper = class Helper for TControl
+  public
+    function CurrentPPI: Integer;
+  end;
+
+
+  { TStatusBar }
+
+  TStatusBar = class(ComCtrls.TStatusBar)
+  protected
+    procedure CalculatePreferredSize(var PreferredWidth,
+      PreferredHeight: Integer; WithThemeSpace: Boolean); override;
+  end;
+
+  { TToolButton }
+
+  TToolButton = class(ComCtrls.TToolButton)
+  public
+    procedure GetCurrentIcon(var ImageList: TCustomImageList;
+      var TheIndex: Integer; var TheEffect: TGraphicsDrawEffect); override;
+  end;
 
   { TfrmCpuView }
 
@@ -135,6 +160,7 @@ type
     acDMFloat80: THexViewByteViewModeAction;
     acDMAddress: THexViewByteViewModeAction;
     acDMText: THexViewByteViewModeAction;
+    ilToolBarChars: TImageList;
     memHints: TMemo;
     miSBFollowInDump: TMenuItem;
     miSBShowInDasm: TMenuItem;
@@ -395,8 +421,11 @@ type
     function ActiveView: TFWCustomHexView;
     function ActiveViewIndex: Integer;
     procedure AfterDbgGateCreate; virtual; abstract;
+    procedure AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy; const AFromPPI,
+      AToPPI, AOldFormWidth, ANewFormWidth: Integer); override;
     procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
+    procedure GenerateToolBarImages;
     procedure InitStatusBarValues(APanelIndex: Integer); virtual;
     function ToDpi(Value: Integer): Integer;
     function ToDefaultDpi(Value: Integer): Integer;
@@ -422,6 +451,52 @@ var
 implementation
 
 {$R *.lfm}
+
+{ TScaledControlHelper }
+
+function TScaledControlHelper.CurrentPPI: Integer;
+var
+  AForm: TCustomForm;
+  AMonitor: TMonitor;
+begin
+  Result := Screen.PixelsPerInch;
+  AForm := GetParentForm(Self);
+  if AForm = nil then Exit;
+  if not AForm.HandleAllocated then Exit;
+  AMonitor := Screen.MonitorFromWindow(AForm.Handle);
+  if AMonitor = nil then Exit;
+  Result := AMonitor.PixelsPerInch;
+end;
+
+{ TStatusBar }
+
+procedure TStatusBar.CalculatePreferredSize(var PreferredWidth,
+  PreferredHeight: Integer; WithThemeSpace: Boolean);
+var
+  AScreenPPI, ACurrentPPI: Integer;
+begin
+  inherited CalculatePreferredSize(PreferredWidth, PreferredHeight,
+    WithThemeSpace);
+  AScreenPPI := Screen.PixelsPerInch;
+  ACurrentPPI := CurrentPPI;
+  if AScreenPPI <> ACurrentPPI then
+    PreferredHeight := MulDiv(PreferredHeight, ACurrentPPI, AScreenPPI);
+end;
+
+{ TToolButton }
+
+procedure TToolButton.GetCurrentIcon(var ImageList: TCustomImageList;
+  var TheIndex: Integer; var TheEffect: TGraphicsDrawEffect);
+begin
+  inherited GetCurrentIcon(ImageList, TheIndex, TheEffect);
+  case Tag of
+    1, 2, 3:
+    begin;
+      ImageList := frmCpuView.ilToolBarChars;
+      TheIndex := Tag - 1;
+    end;
+  end;
+end;
 
 { TfrmCpuView }
 
@@ -449,7 +524,6 @@ begin
   acViewGoto.ImageIndex := IDEImages.LoadImage('address');
   acDumpsClosePage.ImageIndex := IDEImages.LoadImage('menu_exit');
   acDbgRunToUserCode.ImageIndex := IDEImages.LoadImage('menu_run_withdebugging');
-  acUtilTraceLog.ImageIndex := IDEImages.LoadImage('debugger_call_stack');
   ToolBar.Images := IDEImages.Images_16;
   pmAsm.Images := IDEImages.Images_16;
   pmDump.Images := IDEImages.Images_16;
@@ -458,6 +532,7 @@ begin
   pmStack.Images := IDEImages.Images_16;
   SetHooks;
   LoadSettings;
+  GenerateToolBarImages;
   CpuViewDebugLog.Reset;
   CpuViewDebugLog.Log('TfrmCpuView: start', True, False);
 end;
@@ -816,6 +891,57 @@ begin
     Exit(2);
   if ActiveDumpView.Focused then
     Exit(3);
+end;
+
+procedure TfrmCpuView.AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy;
+  const AFromPPI, AToPPI, AOldFormWidth, ANewFormWidth: Integer);
+begin
+  inherited AutoAdjustLayout(AMode, AFromPPI, AToPPI, AOldFormWidth,
+    ANewFormWidth);
+  GenerateToolBarImages;
+end;
+
+procedure TfrmCpuView.GenerateToolBarImages;
+var
+  imgSize: Integer;
+
+  procedure AddCharToIL(const AChar: string);
+  var
+    Bitmap: TBitmap;
+    textExt: TSize;
+  begin
+    Bitmap := TBitmap.Create;
+    try
+      Bitmap.PixelFormat := pf24bit;
+      Bitmap.SetSize(imgSize, imgSize);
+      Bitmap.Canvas.Brush.Color := clWindow;
+      Bitmap.Canvas.Pen.Color := clWindowText;
+      Bitmap.Canvas.Rectangle(0, 0, imgSize, imgSize);
+      Bitmap.Canvas.Brush.Style := bsClear;
+      Bitmap.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
+      Bitmap.Canvas.Font.Assign(Font);
+      Bitmap.Canvas.Font.Color := clWindowText;
+      Bitmap.Canvas.Font.Style := [fsBold];
+      Bitmap.Canvas.Font.Height := imgSize;
+      textExt := Bitmap.Canvas.TextExtent(AChar);
+      textExt.cx := Min(textExt.cx, imgSize);
+      textExt.cy := Min(textExt.cy, imgSize);
+      Bitmap.Canvas.TextOut((imgSize - textExt.cx) shr 1,
+        (imgSize - textExt.cy) shr 1, AChar);
+      ilToolBarChars.AddMasked(Bitmap, clWindow);
+    finally
+      Bitmap.Free;
+    end;
+  end;
+
+begin
+  ilToolBarChars.Clear;
+  imgSize := 16 * Font.PixelsPerInch div 96;
+  ilToolBarChars.Width := imgSize;
+  ilToolBarChars.Height := imgSize;
+  AddCharToIL('T'); // TraceLog
+  AddCharToIL('E'); // Exports
+  AddCharToIL('M'); // MemoryMap
 end;
 
 procedure TfrmCpuView.InitStatusBarValues(APanelIndex: Integer);

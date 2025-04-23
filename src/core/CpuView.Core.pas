@@ -908,30 +908,26 @@ end;
 
 procedure TCpuViewCore.BuildTraceLine(ACurrentAddrVA: Int64);
 var
-  FS: TFormatSettings;
   AItem: TAddrCacheItem;
 begin
   if (FLastAddrVA = ACurrentAddrVA) then Exit;
   try
-    FS := FormatSettings;
-    FS.LongDateFormat := 'hh:nn:ss:zzz';
-
     if (ACurrentAddrVA = 0) and (FDebugger.DebugState = adsFinished) then
     begin
-      TraceLog.Add(TimeToStr(Now, FS) + ': debug stop');
+      TraceLog.Add(FormatDateTime('hh:mm:ss.zzz', Now) + ': debug stop');
       Exit;
     end;
 
     if FDebugger.DebugState <> adsPaused then Exit;
 
     if FLastAddrVA = 0 then
-      TraceLog.Add(TimeToStr(Now, FS) + ': debug start');
+      TraceLog.Add(FormatDateTime('hh:mm:ss.zzz', Now) + ': debug start');
 
     if not QueryDisasmAtAddr(ACurrentAddrVA, AItem) then Exit;
 
     TraceLog.Add(Format('%s | %.16x | %s (%s)',
       [
-      TimeToStr(Now, FS),
+      FormatDateTime('hh:mm:ss.zzz', Now),
       ACurrentAddrVA,
       AItem.FirstAsmLine,
       QuerySymbolAtAddr(ACurrentAddrVA, False)
