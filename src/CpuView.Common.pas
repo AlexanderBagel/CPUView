@@ -103,6 +103,12 @@ type
 
   TCommonAbstractUtilsClass = class of TCommonAbstractUtils;
 
+  IGuiImplementation = interface
+    ['{5360B5C5-2AEF-4DB8-847C-27C8B3282A63}']
+    procedure OpenInDisassembler(AAddrVA: Int64);
+    procedure OpenInDump(AAddrVA: Int64; ANewWindow: Boolean);
+  end;
+
 implementation
 
 { TRegionData }

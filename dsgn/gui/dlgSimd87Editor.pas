@@ -1,3 +1,20 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ****************************************************************************
+//  * Project   : CPU-View
+//  * Unit Name : dlgSimd87Editor.pas
+//  * Purpose   : Basic editor of x87, MMX, SSE and AVX registers
+//  * Author    : Alexander (Rouse_) Bagel
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
+//  * Version   : 1.0
+//  * Home Page : http://rouse.drkb.ru
+//  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//
+
 unit dlgSimd87Editor;
 
 {$mode objfpc}{$H+}

@@ -216,6 +216,7 @@ type
     function IgnoreSelectionWhenCopyAddress: Boolean; override;
     procedure InitPainters; override;
     function IsJumpValid(AJmpToAddr: Int64): Boolean; override;
+    procedure RestoreViewParam; override;
   protected
     // Lock Vertical Scroll
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -1620,6 +1621,12 @@ begin
   Result := AddrType = atExecute;
 end;
 
+procedure TCustomAsmView.RestoreViewParam;
+begin
+  inherited RestoreViewParam;
+  Header.ColumnMinWidth[ctAddress] := CalculateColumnBestSize(ctAddress);
+end;
+
 procedure TCustomAsmView.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   FLockKeyScroll := ssShift in Shift;
@@ -2254,7 +2261,6 @@ end;
 procedure TCustomDumpView.InitDefault;
 begin
   inherited;
-  ScrollBars := TScrollStyle.ssBoth;
   ByteViewMode := bvmHex8;
   Encoder.EncodeType := cetDefault;
   Header.Columns := [ctAddress, ctOpcode, ctDescription];
@@ -2518,9 +2524,9 @@ begin
     ValidateRect.Left := ARect.Left + ABounds.LeftOffset + ABounds.Width;
     ValidateRect.Width := ValidateRect.Height;
     ValidateRect.Right := Min(ValidateRect.Right, ARect.Right + TextMargin);
-    if ValidateRect.IsEmpty then Exit;
     Offsets := -Ceil(ARect.Height / 5);
     InflateRect(ValidateRect, Offsets, Offsets);
+    if ValidateRect.IsEmpty then Exit;
     ACanvas.Pen.Color := ColorMap.TextColor;
     ACanvas.Brush.Style := bsSolid;
     ACanvas.RoundRect(ValidateRect, 2, 2);
@@ -2587,7 +2593,6 @@ end;
 constructor TCustomStackView.Create(AOwner: TComponent);
 begin
   inherited;
-  ScrollBars := TScrollStyle.ssVertical;
   FFrames := TListEx<TStackFrame>.Create;
   FAddrPCDict := TDictionary<Int64, Int64>.Create;
   UpdateFrameDescriptions;
@@ -2865,6 +2870,8 @@ begin
         ValidateRect.Width := ValidateRect.Height;
         Offsets := -Ceil(ValidateRect.Height / 5);
         InflateRect(ValidateRect, Offsets, Offsets);
+        ValidateRect.Right := Min(ValidateRect.Right, ARect.Right + TextMargin shl 1);
+        if ValidateRect.IsEmpty then Exit;
         OffsetRect(ValidateRect, -1 -
           TextMetric.CharLength(AColumn, 1, Info.ValueSeparatorSize), 0);
         ACanvas.Pen.Color := ColorMap.TextColor;
@@ -2916,6 +2923,7 @@ begin
   // контекста может еще не быть, а вот GetHitInfo уже может прийти!
   // The context may not be there yet, but GetHitInfo may already be called!
   if FContext = nil then Exit;
+  if AHitInfo.SelectPoint.Column = ctNone then Exit;
   AHitInfo.SelectPoint.ValueOffset := GetBounds(AHitInfo, ABounds);
   AHitInfo.SelectPoint.CharIndex := AHitInfo.SelectPoint.ValueOffset;
   if FContext.EmptyRow(AHitInfo.SelectPoint.RowIndex) or
@@ -3139,7 +3147,6 @@ end;
 constructor TCustomRegView.Create(AOwner: TComponent);
 begin
   inherited;
-  ScrollBars := TScrollStyle.ssVertical;
   FActiveRegParam.Reset;
 end;
 
@@ -3378,8 +3385,6 @@ begin
     bvmFloat80: Result.CharCount := 20;
   end;
 end;
-
-{ TEditViewPainter }
 
 { TEditViewPainter }
 

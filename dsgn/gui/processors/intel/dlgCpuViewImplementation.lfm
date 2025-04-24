@@ -19,40 +19,20 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   end
   inherited ToolBar: TToolBar
     inherited tbSep1: TToolButton
-      Left = 47
-      Height = 22
+      Left = 71
     end
     inherited tbBreakPoint: TToolButton
-      Left = 55
-    end
-    inherited tbSep2: TToolButton
-      Left = 101
-      Height = 22
+      Left = 79
     end
     inherited tbRunTillRet: TToolButton
-      Left = 78
-    end
-    inherited tbRunTo: TToolButton
-      Left = 109
-    end
-    inherited tbRunToUserCode: TToolButton
-      Left = 132
-    end
-    inherited tbSep3: TToolButton
-      Left = 155
-      Height = 22
-    end
-    inherited tbTraceLog: TToolButton
-      Left = 163
+      Left = 114
     end
   end
   inherited pnDumps: TPanel
-    inherited pnDumpStack: TPanel
-      inherited pcDumps: TPageControl
-        inherited tabDump0: TTabSheet
-          ClientHeight = 255
-        end
-      end
+    inherited memHints: TMemo
+      Lines.Strings = (
+        'Hint text display here'
+      )
     end
   end
   inherited pmRegSelected: TPopupMenu
@@ -214,6 +194,12 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     end
     inherited acUtilTraceLog: TAction[81]
     end
+    inherited acSBShowInDump: TAction[82]
+    end
+    inherited acSBShowInAsm: TAction[83]
+    end
+    inherited acUtilsExports: TAction[84]
+    end
   end
   inherited pmDump: TPopupMenu
     Left = 176
@@ -221,7 +207,7 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   inherited pmHint: TPopupMenu
     OnPopup = pmHintPopup
   end
-  object pmIntelReg: TPopupMenu[16]
+  object pmIntelReg: TPopupMenu[17]
     Left = 1544
     Top = 112
     object miRegIntelViewMode: TMenuItem
@@ -255,6 +241,12 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
       Action = acRegShowDebug
     end
     object miRegIntelSep2: TMenuItem
+      Caption = '-'
+    end
+    object miRegIntelFit: TMenuItem
+      Action = acViewFitColumnToBestSize
+    end
+    object miRegIntelSep3: TMenuItem
       Caption = '-'
     end
     object miRegIntelCopy: TMenuItem

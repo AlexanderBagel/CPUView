@@ -1,0 +1,81 @@
+object frmProcExports: TfrmProcExports
+  Left = 1203
+  Height = 536
+  Top = 640
+  Width = 1085
+  Caption = 'frmProcExports'
+  ClientHeight = 536
+  ClientWidth = 1085
+  DesignTimePPI = 144
+  KeyPreview = True
+  Position = poScreenCenter
+  LCLVersion = '4.99.0.0'
+  OnClose = FormClose
+  OnDestroy = FormDestroy
+  OnKeyPress = FormKeyPress
+  object lvExports: TLazVirtualStringTree
+    Left = 0
+    Height = 536
+    Top = 0
+    Width = 1085
+    Align = alClient
+    DefaultText = 'Node'
+    Header.AutoSizeIndex = 2
+    Header.Columns = <    
+      item
+        Position = 0
+        Text = 'Address'
+        Width = 200
+      end    
+      item
+        Position = 1
+        Text = 'Module'
+        Width = 200
+      end    
+      item
+        Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAllowFocus]
+        Position = 2
+        Text = 'Function'
+        Width = 681
+      end>
+    Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoShowSortGlyphs, hoVisible]
+    PopupMenu = pmCopy
+    TabOrder = 0
+    TreeOptions.PaintOptions = [toHideFocusRect, toShowButtons, toShowDropmark, toShowRoot, toShowVertGridLines, toThemeAware, toUseBlendedImages, toUseBlendedSelection, toUseExplorerTheme]
+    TreeOptions.SelectionOptions = [toFullRowSelect]
+    OnDblClick = lvExportsDblClick
+    OnGetText = lvExportsGetText
+    OnHeaderClick = lvExportsHeaderClick
+  end
+  object pmCopy: TPopupMenu
+    Left = 192
+    Top = 136
+    object miFollowAsm: TMenuItem
+      Caption = 'Follow in Disassembler'
+      OnClick = miFollowAsmClick
+    end
+    object miSep1: TMenuItem
+      Caption = '-'
+    end
+    object miCopyAddr: TMenuItem
+      Caption = 'Copy Address'
+      OnClick = miCopyAddrClick
+    end
+    object miCopyFunc: TMenuItem
+      Caption = 'Copy Function Name'
+      OnClick = miCopyFuncClick
+    end
+    object miCopyLine: TMenuItem
+      Caption = 'Copy Line'
+      OnClick = miCopyLineClick
+    end
+    object miSep2: TMenuItem
+      Caption = '-'
+    end
+    object miNextMatch: TMenuItem
+      Caption = 'Next Match'
+      ShortCut = 114
+      OnClick = miNextMatchClick
+    end
+  end
+end

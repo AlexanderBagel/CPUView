@@ -208,6 +208,7 @@ type
       AFrames: TList<TStackFrame>); override;
     function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; override;
     function GetRemoteModules: TList<TRemoteModule>; override;
+    function GetRemoteProcList(const AModule: TRemoteModule): TList<TRemoteProc>; override;
     function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; override;
@@ -452,8 +453,8 @@ begin
     begin
       Result := ASym.Name;
       if Result = '' then Exit;
-      if ASym.Parent <> nil then
-        Result := ASym.Parent.Name + '.' + Result;
+      if ASym.{%H-}Parent <> nil then
+        Result := ASym.{%H-}Parent.Name + '.' + Result;
       if ASym.Line > 0 then
         Result := Format('%s %s:%d', [
           Result, ExtractFileName(ASym.FileName), ASym.Line])
@@ -1073,6 +1074,43 @@ begin
       Item.ImageBase := Lib.LoaderList.ImageBase + Lib.LoaderList.RelocationOffset;
       Item.LibraryPath := Lib.Name;
       Result.Add(Item);
+      Iterator.Next;
+    end;
+  finally
+    Iterator.Free;
+  end;
+end;
+
+function TCpuViewDebugGate.GetRemoteProcList(const AModule: TRemoteModule
+  ): TList<TRemoteProc>;
+var
+  LibraryMap: TLibraryMap;
+  Iterator: TMapIterator;
+  Lib: TDbgLibrary;
+  Sym: TFpSymbol;
+  RemProc: TRemoteProc;
+  I: Integer;
+begin
+  Result := TList<TRemoteProc>.Create;
+  if FDbgController = nil then Exit;
+  LibraryMap := FDbgController.CurrentProcess.LibMap;
+  if LibraryMap = nil then Exit;
+  Iterator := TMapIterator.Create(LibraryMap);
+  try
+    while not Iterator.EOM do
+    begin
+      Iterator.GetData(Lib);
+      if Lib.ModuleHandle = AModule.hInstance then
+      begin
+        for I := 0 to Lib.SymbolTableInfo.SymbolCount - 1 do
+        begin
+          Sym := Lib.SymbolTableInfo.Symbols[I];
+          RemProc.FuncName := Sym.Name;
+          RemProc.AddrVA := Sym.Address.Address;
+          Result.Add(RemProc);
+        end;
+        Break;
+      end;
       Iterator.Next;
     end;
   finally

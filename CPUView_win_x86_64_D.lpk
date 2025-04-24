@@ -172,6 +172,10 @@
         <Filename Value="dsgn\gui\dlgSimd87Editor.pas"/>
         <UnitName Value="dlgSimd87Editor"/>
       </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgProcExports.pas"/>
+        <UnitName Value="dlgProcExports"/>
+      </Item>
     </Files>
     <RequiredPkgs>
       <Item>

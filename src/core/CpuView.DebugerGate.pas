@@ -19,6 +19,7 @@ unit CpuView.DebugerGate;
 
 {$IFDEF FPC}
   {$MODE Delphi}
+  {$WARN 5024 off : Parameter "$1" not used}
 {$ENDIF}
 
 {$I CpuViewCfg.inc}
@@ -76,6 +77,11 @@ type
     LibraryPath: string;
   end;
 
+  TRemoteProc = record
+    AddrVA: Int64;
+    FuncName: string;
+  end;
+
   { TAbstractDebugger }
 
   TAbstractDebugger = class(TComponent)
@@ -113,6 +119,7 @@ type
       AFrames: TList<TStackFrame>); virtual;
     function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; virtual; abstract;
     function GetRemoteModules: TList<TRemoteModule>; virtual; abstract;
+    function GetRemoteProcList(const AModule: TRemoteModule): TList<TRemoteProc>; virtual; abstract;
     function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; virtual; abstract;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;

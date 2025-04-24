@@ -25,7 +25,7 @@ interface
 uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics,
   Dialogs, ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Clipbrd,
-  ImgList, GraphType, Math, Types,
+  ImgList, GraphType, Types, Generics.Collections,
 
   IDEImagesIntf,
   BaseDebugManager,
@@ -33,6 +33,7 @@ uses
   FWHexView,
   FWHexView.Actions,
 
+  CpuView.Common,
   CpuView.Core,
   CpuView.CPUContext,
   CpuView.Viewers,
@@ -48,6 +49,7 @@ uses
   dlgInputBox,
   dlgTraceLog,
   dlgSimd87Editor,
+  dlgProcExports,
 
   uni_profiler;
 
@@ -79,7 +81,7 @@ type
 
   { TfrmCpuView }
 
-  TfrmCpuView = class(TForm)
+  TfrmCpuView = class(TForm, IGuiImplementation)
     acShowInDump: TAction;
     acShowInStack: TAction;
     acShowInAsm: TAction;
@@ -114,6 +116,7 @@ type
     acSaveRawDump: TAction;
     acSBShowInDump: TAction;
     acSBShowInAsm: TAction;
+    acUtilsExports: TAction;
     acUtilTraceLog: TAction;
     acViewGoto: TAction;
     acViewFitColumnToBestSize: TAction;
@@ -322,6 +325,7 @@ type
     tbRunToUserCode: TToolButton;
     tbSep3: TToolButton;
     tbTraceLog: TToolButton;
+    ToolButton1: TToolButton;
     procedure acAsmReturnToIPExecute(Sender: TObject);
     procedure acAsmReturnToIPUpdate(Sender: TObject);
     procedure acAsmSetNewIPExecute(Sender: TObject);
@@ -368,6 +372,8 @@ type
     procedure acTEAnsiExecute(Sender: TObject);
     procedure acTEAnsiUpdate(Sender: TObject);
     procedure ActionRegModifyUpdate(Sender: TObject);
+    procedure acUtilsExportsExecute(Sender: TObject);
+    procedure acUtilsExportsUpdate(Sender: TObject);
     procedure acUtilTraceLogExecute(Sender: TObject);
     procedure acViewFitColumnToBestSizeExecute(Sender: TObject);
     procedure acViewGotoExecute(Sender: TObject);
@@ -416,6 +422,10 @@ type
     function CheckAddressCallback(ANewAddrVA: Int64): Boolean;
     function CheckRegCallback({%H-}ANewAddrVA: Int64): Boolean;
     procedure InternalShowInDump(AddrVA: Int64);
+  protected
+    { IGuiImplementation }
+    procedure OpenInDisassembler(AAddrVA: Int64);
+    procedure OpenInDump(AAddrVA: Int64; ANewWindow: Boolean);
   protected
     function ActiveDumpView: TDumpView;
     function ActiveView: TFWCustomHexView;
@@ -688,6 +698,35 @@ begin
   else
     Core.ShowDumpAtAddr(AddrVA);
   ActiveControl := ActiveDumpView;
+end;
+
+procedure TfrmCpuView.OpenInDisassembler(AAddrVA: Int64);
+begin
+  Core.ShowDisasmAtAddr(AAddrVA);
+  ActiveControl := AsmView;
+end;
+
+procedure TfrmCpuView.OpenInDump(AAddrVA: Int64; ANewWindow: Boolean);
+var
+  NewPage: TTabSheet;
+  NewDump: TDumpView;
+begin
+  if ANewWindow then
+  begin
+    Inc(FDumpNameIdx);
+    NewPage := pcDumps.AddTabSheet;
+    NewPage.Caption := 'DUMP' + IntToStr(FDumpNameIdx);
+    NewDump := TDumpView.Create(NewPage);
+    NewDump.Parent := NewPage;
+    NewDump.Align := alClient;
+    NewDump.PopupMenu := pmDump;
+    NewDump.OnSelectionChange := DumpViewSelectionChange;
+    Settings.SetSettingsToDumpView(NewDump);
+    Core.DumpViewList.Add(NewDump);
+    pcDumps.ActivePage := NewPage;
+    Core.DumpViewList.ItemIndex := NewPage.PageIndex;
+  end;
+  InternalShowInDump(AAddrVA);
 end;
 
 procedure TfrmCpuView.UpdateStatusBar;
@@ -1000,6 +1039,52 @@ begin
     (TRegisterFlag(TAction(Sender).Tag) in FContextRegisterParam.Flags);
 end;
 
+procedure TfrmCpuView.acUtilsExportsExecute(Sender: TObject);
+var
+  RemoteModules: TList<TRemoteModule>;
+  Module: TRemoteModule;
+  ProcList: TList<TRemoteProc>;
+  RemoteProc: TRemoteProc;
+  ExportItem: TRemoteExport;
+  ExportList: TRemoteExports;
+begin
+  if frmProcExports = nil then
+  begin
+    frmProcExports := TfrmProcExports.Create(Application);
+    ExportList := TRemoteExports.Create;
+    RemoteModules := FDbgGate.GetRemoteModules;
+    try
+      for Module in RemoteModules do
+      begin
+        ExportItem.LibraryName := ExtractFileName(Module.LibraryPath);
+        ProcList := FDbgGate.GetRemoteProcList(Module);
+        try
+          for RemoteProc in ProcList do
+          begin
+            ExportItem.AddrVA := RemoteProc.AddrVA;
+            ExportItem.Address := IntToHex(ExportItem.AddrVA, 1);
+            ExportItem.FunctionName := RemoteProc.FuncName;
+            ExportItem.SearchFunctionName := AnsiUpperCase(RemoteProc.FuncName);
+            ExportList.Add(ExportItem);
+          end;
+        finally
+          ProcList.Free;
+        end;
+      end;
+    finally
+      RemoteModules.Free;
+    end;
+    frmProcExports.ShowExports(Core, Self, ExportList);
+  end
+  else
+    frmProcExports.BringToFront;
+end;
+
+procedure TfrmCpuView.acUtilsExportsUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled := FDbgGate.DebugState = adsPaused;
+end;
+
 procedure TfrmCpuView.acUtilTraceLogExecute(Sender: TObject);
 begin
   if frmTraceLog = nil then
@@ -1075,25 +1160,8 @@ begin
 end;
 
 procedure TfrmCpuView.acShowInNewDumpExecute(Sender: TObject);
-var
-  NewPage: TTabSheet;
-  NewDump: TDumpView;
-  AddrVA: Int64;
 begin
-  AddrVA := ActiveViewerSelectedValue;
-  Inc(FDumpNameIdx);
-  NewPage := pcDumps.AddTabSheet;
-  NewPage.Caption := 'DUMP' + IntToStr(FDumpNameIdx);
-  NewDump := TDumpView.Create(NewPage);
-  NewDump.Parent := NewPage;
-  NewDump.Align := alClient;
-  NewDump.PopupMenu := pmDump;
-  NewDump.OnSelectionChange := DumpViewSelectionChange;
-  Settings.SetSettingsToDumpView(NewDump);
-  Core.DumpViewList.Add(NewDump);
-  pcDumps.ActivePage := NewPage;
-  Core.DumpViewList.ItemIndex := NewPage.PageIndex;
-  InternalShowInDump(AddrVA);
+  OpenInDump(ActiveViewerSelectedValue, True);
 end;
 
 procedure TfrmCpuView.acShowInStackExecute(Sender: TObject);
@@ -1155,7 +1223,7 @@ end;
 
 procedure TfrmCpuView.acShowInDumpExecute(Sender: TObject);
 begin
-  InternalShowInDump(ActiveViewerSelectedValue);
+  OpenInDump(ActiveViewerSelectedValue, False);
 end;
 
 procedure TfrmCpuView.acShowInAsmUpdate(Sender: TObject);
@@ -1167,8 +1235,7 @@ end;
 
 procedure TfrmCpuView.acShowInAsmExecute(Sender: TObject);
 begin
-  Core.ShowDisasmAtAddr(ActiveViewerSelectedValue);
-  ActiveControl := AsmView;
+  OpenInDisassembler(ActiveViewerSelectedValue);
 end;
 
 procedure TfrmCpuView.acHighlightRegUpdate(Sender: TObject);

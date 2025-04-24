@@ -17,7 +17,7 @@ uses
   frmCpuViewShortCuts, CpuView.Windows, dlgCpuViewImplementation, 
   CpuView.IntelContext, CpuView.IntelContext.Types, 
   CpuView.ScriptExecutor.Intel, dlgCpuView.TemporaryLocker, dlgInputBox, 
-  dlgTraceLog, dlgSimd87Editor, LazarusPackageIntf;
+  dlgTraceLog, dlgSimd87Editor, dlgProcExports, LazarusPackageIntf;
 
 implementation
 

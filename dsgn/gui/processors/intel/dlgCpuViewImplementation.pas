@@ -28,6 +28,7 @@ uses
   Dialogs, Menus, ActnList, ExtCtrls, Generics.Collections,
 
   dlgCpuView,
+  dlgProcExports,
 
   FWHexView.Common,
   FWHexView.Actions,
@@ -49,6 +50,7 @@ type
     acRegShowFPU: TAction;
     acRegShowXMM: TAction;
     acRegShowYMM: TAction;
+    miRegIntelFit: TMenuItem;
     miRegIntelViewMode: TMenuItem;
     miRegIntelFPU: TMenuItem;
     miRegIntelFPUSt: TMenuItem;
@@ -62,6 +64,7 @@ type
     pmIntelReg: TPopupMenu;
     miRegIntelSep1: TMenuItem;
     miRegIntelSep2: TMenuItem;
+    miRegIntelSep3: TMenuItem;
     procedure acFPU_MMXExecute(Sender: TObject);
     procedure acFPU_MMXUpdate(Sender: TObject);
     procedure acRegShowDebugExecute(Sender: TObject);
@@ -408,6 +411,7 @@ begin
   FHintMenuData.Clear;
   edCommands.Text := '';
   memHints.Text := '';
+  FreeAndNil(frmProcExports);
   UpdateStatusBar;
 end;
 

@@ -1,3 +1,20 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ****************************************************************************
+//  * Project   : CPU-View
+//  * Unit Name : dlgTraceLog.pas
+//  * Purpose   : Tracer log dialog
+//  * Author    : Alexander (Rouse_) Bagel
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
+//  * Version   : 1.0
+//  * Home Page : http://rouse.drkb.ru
+//  * Home Blog : http://alexander-bagel.blogspot.ru
+//  ****************************************************************************
+//  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
+//  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//
+
 unit dlgTraceLog;
 
 {$mode objfpc}{$H+}
