@@ -67,6 +67,7 @@ type
     procedure miCopyLineClick(Sender: TObject);
     procedure miFollowAsmClick(Sender: TObject);
     procedure miNextMatchClick(Sender: TObject);
+    procedure pmCopyPopup(Sender: TObject);
   private
     SearchString: string;
     SearchPosition: Integer;
@@ -263,6 +264,11 @@ begin
     Inc(SearchPosition);
     Search(SearchString);
   end;
+end;
+
+procedure TfrmProcExports.pmCopyPopup(Sender: TObject);
+begin
+  miNextMatch.Enabled := SearchString <> '';
 end;
 
 function TfrmProcExports.Search(const Value: string): Boolean;

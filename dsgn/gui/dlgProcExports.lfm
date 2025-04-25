@@ -1,12 +1,11 @@
 object frmProcExports: TfrmProcExports
   Left = 1203
-  Height = 536
+  Height = 357
   Top = 640
-  Width = 1085
+  Width = 723
   Caption = 'frmProcExports'
-  ClientHeight = 536
-  ClientWidth = 1085
-  DesignTimePPI = 144
+  ClientHeight = 357
+  ClientWidth = 723
   KeyPreview = True
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
@@ -15,9 +14,9 @@ object frmProcExports: TfrmProcExports
   OnKeyPress = FormKeyPress
   object lvExports: TLazVirtualStringTree
     Left = 0
-    Height = 536
+    Height = 357
     Top = 0
-    Width = 1085
+    Width = 723
     Align = alClient
     DefaultText = 'Node'
     Header.AutoSizeIndex = 2
@@ -25,19 +24,20 @@ object frmProcExports: TfrmProcExports
       item
         Position = 0
         Text = 'Address'
-        Width = 200
+        Width = 133
       end    
       item
         Position = 1
         Text = 'Module'
-        Width = 200
+        Width = 133
       end    
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAllowFocus]
         Position = 2
         Text = 'Function'
-        Width = 681
+        Width = 455
       end>
+    Header.Height = 14
     Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoShowSortGlyphs, hoVisible]
     PopupMenu = pmCopy
     TabOrder = 0
@@ -48,10 +48,11 @@ object frmProcExports: TfrmProcExports
     OnHeaderClick = lvExportsHeaderClick
   end
   object pmCopy: TPopupMenu
-    Left = 192
-    Top = 136
+    OnPopup = pmCopyPopup
+    Left = 128
+    Top = 91
     object miFollowAsm: TMenuItem
-      Caption = 'Follow in Disassembler'
+      Caption = 'Open in Cpu-View'
       OnClick = miFollowAsmClick
     end
     object miSep1: TMenuItem

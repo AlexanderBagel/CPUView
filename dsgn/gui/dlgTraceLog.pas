@@ -42,6 +42,7 @@ type
     Separator2: TMenuItem;
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormDestroy(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure miClearClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
     procedure miSelectAllClick(Sender: TObject);
@@ -88,6 +89,12 @@ end;
 procedure TfrmTraceLog.FormDestroy(Sender: TObject);
 begin
   frmTraceLog := nil;
+end;
+
+procedure TfrmTraceLog.FormKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if Key = VK_ESCAPE then Close;
 end;
 
 procedure TfrmTraceLog.miSaveClick(Sender: TObject);

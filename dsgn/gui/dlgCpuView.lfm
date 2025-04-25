@@ -1,12 +1,11 @@
 object frmCpuView: TfrmCpuView
   Left = 889
-  Height = 1304
+  Height = 869
   Top = 243
-  Width = 2096
+  Width = 1397
   Caption = 'Cpu-View'
-  ClientHeight = 1304
-  ClientWidth = 2096
-  DesignTimePPI = 144
+  ClientHeight = 869
+  ClientWidth = 1397
   KeyPreview = True
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
@@ -18,44 +17,44 @@ object frmCpuView: TfrmCpuView
   OnKeyPress = FormKeyPress
   object pnDebug: TPanel
     Left = 0
-    Height = 79
-    Top = 1225
-    Width = 2096
+    Height = 54
+    Top = 815
+    Width = 1397
     Align = alBottom
     AutoSize = True
-    ClientHeight = 79
-    ClientWidth = 2096
+    ClientHeight = 54
+    ClientWidth = 1397
     TabOrder = 0
     object edCommands: TEdit
-      Left = 5
-      Height = 33
-      Top = 5
-      Width = 2086
+      Left = 4
+      Height = 26
+      Top = 4
+      Width = 1389
       Align = alBottom
-      BorderSpacing.Around = 4
+      BorderSpacing.Around = 3
       TabOrder = 0
       TextHint = 'Enter query...'
     end
     object StatusBar: TStatusBar
       Left = 1
-      Height = 36
-      Top = 42
-      Width = 2094
+      Height = 20
+      Top = 33
+      Width = 1395
       Panels = <      
         item
           Text = 'Pid: 0, Tid: 0, State: Unknown'
-          Width = 300
-        end      
-        item
-          Text = 'Module: ""'
           Width = 200
         end      
         item
-          Text = 'Addr: 0x0 (No access)'
-          Width = 350
+          Text = 'Module: ""'
+          Width = 133
         end      
         item
-          Width = 50
+          Text = 'Addr: 0x0 (No access)'
+          Width = 233
+        end      
+        item
+          Width = 33
         end>
       PopupMenu = pmStatusBar
       SimplePanel = False
@@ -63,19 +62,19 @@ object frmCpuView: TfrmCpuView
   end
   object pnAsmReg: TPanel
     Left = 0
-    Height = 686
-    Top = 39
-    Width = 2096
+    Height = 456
+    Top = 26
+    Width = 1397
     Align = alClient
     Caption = 'pnAsmReg'
-    ClientHeight = 686
-    ClientWidth = 2096
+    ClientHeight = 456
+    ClientWidth = 1397
     TabOrder = 1
     object AsmView: TAsmView
       Left = 1
-      Height = 684
+      Height = 454
       Top = 1
-      Width = 1376
+      Width = 917
       Align = alClient
       BorderStyle = bsNone
       PopupMenu = pmAsm
@@ -83,10 +82,10 @@ object frmCpuView: TfrmCpuView
       OnSelectionChange = AsmViewSelectionChange
     end
     object RegView: TRegView
-      Left = 1385
-      Height = 684
+      Left = 923
+      Height = 454
       Top = 1
-      Width = 710
+      Width = 473
       Align = alRight
       BorderStyle = bsNone
       ParentShowHint = False
@@ -97,19 +96,19 @@ object frmCpuView: TfrmCpuView
       OnSelectionChange = RegViewSelectionChange
     end
     object splitAsmReg: TSplitter
-      Left = 1377
-      Height = 684
+      Left = 918
+      Height = 454
       Top = 1
-      Width = 8
+      Width = 5
       Align = alRight
       ResizeAnchor = akRight
     end
   end
   object ToolBar: TToolBar
     Left = 0
-    Height = 39
+    Height = 26
     Top = 0
-    Width = 2096
+    Width = 1397
     Caption = 'ToolBar'
     PopupMenu = pmDebug
     TabOrder = 2
@@ -121,64 +120,64 @@ object frmCpuView: TfrmCpuView
       ShowHint = True
     end
     object tbStepOut: TToolButton
-      Left = 36
+      Left = 24
       Top = 2
       Action = acDbgStepOver
       ParentShowHint = False
       ShowHint = True
     end
     object tbSep1: TToolButton
-      Left = 106
-      Height = 33
+      Left = 70
+      Height = 22
       Top = 2
       Caption = 'tbSep1'
       Style = tbsSeparator
     end
     object tbBreakPoint: TToolButton
-      Left = 114
+      Left = 75
       Top = 2
       Action = acDbgToggleBp
       ParentShowHint = False
       ShowHint = True
     end
     object tbSep2: TToolButton
-      Left = 149
-      Height = 33
+      Left = 98
+      Height = 22
       Top = 2
       Caption = 'tbSep2'
       Style = tbsSeparator
     end
     object tbRunTillRet: TToolButton
-      Left = 71
+      Left = 47
       Top = 2
       Action = acDbgStepOut
       ParentShowHint = False
       ShowHint = True
     end
     object tbRunTo: TToolButton
-      Left = 157
+      Left = 103
       Top = 2
       Action = acDbgRunTo
       ParentShowHint = False
       ShowHint = True
     end
     object tbRunToUserCode: TToolButton
-      Left = 192
+      Left = 126
       Top = 2
       Action = acDbgRunToUserCode
       ParentShowHint = False
       ShowHint = True
     end
     object tbSep3: TToolButton
-      Left = 227
-      Height = 33
+      Left = 149
+      Height = 22
       Top = 2
       Caption = 'tbSep3'
       Style = tbsSeparator
     end
     object tbTraceLog: TToolButton
       Tag = 1
-      Left = 235
+      Left = 154
       Top = 2
       Action = acUtilTraceLog
       ParentShowHint = False
@@ -186,7 +185,7 @@ object frmCpuView: TfrmCpuView
     end
     object ToolButton1: TToolButton
       Tag = 2
-      Left = 270
+      Left = 177
       Top = 2
       Action = acUtilsExports
       ParentShowHint = False
@@ -195,19 +194,19 @@ object frmCpuView: TfrmCpuView
   end
   object pnDumps: TPanel
     Left = 0
-    Height = 492
-    Top = 733
-    Width = 2096
+    Height = 328
+    Top = 487
+    Width = 1397
     Align = alBottom
     Caption = 'pnDumps'
-    ClientHeight = 492
-    ClientWidth = 2096
+    ClientHeight = 328
+    ClientWidth = 1397
     TabOrder = 3
     object memHints: TMemo
       Left = 1
-      Height = 63
+      Height = 42
       Top = 1
-      Width = 2094
+      Width = 1395
       Align = alTop
       Lines.Strings = (
         'Hint text display here'
@@ -219,19 +218,19 @@ object frmCpuView: TfrmCpuView
     end
     object pnDumpStack: TPanel
       Left = 1
-      Height = 427
-      Top = 64
-      Width = 2094
+      Height = 284
+      Top = 43
+      Width = 1395
       Align = alClient
       Caption = 'pnDumpStack'
-      ClientHeight = 427
-      ClientWidth = 2094
+      ClientHeight = 284
+      ClientWidth = 1395
       TabOrder = 1
       object pcDumps: TPageControl
         Left = 1
-        Height = 425
+        Height = 282
         Top = 1
-        Width = 1140
+        Width = 759
         ActivePage = tabDump0
         Align = alClient
         PopupMenu = pmDumps
@@ -240,13 +239,13 @@ object frmCpuView: TfrmCpuView
         OnChange = pcDumpsChange
         object tabDump0: TTabSheet
           Caption = 'DUMP 0'
-          ClientHeight = 387
-          ClientWidth = 1132
+          ClientHeight = 255
+          ClientWidth = 755
           object DumpView: TDumpView
             Left = 0
-            Height = 387
+            Height = 255
             Top = 0
-            Width = 1132
+            Width = 755
             PopupMenu = pmDump
             Align = alClient
             BorderStyle = bsNone
@@ -257,10 +256,10 @@ object frmCpuView: TfrmCpuView
         end
       end
       object StackView: TStackView
-        Left = 1149
-        Height = 425
+        Left = 765
+        Height = 282
         Top = 1
-        Width = 944
+        Width = 629
         PopupMenu = pmStack
         Align = alRight
         BorderStyle = bsNone
@@ -268,10 +267,10 @@ object frmCpuView: TfrmCpuView
         OnSelectionChange = StackViewSelectionChange
       end
       object splitDumpStack: TSplitter
-        Left = 1141
-        Height = 425
+        Left = 760
+        Height = 282
         Top = 1
-        Width = 8
+        Width = 5
         Align = alRight
         ResizeAnchor = akRight
       end
@@ -280,15 +279,15 @@ object frmCpuView: TfrmCpuView
   object splitAsmDumps: TSplitter
     Cursor = crVSplit
     Left = 0
-    Height = 8
-    Top = 725
-    Width = 2096
+    Height = 5
+    Top = 482
+    Width = 1397
     Align = alBottom
     ResizeAnchor = akBottom
   end
   object pmRegSelected: TPopupMenu
-    Left = 1656
-    Top = 176
+    Left = 1104
+    Top = 117
     object miRegIncValue: TMenuItem
       Action = acRegModifyInc
     end
@@ -412,8 +411,8 @@ object frmCpuView: TfrmCpuView
     end
   end
   object ActionList: TActionList
-    Left = 296
-    Top = 96
+    Left = 197
+    Top = 64
     object acVmHex: TCpuContextRegViewModeAction
       Category = 'ViewMode'
     end
@@ -785,6 +784,7 @@ object frmCpuView: TfrmCpuView
       Category = 'Utils'
       Caption = 'Trace Log'
       Hint = 'Show Trace Log Window...'
+      ShortCut = 16468
       OnExecute = acUtilTraceLogExecute
     end
     object acSBShowInDump: TAction
@@ -813,13 +813,14 @@ object frmCpuView: TfrmCpuView
       Category = 'Utils'
       Caption = 'Exports'
       Hint = 'Show the export list window...'
+      ShortCut = 16453
       OnExecute = acUtilsExportsExecute
       OnUpdate = acUtilsExportsUpdate
     end
   end
   object pmStack: TPopupMenu
-    Left = 1656
-    Top = 809
+    Left = 1104
+    Top = 539
     object miStackShowInAsm: TMenuItem
       Action = acShowInAsm
     end
@@ -868,8 +869,8 @@ object frmCpuView: TfrmCpuView
     end
   end
   object pmDump: TPopupMenu
-    Left = 185
-    Top = 1040
+    Left = 123
+    Top = 693
     object miDumpShowInAsm: TMenuItem
       Action = acShowInAsm
     end
@@ -1010,8 +1011,8 @@ object frmCpuView: TfrmCpuView
     end
   end
   object pmAsm: TPopupMenu
-    Left = 449
-    Top = 96
+    Left = 299
+    Top = 64
     object miAsmShowInDump: TMenuItem
       Action = acShowInDump
     end
@@ -1062,18 +1063,18 @@ object frmCpuView: TfrmCpuView
     end
   end
   object pmHint: TPopupMenu
-    Left = 401
-    Top = 744
+    Left = 267
+    Top = 496
   end
   object tmpZOrderLock: TTimer
     Enabled = False
     OnTimer = tmpZOrderLockTimer
-    Left = 656
-    Top = 104
+    Left = 437
+    Top = 69
   end
   object pmDumps: TPopupMenu
-    Left = 368
-    Top = 1040
+    Left = 245
+    Top = 693
     object miDumpsClosePage: TMenuItem
       Action = acDumpsClosePage
     end
@@ -1082,8 +1083,8 @@ object frmCpuView: TfrmCpuView
     end
   end
   object pmDebug: TPopupMenu
-    Left = 984
-    Top = 113
+    Left = 656
+    Top = 75
     object miDebugGenException: TMenuItem
       Caption = 'miDebugGenException'
       OnClick = miDebugGenExceptionClick
@@ -1099,8 +1100,8 @@ object frmCpuView: TfrmCpuView
   end
   object pmStatusBar: TPopupMenu
     OnPopup = pmStatusBarPopup
-    Left = 1505
-    Top = 1152
+    Left = 1003
+    Top = 768
     object miSBShowInDasm: TMenuItem
       Action = acSBShowInAsm
     end
@@ -1122,11 +1123,11 @@ object frmCpuView: TfrmCpuView
     Filter = 'Binary File (*.bin)|*.bin|All Files (*.*)|*.*'
     FilterIndex = 0
     Options = [ofOverwritePrompt, ofPathMustExist, ofEnableSizing, ofViewDetail]
-    Left = 353
-    Top = 432
+    Left = 235
+    Top = 288
   end
   object ilToolBarChars: TImageList
-    Left = 161
-    Top = 96
+    Left = 107
+    Top = 64
   end
 end

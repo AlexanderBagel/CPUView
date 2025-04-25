@@ -7,10 +7,12 @@ object frmTraceLog: TfrmTraceLog
   ClientHeight = 749
   ClientWidth = 1065
   DesignTimePPI = 144
+  KeyPreview = True
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
   OnClose = FormClose
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   object memLog: TMemo
     Left = 0
     Height = 749
