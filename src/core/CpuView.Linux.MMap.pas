@@ -410,7 +410,7 @@ end;
 function TSimpleElf.Rebase(Value: Int64): Int64;
 begin
   if FImageBase <> FLoadedImageBase then
-    Result := Value - FLoadedImageBase + FImageBase
+    Result := Value + FImageBase
   else
     Result := Value;
 end;
