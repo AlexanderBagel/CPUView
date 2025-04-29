@@ -159,6 +159,7 @@ type
     FErrorOnInit: Boolean;
     FProcess: TDbgProcess;
     FRegisterInDebugBoss, FRegisterDestroyNotification: Boolean;
+    FReturnAddrVA: Int64;
     FSupportStream: TRemoteStream;
     FPreviosSrcLine: Integer;
     FPreviosSrcFuncName, FPreviosSrcFileName: string;
@@ -210,6 +211,7 @@ type
     function GetRemoteModules: TList<TRemoteModule>; override;
     function GetRemoteProcList(const AModule: TRemoteModule): TList<TRemoteProc>; override;
     function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; override;
+    function GetReturnAddrVA: Int64; override;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; override;
     function GetUserCodeAddrVA: Int64; override;
@@ -319,6 +321,7 @@ var
   I: Integer;
 begin
   Result := ucNotFound;
+  FReturnAddrVA := 0;
   if FCallStackMonitor = nil then Exit;
   if Assigned(FSnapshotManager) then
     Snap := FSnapshotManager.SelectedEntry
@@ -338,6 +341,8 @@ begin
       Entry := IdeStack.Entries[I];
       if (Entry = nil) or (Entry.Validity <> ddsValid) then
         Exit(ucNeedWait);
+      if I = 1 then
+        FReturnAddrVA := Entry.Address;
       if IsUserCode(Entry.Address) then
       begin
         FUserCodeAddrVA := Entry.Address;
@@ -1151,6 +1156,11 @@ begin
   finally
     Iterator.Free;
   end;
+end;
+
+function TCpuViewDebugGate.GetReturnAddrVA: Int64;
+begin
+  Result := FReturnAddrVA;
 end;
 
 constructor TCpuViewDebugGate.Create(AOwner: TComponent;

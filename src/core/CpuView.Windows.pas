@@ -34,54 +34,15 @@ uses
   CpuView.Common,
   CpuView.IntelContext.Types;
 
-type
-
-  { TCommonUtils }
-
-  TCommonUtils = class(TCommonAbstractUtils)
-  private
-    FProcessHandle: THandle;
-  protected
-    procedure SetProcessID(const Value: Integer); override;
-  public
-    destructor Destroy; override;
-    function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
-    function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
-    function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
-    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
-    function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
-    function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
-    procedure Update; override;
-  end;
-
-  function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-  function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-
-implementation
-
 const
-  SIZE_OF_80387_REGISTERS = 80;
-  MAXIMUM_SUPPORTED_EXTENSION = 512;
-  WOW64_SIZE_OF_80387_REGISTERS = 80;
-  WOW64_MAXIMUM_SUPPORTED_EXTENSION = 512;
-  WOW64_CONTEXT_i386 = $00010000;
-  WOW64_CONTEXT_i486 = $00010000;
-  WOW64_CONTEXT_CONTROL = LongInt(WOW64_CONTEXT_i386 or $00000001);
-  WOW64_CONTEXT_INTEGER = LongInt(WOW64_CONTEXT_i386 or $00000002);
-  WOW64_CONTEXT_SEGMENTS = LongInt(WOW64_CONTEXT_i386 or $00000004);
-  WOW64_CONTEXT_FLOATING_POINT = LongInt(WOW64_CONTEXT_i386 or $00000008);
-  WOW64_CONTEXT_DEBUG_REGISTERS = LongInt(WOW64_CONTEXT_i386 or $00000010);
-  WOW64_CONTEXT_EXTENDED_REGISTERS = LongInt(WOW64_CONTEXT_i386 or $00000020);
-  WOW64_CONTEXT_FULL = (WOW64_CONTEXT_CONTROL or WOW64_CONTEXT_INTEGER or WOW64_CONTEXT_SEGMENTS);
-  WOW64_CONTEXT_WITHOUT_EXTENDED = (WOW64_CONTEXT_FULL or  WOW64_CONTEXT_FLOATING_POINT or WOW64_CONTEXT_DEBUG_REGISTERS);
-  WOW64_CONTEXT_ALL = (WOW64_CONTEXT_WITHOUT_EXTENDED or WOW64_CONTEXT_EXTENDED_REGISTERS);
-  WOW64_CONTEXT_XSTATE = LongInt(WOW64_CONTEXT_i386 or $00000040);
-  WOW64_CONTEXT_EXCEPTION_ACTIVE = $08000000;
-  WOW64_CONTEXT_SERVICE_ACTIVE = $10000000;
-  WOW64_CONTEXT_EXCEPTION_REQUEST = $40000000;
-  WOW64_CONTEXT_EXCEPTION_REPORTING = $80000000;
+  ntdll = 'ntdll.dll';
+  kernel32 = 'kernel32.dll';
+  psapi = 'psapi.dll';
+  imagehlp = 'Imagehlp.dll';
+
+  STATUS_SUCCESS = 0;
+  TH32CS_SNAPTHREAD = 4;
+  FLS_MAXIMUM_AVAILABLE = 128;
 
 type
   LONG = Longint;
@@ -141,6 +102,460 @@ type
   PTHREAD_BASIC_INFORMATION = ^THREAD_BASIC_INFORMATION;
   TThreadBasicInformation = THREAD_BASIC_INFORMATION;
   PThreadBasicInformation = ^TThreadBasicInformation;
+
+  UNICODE_STRING = record
+    Length: WORD;
+    MaximumLength: WORD;
+    Buffer: PWideChar;
+  end;
+  PUNICODE_STRING = ^UNICODE_STRING;
+
+  OBJECT_ATTRIBUTES = record
+    Length: ULONG;
+    RootDirectory: THandle;
+    ObjectName: PUNICODE_STRING;
+    Attributes: ULONG;
+    SecurityDescriptor: Pointer;
+    SecurityQualityOfService: Pointer;
+  end;
+  POBJECT_ATTRIBUTES = ^OBJECT_ATTRIBUTES;
+
+  IO_STATUS_BLOCK = record
+    case integer of
+      0:
+       (Status: DWORD);
+      1:
+       (Pointer: Pointer;
+        Information: ULONG);
+  end;
+  PIO_STATUS_BLOCK = ^IO_STATUS_BLOCK;
+
+  TUNICODE_STRING = packed record
+    Length : WORD;
+    MaximumLength : WORD;
+    Buffer : array [0..MAX_PATH - 1] of WideChar;
+  end;
+
+  POBJECT_NAME_INFORMATION = ^TOBJECT_NAME_INFORMATION;
+  TOBJECT_NAME_INFORMATION = packed record
+    Name : TUNICODE_STRING;
+  end;
+
+  PloadedImage = ^TLoadedImage;
+  {$EXTERNALSYM _LOADED_IMAGE}
+  _LOADED_IMAGE = record
+    ModuleName: LPSTR;
+    hFile: THandle;
+    MappedAddress: PChar;
+    FileHeader: PImageNtHeaders;
+    LastRvaSection: PImageSectionHeader;
+    NumberOfSections: ULONG;
+    Sections: PImageSectionHeader;
+    Characteristics: ULONG;
+    fSystemImage: ByteBool;
+    fDOSImage: ByteBool;
+
+    //Links: TListEntry;  WRONG ONE poiner record with align 16
+    Links: LIST_ENTRY; // Valid two pointer record
+
+    SizeOfImage: ULONG;
+  end;
+  LOADED_IMAGE = _LOADED_IMAGE;
+  LoadedImage = _LOADED_IMAGE;
+  TLoadedImage = _LOADED_IMAGE;
+
+  RTL_DRIVE_LETTER_CURDIR = record
+    Flags: Word;
+    Length: Word;
+    TimeStamp: Cardinal;
+    DosPath: UNICODE_STRING;
+  end;
+
+  PRTL_USER_PROCESS_PARAMETERS = ^RTL_USER_PROCESS_PARAMETERS;
+  RTL_USER_PROCESS_PARAMETERS = record
+    MaximumLength: Cardinal;
+    Length: Cardinal;
+    Flags: Cardinal;
+    DebugFlags: Cardinal;
+    ConsoleHandle: Pointer;
+    ConsoleFlags: Cardinal;
+    StdInputHandle: Cardinal;
+    StdOutputHandle: Cardinal;
+    StdErrorHandle: Cardinal;
+    CurrentDirectoryPath: UNICODE_STRING;
+    CurrentDirectoryHandle: Cardinal;
+    DllPath: UNICODE_STRING;
+    ImagePathName: UNICODE_STRING;
+    CommandLine: UNICODE_STRING;
+    Environment: Pointer;
+    StartingPositionLeft: Cardinal;
+    StartingPositionTop: Cardinal;
+    Width: Cardinal;
+    Height: Cardinal;
+    CharWidth: Cardinal;
+    CharHeight: Cardinal;
+    ConsoleTextAttributes: Cardinal;
+    WindowFlags: Cardinal;
+    ShowWindowFlags: Cardinal;
+    WindowTitle: UNICODE_STRING;
+    DesktopName: UNICODE_STRING;
+    ShellInfo: UNICODE_STRING;
+    RuntimeData: UNICODE_STRING;
+    DLCurrentDirectory: array [0..31] of RTL_DRIVE_LETTER_CURDIR
+  end;
+
+  PPVOID = ^Pointer;
+
+  PPEB = ^TPEB;
+  TPEB = record
+    InheritedAddressSpace: BOOLEAN;
+    ReadImageFileExecOptions: BOOLEAN;
+    BeingDebugged: BOOLEAN;
+    BitField: BOOLEAN;
+        {
+            BOOLEAN ImageUsesLargePages : 1;
+            BOOLEAN IsProtectedProcess : 1;
+            BOOLEAN IsLegacyProcess : 1;
+            BOOLEAN IsImageDynamicallyRelocated : 1;
+            BOOLEAN SkipPatchingUser32Forwarders : 1;
+            BOOLEAN IsPackagedProcess : 1;
+            BOOLEAN IsAppContainer : 1;
+            BOOLEAN SpareBits : 1;
+        }
+    Mutant: HANDLE;
+    ImageBaseAddress: PVOID;
+    LoaderData: PVOID;
+    ProcessParameters: PRTL_USER_PROCESS_PARAMETERS;
+    SubSystemData: PVOID;
+    ProcessHeap: PVOID;
+    FastPebLock: PRTLCriticalSection;
+    AtlThunkSListPtr: PVOID;
+    IFEOKey: PVOID;
+    EnvironmentUpdateCount: ULONG;
+    UserSharedInfoPtr: PVOID;
+    SystemReserved: ULONG;
+    AtlThunkSListPtr32: ULONG;
+    ApiSetMap: PVOID;
+    TlsExpansionCounter: ULONG;
+    TlsBitmap: PVOID;
+    TlsBitmapBits: array[0..1] of ULONG;
+    ReadOnlySharedMemoryBase: PVOID;
+    HotpatchInformation: PVOID;
+    ReadOnlyStaticServerData: PPVOID;
+    AnsiCodePageData: PVOID;
+    OemCodePageData: PVOID;
+    UnicodeCaseTableData: PVOID;
+
+    KeNumberOfProcessors: ULONG;
+    NtGlobalFlag: ULONG;
+
+    CriticalSectionTimeout: LARGE_INTEGER;
+    HeapSegmentReserve: SIZE_T;
+    HeapSegmentCommit: SIZE_T;
+    HeapDeCommitTotalFreeThreshold: SIZE_T;
+    HeapDeCommitFreeBlockThreshold: SIZE_T;
+
+    NumberOfHeaps: ULONG;
+    MaximumNumberOfHeaps: ULONG;
+    ProcessHeaps: PPVOID;
+
+    GdiSharedHandleTable: PVOID;
+    ProcessStarterHelper: PVOID;
+    GdiDCAttributeList: ULONG;
+
+    LoaderLock: PRTLCriticalSection;
+
+    NtMajorVersion: ULONG;
+    NtMinorVersion: ULONG;
+    NtBuildNumber: USHORT;
+    NtCSDVersion: USHORT;
+    PlatformId: ULONG;
+    Subsystem: ULONG;
+    MajorSubsystemVersion: ULONG;
+    MinorSubsystemVersion: ULONG;
+    AffinityMask: ULONG_PTR;
+    {$IFDEF WIN32}
+    GdiHandleBuffer: array [0..33] of ULONG;
+    {$ELSE}
+    GdiHandleBuffer: array [0..59] of ULONG;
+    {$ENDIF}
+    PostProcessInitRoutine: PVOID;
+
+    TlsExpansionBitmap: PVOID;
+    TlsExpansionBitmapBits: array [0..31] of ULONG;
+
+    SessionId: ULONG;
+
+    AppCompatFlags: ULARGE_INTEGER;
+    AppCompatFlagsUser: ULARGE_INTEGER;
+    pShimData: PVOID;
+    AppCompatInfo: PVOID;
+
+    CSDVersion: UNICODE_STRING;
+
+    ActivationContextData: PVOID;
+    ProcessAssemblyStorageMap: PVOID;
+    SystemDefaultActivationContextData: PVOID;
+    SystemAssemblyStorageMap: PVOID;
+
+    MinimumStackCommit: SIZE_T;
+
+    FlsCallback: PPVOID;
+    FlsListHead: LIST_ENTRY;
+    FlsBitmap: PVOID;
+    FlsBitmapBits: array [1..FLS_MAXIMUM_AVAILABLE div SizeOf(ULONG) * 8] of ULONG;
+    FlsHighIndex: ULONG;
+
+    WerRegistrationData: PVOID;
+    WerShipAssertPtr: PVOID;
+    pContextData: PVOID;
+    pImageHeaderHash: PVOID;
+
+    TracingFlags: ULONG;
+        {
+            ULONG HeapTracingEnabled : 1;
+            ULONG CritSecTracingEnabled : 1;
+            ULONG LibLoaderTracingEnabled : 1;
+            ULONG SpareTracingBits : 29;
+        }
+    CsrServerReadOnlySharedMemoryBase: ULONGLONG;
+  end;
+
+  PPROCESS_BASIC_INFORAMTION = ^PROCESS_BASIC_INFORMATION;
+  PROCESS_BASIC_INFORMATION = record
+    ExitStatus: LONG;
+    PebBaseAddress: PPEB;
+    AffinityMask: ULONG_PTR;
+    BasePriority: LONG;
+    uUniqueProcessId: ULONG_PTR;
+    uInheritedFromUniqueProcessId: ULONG_PTR;
+  end;
+
+  TThreadEntry32 = record
+    dwSize: DWORD;
+    cntUsage: DWORD;
+    th32ThreadID: DWORD;       // this thread
+    th32OwnerProcessID: DWORD; // Process this thread is associated with
+    tpBasePri: Longint;
+    tpDeltaPri: Longint;
+    dwFlags: DWORD;
+  end;
+
+  WOW64_POINTER = ULONG;
+
+  UNICODE_STRING32 = record
+    Length: USHORT;
+    MaximumLength: USHORT;
+    Buffer: ULONG;
+  end;
+
+  LIST_ENTRY_32 = record
+    FLink, BLink: ULONG;
+  end;
+
+  PLIST_ENTRY = ^LIST_ENTRY;
+  LIST_ENTRY = record
+    FLink, BLink: PLIST_ENTRY;
+  end;
+
+  PWOW64_PEB = ^TWOW64_PEB;
+  TWOW64_PEB = record
+    InheritedAddressSpace: BOOLEAN;
+    ReadImageFileExecOptions: BOOLEAN;
+    BeingDebugged: BOOLEAN;
+    BitField: BOOLEAN;
+        {
+            BOOLEAN ImageUsesLargePages : 1;
+            BOOLEAN IsProtectedProcess : 1;
+            BOOLEAN IsLegacyProcess : 1;
+            BOOLEAN IsImageDynamicallyRelocated : 1;
+            BOOLEAN SkipPatchingUser32Forwarders : 1;
+            BOOLEAN IsPackagedProcess : 1;
+            BOOLEAN IsAppContainer : 1;
+            BOOLEAN SpareBits : 1;
+        }
+    Mutant: WOW64_POINTER;
+    ImageBaseAddress: WOW64_POINTER;
+    LoaderData: WOW64_POINTER;
+    ProcessParameters: WOW64_POINTER;
+    SubSystemData: WOW64_POINTER;
+    ProcessHeap: WOW64_POINTER;
+    FastPebLock: WOW64_POINTER;
+    AtlThunkSListPtr: WOW64_POINTER;
+    IFEOKey: WOW64_POINTER;
+    EnvironmentUpdateCount: ULONG;
+    UserSharedInfoPtr: WOW64_POINTER;
+    SystemReserved: ULONG;
+    AtlThunkSListPtr32: ULONG;
+    ApiSetMap: WOW64_POINTER;
+    TlsExpansionCounter: ULONG;
+    TlsBitmap: WOW64_POINTER;
+    TlsBitmapBits: array[0..1] of ULONG;
+    ReadOnlySharedMemoryBase: WOW64_POINTER;
+    HotpatchInformation: WOW64_POINTER;
+    ReadOnlyStaticServerData: WOW64_POINTER;
+    AnsiCodePageData: WOW64_POINTER;
+    OemCodePageData: WOW64_POINTER;
+    UnicodeCaseTableData: WOW64_POINTER;
+
+    KeNumberOfProcessors: ULONG;
+    NtGlobalFlag: ULONG;
+
+    CriticalSectionTimeout: LARGE_INTEGER;
+    HeapSegmentReserve: WOW64_POINTER;
+    HeapSegmentCommit: WOW64_POINTER;
+    HeapDeCommitTotalFreeThreshold: WOW64_POINTER;
+    HeapDeCommitFreeBlockThreshold: WOW64_POINTER;
+
+    NumberOfHeaps: ULONG;
+    MaximumNumberOfHeaps: ULONG;
+    ProcessHeaps: WOW64_POINTER;
+
+    GdiSharedHandleTable: WOW64_POINTER;
+    ProcessStarterHelper: WOW64_POINTER;
+    GdiDCAttributeList: ULONG;
+
+    LoaderLock: WOW64_POINTER;
+
+    NtMajorVersion: ULONG;
+    NtMinorVersion: ULONG;
+    NtBuildNumber: USHORT;
+    NtCSDVersion: USHORT;
+    PlatformId: ULONG;
+    Subsystem: ULONG;
+    MajorSubsystemVersion: ULONG;
+    MinorSubsystemVersion: ULONG;
+    AffinityMask: WOW64_POINTER;
+    GdiHandleBuffer: array [0..33] of ULONG;
+    PostProcessInitRoutine: WOW64_POINTER;
+
+    TlsExpansionBitmap: WOW64_POINTER;
+    TlsExpansionBitmapBits: array [0..31] of ULONG;
+
+    SessionId: ULONG;
+
+    AppCompatFlags: ULARGE_INTEGER;
+    AppCompatFlagsUser: ULARGE_INTEGER;
+    pShimData: WOW64_POINTER;
+    AppCompatInfo: WOW64_POINTER;
+
+    CSDVersion: UNICODE_STRING32;
+
+    ActivationContextData: WOW64_POINTER;
+    ProcessAssemblyStorageMap: WOW64_POINTER;
+    SystemDefaultActivationContextData: WOW64_POINTER;
+    SystemAssemblyStorageMap: WOW64_POINTER;
+
+    MinimumStackCommit: WOW64_POINTER;
+
+    FlsCallback: WOW64_POINTER;
+    FlsListHead: LIST_ENTRY_32;
+    FlsBitmap: WOW64_POINTER;
+    FlsBitmapBits: array [1..FLS_MAXIMUM_AVAILABLE div SizeOf(ULONG) * 8] of ULONG;
+    FlsHighIndex: ULONG;
+
+    WerRegistrationData: WOW64_POINTER;
+    WerShipAssertPtr: WOW64_POINTER;
+    pContextData: WOW64_POINTER;
+    pImageHeaderHash: WOW64_POINTER;
+
+    TracingFlags: ULONG;
+        {
+            ULONG HeapTracingEnabled : 1;
+            ULONG CritSecTracingEnabled : 1;
+            ULONG LibLoaderTracingEnabled : 1;
+            ULONG SpareTracingBits : 29;
+        }
+    CsrServerReadOnlySharedMemoryBase: ULONGLONG;
+  end;
+
+  { TCommonUtils }
+
+  TCommonUtils = class(TCommonAbstractUtils)
+  private
+    FProcessHandle: THandle;
+  protected
+    procedure SetProcessID(const Value: Integer); override;
+  public
+    destructor Destroy; override;
+    function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
+    function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
+    function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
+    function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
+    function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
+    procedure Update; override;
+  end;
+
+  function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
+  function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
+  function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+
+  function GetMappedFileName(hProcess: THandle; AddrVA: Pointer; out AModuleName: string): Boolean;
+
+  function NtQueryInformationThread(ThreadHandle: THandle;
+    ThreadInformationClass: DWORD;
+    ThreadInformation: Pointer; ThreadInformationLength: ULONG;
+    ReturnLength: PULONG): NTSTATUS; stdcall; external ntdll;
+  function GetMappedFileNameW(hProcess: THandle; lpv: Pointer;
+    lpFilename: LPCWSTR; nSize: DWORD): DWORD; stdcall; external psapi;
+  procedure RtlInitUnicodeString(
+    DestinationString : PUNICODE_STRING;
+    SourceString : LPCWSTR); stdcall; external ntdll;
+  function ZwClose(AHandle: THandle): DWORD; stdcall; external ntdll;
+  function ZwOpenFile(FileHandle: PHANDLE; DesiredAccess: ACCESS_MASK;
+    ObjectAttributes: POBJECT_ATTRIBUTES; IoStatusBlock: PIO_STATUS_BLOCK;
+    ShareAccess: ULONG; OpenOptions: ULONG): DWORD; stdcall; external ntdll;
+  function NtQueryObject(ObjectHandle: THandle;
+    ObjectInformationClass: DWORD; ObjectInformation: Pointer;
+    ObjectInformationLength: ULONG;
+    ReturnLength: PDWORD): DWORD; stdcall; external ntdll;
+  function NtQueryInformationProcess(ProcessHandle: Cardinal;
+    ProcessInformationClass: Integer;
+    ProcessInformation: Pointer;
+    ProcessInformationLength: Cardinal;
+    ReturnLength: PCardinal): NTStatus; stdcall; external ntdll;
+  function ImageDirectoryEntryToDataEx(Base: Pointer; MappedAsImage: ByteBool;
+    DirectoryEntry: Word; var Size: ULONG;
+    var FoundHeader: PImageSectionHeader): Pointer; stdcall;
+    external imagehlp;
+  function MapAndLoad(ImageName, DllPath: LPSTR; LoadedImage: PLoadedImage;
+    DotDll, ReadOnly: Bool): Bool; stdcall; external imagehlp;
+  function UnMapAndLoad(LoadedImage: PLoadedImage): Bool; stdcall;
+    external imagehlp;
+  function CreateToolhelp32Snapshot(dwFlags, th32ProcessID: DWORD): THandle;
+    external kernel32;
+  function Thread32First(hSnapshot: THandle; var lpte: TThreadEntry32): BOOL; stdcall;
+    external kernel32;
+  function Thread32Next(hSnapshot: THandle; var lpte: TThreadENtry32): BOOL; stdcall;
+    external kernel32;
+
+implementation
+
+const
+  SIZE_OF_80387_REGISTERS = 80;
+  MAXIMUM_SUPPORTED_EXTENSION = 512;
+  WOW64_SIZE_OF_80387_REGISTERS = 80;
+  WOW64_MAXIMUM_SUPPORTED_EXTENSION = 512;
+  WOW64_CONTEXT_i386 = $00010000;
+  WOW64_CONTEXT_i486 = $00010000;
+  WOW64_CONTEXT_CONTROL = LongInt(WOW64_CONTEXT_i386 or $00000001);
+  WOW64_CONTEXT_INTEGER = LongInt(WOW64_CONTEXT_i386 or $00000002);
+  WOW64_CONTEXT_SEGMENTS = LongInt(WOW64_CONTEXT_i386 or $00000004);
+  WOW64_CONTEXT_FLOATING_POINT = LongInt(WOW64_CONTEXT_i386 or $00000008);
+  WOW64_CONTEXT_DEBUG_REGISTERS = LongInt(WOW64_CONTEXT_i386 or $00000010);
+  WOW64_CONTEXT_EXTENDED_REGISTERS = LongInt(WOW64_CONTEXT_i386 or $00000020);
+  WOW64_CONTEXT_FULL = (WOW64_CONTEXT_CONTROL or WOW64_CONTEXT_INTEGER or WOW64_CONTEXT_SEGMENTS);
+  WOW64_CONTEXT_WITHOUT_EXTENDED = (WOW64_CONTEXT_FULL or  WOW64_CONTEXT_FLOATING_POINT or WOW64_CONTEXT_DEBUG_REGISTERS);
+  WOW64_CONTEXT_ALL = (WOW64_CONTEXT_WITHOUT_EXTENDED or WOW64_CONTEXT_EXTENDED_REGISTERS);
+  WOW64_CONTEXT_XSTATE = LongInt(WOW64_CONTEXT_i386 or $00000040);
+  WOW64_CONTEXT_EXCEPTION_ACTIVE = $08000000;
+  WOW64_CONTEXT_SERVICE_ACTIVE = $10000000;
+  WOW64_CONTEXT_EXCEPTION_REQUEST = $40000000;
+  WOW64_CONTEXT_EXCEPTION_REPORTING = $80000000;
+
+type
 
   TWow64FloatingSaveArea = packed record
     ControlWord: DWORD;
@@ -258,16 +673,10 @@ const
     stdcall; external kernel32;
   function LocateXStateFeature(Context: PContext; FeatureId: DWORD; Len: PDWORD): Pointer;
     stdcall; external kernel32;
-  function NtQueryInformationThread(ThreadHandle: THandle;
-    ThreadInformationClass: DWORD;
-    ThreadInformation: Pointer; ThreadInformationLength: ULONG;
-    ReturnLength: PULONG): NTSTATUS; stdcall; external 'ntdll.dll';
   function Wow64GetThreadContext(hThread: THandle; Context: PWow64Context): BOOL;
     stdcall; external kernel32;
   function Wow64SetThreadContext(hThread: THandle; const lpContext: TWow64Context): BOOL;
     stdcall; external kernel32;
-  function GetMappedFileNameW(hProcess: THandle; lpv: Pointer;
-    lpFilename: LPCWSTR; nSize: DWORD): DWORD; stdcall; external 'psapi.dll';
 
 // CONTEXT structure for AMD64 needs to be aligned on a 16-byte boundary
 function Amd64Align(Src: Pointer): Pointer;
@@ -732,6 +1141,19 @@ begin
   end;
 end;
 
+function GetMappedFileName(hProcess: THandle; AddrVA: Pointer;
+  out AModuleName: string): Boolean;
+var
+  ModulePath: UnicodeString;
+  ALength: DWORD;
+begin
+  SetLength(ModulePath{%H-}, MAX_PATH);
+  ALength := GetMappedFileNameW(hProcess, {%H-}AddrVA, @ModulePath[1], MAX_PATH);
+  Result := ALength > 0;
+  SetLength(ModulePath, ALength);
+  AModuleName := string(ModulePath);
+end;
+
 function GetThreadNativeStackLimit(ProcessHandle: THandle; ThreadID: DWORD): TStackLimit;
 var
   hThread: THandle;
@@ -945,15 +1367,8 @@ begin
 end;
 
 function TCommonUtils.QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean;
-var
-  ModulePath: UnicodeString;
-  ALength: DWORD;
 begin
-  SetLength(ModulePath{%H-}, MAX_PATH);
-  ALength := GetMappedFileNameW(FProcessHandle, {%H-}Pointer(AddrVA), @ModulePath[1], MAX_PATH);
-  Result := ALength > 0;
-  SetLength(ModulePath, ALength);
-  AModuleName := string(ModulePath);
+  Result := GetMappedFileName(FProcessHandle, {%H-}Pointer(AddrVA), AModuleName);
 end;
 
 function TCommonUtils.QueryRegion(AddrVA: Int64;

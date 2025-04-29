@@ -1,11 +1,12 @@
 object frmProcExports: TfrmProcExports
   Left = 1203
-  Height = 357
+  Height = 536
   Top = 640
-  Width = 723
+  Width = 1084
   Caption = 'frmProcExports'
-  ClientHeight = 357
-  ClientWidth = 723
+  ClientHeight = 536
+  ClientWidth = 1084
+  DesignTimePPI = 144
   KeyPreview = True
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
@@ -14,9 +15,9 @@ object frmProcExports: TfrmProcExports
   OnKeyPress = FormKeyPress
   object lvExports: TLazVirtualStringTree
     Left = 0
-    Height = 357
+    Height = 536
     Top = 0
-    Width = 723
+    Width = 1084
     Align = alClient
     DefaultText = 'Node'
     Header.AutoSizeIndex = 2
@@ -24,33 +25,35 @@ object frmProcExports: TfrmProcExports
       item
         Position = 0
         Text = 'Address'
-        Width = 133
+        Width = 200
       end    
       item
         Position = 1
         Text = 'Module'
-        Width = 133
+        Width = 200
       end    
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAllowFocus]
         Position = 2
         Text = 'Function'
-        Width = 455
+        Width = 680
       end>
-    Header.Height = 14
-    Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoShowSortGlyphs, hoVisible]
+    Header.Height = 48
+    Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoOwnerDraw, hoShowSortGlyphs, hoVisible]
     PopupMenu = pmCopy
     TabOrder = 0
     TreeOptions.PaintOptions = [toHideFocusRect, toShowButtons, toShowDropmark, toShowRoot, toShowVertGridLines, toThemeAware, toUseBlendedImages, toUseBlendedSelection, toUseExplorerTheme]
     TreeOptions.SelectionOptions = [toFullRowSelect]
+    OnAdvancedHeaderDraw = lvExportsAdvancedHeaderDraw
     OnDblClick = lvExportsDblClick
     OnGetText = lvExportsGetText
     OnHeaderClick = lvExportsHeaderClick
+    OnHeaderDrawQueryElements = lvExportsHeaderDrawQueryElements
   end
   object pmCopy: TPopupMenu
     OnPopup = pmCopyPopup
-    Left = 128
-    Top = 91
+    Left = 192
+    Top = 137
     object miFollowAsm: TMenuItem
       Caption = 'Open in Cpu-View'
       OnClick = miFollowAsmClick

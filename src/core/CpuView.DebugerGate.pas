@@ -121,6 +121,7 @@ type
     function GetRemoteModules: TList<TRemoteModule>; virtual; abstract;
     function GetRemoteProcList(const AModule: TRemoteModule): TList<TRemoteProc>; virtual; abstract;
     function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; virtual; abstract;
+    function GetReturnAddrVA: Int64; virtual; abstract;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;
     function GetUserCodeAddrVA: Int64; virtual; abstract;

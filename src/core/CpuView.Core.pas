@@ -227,6 +227,7 @@ type
     procedure ShowDumpAtAddr(AddrVA: Int64; PushToJmpStack: Boolean = True); overload;
     procedure ShowDumpAtAddr(AddrVA: Int64; ASelLength: Integer; PushToJmpStack: Boolean = True); overload;
     procedure ShowStackAtAddr(AddrVA: Int64);
+    procedure TraceTilReturn;
     procedure TraceToUserCode;
     procedure UpdateAfterSettingsChange;
     function UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue): Boolean;
@@ -1569,6 +1570,17 @@ procedure TCpuViewCore.ShowStackAtAddr(AddrVA: Int64);
 begin
   if Assigned(FStackView) then
     FStackView.JumpToAddress(AddrVA);
+end;
+
+procedure TCpuViewCore.TraceTilReturn;
+var
+  RetAddrVA: Int64;
+begin
+  RetAddrVA := FDebugger.GetReturnAddrVA;
+  if (RetAddrVA = 0) or FDebugger.IsUserCode(RetAddrVA) then
+    FDebugger.TraceTilReturn
+  else
+    FDebugger.TraceTo(RetAddrVA);
 end;
 
 procedure TCpuViewCore.TraceToUserCode;

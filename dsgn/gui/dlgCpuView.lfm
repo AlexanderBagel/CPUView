@@ -1,7 +1,7 @@
 object frmCpuView: TfrmCpuView
-  Left = 889
+  Left = 458
   Height = 869
-  Top = 243
+  Top = 0
   Width = 1397
   Caption = 'Cpu-View'
   ClientHeight = 869
@@ -74,7 +74,7 @@ object frmCpuView: TfrmCpuView
       Left = 1
       Height = 454
       Top = 1
-      Width = 917
+      Width = 1075
       Align = alClient
       BorderStyle = bsNone
       PopupMenu = pmAsm
@@ -82,10 +82,10 @@ object frmCpuView: TfrmCpuView
       OnSelectionChange = AsmViewSelectionChange
     end
     object RegView: TRegView
-      Left = 923
+      Left = 1081
       Height = 454
       Top = 1
-      Width = 473
+      Width = 315
       Align = alRight
       BorderStyle = bsNone
       ParentShowHint = False
@@ -96,7 +96,7 @@ object frmCpuView: TfrmCpuView
       OnSelectionChange = RegViewSelectionChange
     end
     object splitAsmReg: TSplitter
-      Left = 918
+      Left = 1076
       Height = 454
       Top = 1
       Width = 5
@@ -183,11 +183,19 @@ object frmCpuView: TfrmCpuView
       ParentShowHint = False
       ShowHint = True
     end
-    object ToolButton1: TToolButton
+    object tbExports: TToolButton
       Tag = 2
       Left = 177
       Top = 2
       Action = acUtilsExports
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object tbMemoosyMap: TToolButton
+      Tag = 3
+      Left = 200
+      Top = 2
+      Action = acUtilsMM
       ParentShowHint = False
       ShowHint = True
     end
@@ -317,6 +325,9 @@ object frmCpuView: TfrmCpuView
     end
     object miRegShowInNewDump: TMenuItem
       Action = acShowInNewDump
+    end
+    object miRegShowInMM: TMenuItem
+      Action = acShowInMemoryMap
     end
     object miRegSep2: TMenuItem
       Caption = '-'
@@ -815,7 +826,21 @@ object frmCpuView: TfrmCpuView
       Hint = 'Show the export list window...'
       ShortCut = 16453
       OnExecute = acUtilsExportsExecute
-      OnUpdate = acUtilsExportsUpdate
+      OnUpdate = DefaultActionUpdate
+    end
+    object acUtilsMM: TAction
+      Category = 'Utils'
+      Caption = 'Memory Map'
+      Hint = 'Show process memory map...'
+      ShortCut = 16461
+      OnExecute = acUtilsMMExecute
+      OnUpdate = DefaultActionUpdate
+    end
+    object acShowInMemoryMap: TAction
+      Category = 'Goto Actions'
+      Caption = 'Show In Memory Map...'
+      OnExecute = acShowInMemoryMapExecute
+      OnUpdate = DefaultActionUpdate
     end
   end
   object pmStack: TPopupMenu
@@ -832,6 +857,9 @@ object frmCpuView: TfrmCpuView
     end
     object miStackShowInNewDump: TMenuItem
       Action = acShowInNewDump
+    end
+    object miStackShowInMM: TMenuItem
+      Action = acShowInMemoryMap
     end
     object miStackSep0: TMenuItem
       Caption = '-'
@@ -882,6 +910,9 @@ object frmCpuView: TfrmCpuView
     end
     object miDumpShowInNewDump: TMenuItem
       Action = acShowInNewDump
+    end
+    object miDumpShowInMM: TMenuItem
+      Action = acShowInMemoryMap
     end
     object miDumpSep0: TMenuItem
       Caption = '-'
@@ -1021,6 +1052,9 @@ object frmCpuView: TfrmCpuView
     end
     object miAsmShowInStack: TMenuItem
       Action = acShowInStack
+    end
+    object miAsmShowInMM: TMenuItem
+      Action = acShowInMemoryMap
     end
     object miAsmSource: TMenuItem
       Action = acAsmShowSource

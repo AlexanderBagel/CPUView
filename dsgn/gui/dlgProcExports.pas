@@ -28,10 +28,18 @@ uses
   laz.VirtualTrees,
 
   CpuView.Common,
-  CpuView.Core,
-  CpuView.DebugerGate;
+  CpuView.Core;
 
 type
+
+  { TLazVirtualStringTree }
+
+  TLazVirtualStringTree = class(laz.VirtualTrees.TLazVirtualStringTree)
+  protected
+    procedure AutoScale; override;
+    procedure DoTextDrawing(var PaintInfo: TVTPaintInfo; const AText: string;
+      CellRect: TRect; DrawFormat: Cardinal); override;
+  end;
 
   TRemoteExport = record
     AddrVA: Int64;
@@ -57,11 +65,15 @@ type
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyPress(Sender: TObject; var Key: char);
+    procedure lvExportsAdvancedHeaderDraw(Sender: TVTHeader;
+      var PaintInfo: THeaderPaintInfo; const Elements: THeaderPaintElements);
     procedure lvExportsDblClick(Sender: TObject);
     procedure lvExportsGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; TextType: TVSTTextType; var CellText: String);
     procedure lvExportsHeaderClick(Sender: TVTHeader; HitInfo: TVTHeaderHitInfo
       );
+    procedure lvExportsHeaderDrawQueryElements(Sender: TVTHeader;
+      var PaintInfo: THeaderPaintInfo; var Elements: THeaderPaintElements);
     procedure miCopyAddrClick(Sender: TObject);
     procedure miCopyFuncClick(Sender: TObject);
     procedure miCopyLineClick(Sender: TObject);
@@ -89,6 +101,32 @@ const
   RootCaption = 'CpuView - Exports';
 
 {$R *.lfm}
+
+{ TLazVirtualStringTree }
+
+procedure TLazVirtualStringTree.AutoScale;
+var
+  Enum: TVTVirtualNodeEnumerator;
+begin
+  BeginUpdate;
+  try
+    Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
+    inherited AutoScale;
+    DefaultNodeHeight := Scale96ToFont(DEFAULT_NODE_HEIGHT);
+    Enum := Nodes.GetEnumerator;
+    while Enum.MoveNext do
+      NodeHeight[Enum.Current] := DefaultNodeHeight;
+  finally
+    EndUpdate;
+  end;
+end;
+
+procedure TLazVirtualStringTree.DoTextDrawing(var PaintInfo: TVTPaintInfo;
+  const AText: string; CellRect: TRect; DrawFormat: Cardinal);
+begin
+  PaintInfo.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
+  inherited DoTextDrawing(PaintInfo, AText, CellRect, DrawFormat);
+end;
 
 { TfrmProcExports }
 
@@ -148,6 +186,12 @@ begin
   TmpString := SearchString + AnsiUpperCase(Key);
   if Search(TmpString) then
     SearchString := TmpString;
+end;
+
+procedure TfrmProcExports.lvExportsAdvancedHeaderDraw(Sender: TVTHeader;
+  var PaintInfo: THeaderPaintInfo; const Elements: THeaderPaintElements);
+begin
+  PaintInfo.TargetCanvas.Font.PixelsPerInch := Font.PixelsPerInch;
 end;
 
 procedure TfrmProcExports.lvExportsDblClick(Sender: TObject);
@@ -220,6 +264,14 @@ begin
   end;
 
   FCurrentList.Sort(TComparer<TRemoteExport>.Construct(DefaultExportDataComparer));
+end;
+
+procedure TfrmProcExports.lvExportsHeaderDrawQueryElements(Sender: TVTHeader;
+  var PaintInfo: THeaderPaintInfo; var Elements: THeaderPaintElements);
+begin
+  Elements := [];
+  PaintInfo.TargetCanvas.Font.PixelsPerInch := Font.PixelsPerInch;
+  PaintInfo.TargetCanvas.Font.Assign(Font);
 end;
 
 procedure TfrmProcExports.miCopyAddrClick(Sender: TObject);

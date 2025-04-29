@@ -176,6 +176,14 @@
         <Filename Value="dsgn\gui\dlgProcExports.pas"/>
         <UnitName Value="dlgProcExports"/>
       </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgMemoryMap.pas"/>
+        <UnitName Value="dlgMemoryMap"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.Windows.MMap.pas"/>
+        <UnitName Value="CpuView.Windows.MMap"/>
+      </Item>
     </Files>
     <RequiredPkgs>
       <Item>

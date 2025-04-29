@@ -29,6 +29,7 @@ uses
 
   dlgCpuView,
   dlgProcExports,
+  dlgMemoryMap,
 
   FWHexView.Common,
   FWHexView.Actions,
@@ -412,6 +413,7 @@ begin
   edCommands.Text := '';
   memHints.Text := '';
   FreeAndNil(frmProcExports);
+  FreeAndNil(frmMemoryMap);
   UpdateStatusBar;
 end;
 

@@ -49,7 +49,7 @@ uses
 
 type
   TMemoryBasicInformation = record
-    AllocationBase, BaseAddress, RegionSize, OffsetInFile: Int64;
+    AllocationBase, BaseAddress, RegionSize, OffsetInFile, InumIdx: Int64;
     Read, Write, Execute, Shared: Boolean;
     MappedFile, Hint: string;
   end;
@@ -113,6 +113,9 @@ type
   function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
   function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
   function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+
+  function LoadVirtualMemoryInformation(AProcessID, AThreadID: Integer;
+    AddFirstEmpty: Boolean = True): TMemoryBasicInformationList;
 
 var
   LinuxDebugger: TFpDebugDebuggerBase;
@@ -289,7 +292,8 @@ begin
       Result := 1;
 end;
 
-function LoadVirtualMemoryInformation(AProcessID, AThreadID: Integer): TMemoryBasicInformationList;
+function LoadVirtualMemoryInformation(AProcessID, AThreadID: Integer;
+  AddFirstEmpty: Boolean): TMemoryBasicInformationList;
 var
   MapsPath, Line: string;
   VMData: TStringList;
@@ -297,7 +301,7 @@ var
   InumDict: TDictionary<Int64, Int64>;
   FirstMBI, MBI: TMemoryBasicInformation;
   I: Integer;
-  HighIdx, DummyIdx, InumIdx: Int64;
+  HighIdx, DummyIdx: Int64;
   buff: PByte;
   Delimiter: Char;
 begin
@@ -336,15 +340,15 @@ begin
         buff := ScanChar(buff, Delimiter);
         buff := ScanHex(buff, DummyIdx);
 
-        buff := ScanHex(buff, InumIdx);
-        if InumIdx = 0 then
+        buff := ScanHex(buff, MBI.InumIdx);
+        if MBI.InumIdx = 0 then
           MBI.AllocationBase := MBI.BaseAddress
         else
         begin
-          if not InumDict.TryGetValue(InumIdx, MBI.AllocationBase) then
+          if not InumDict.TryGetValue(MBI.InumIdx, MBI.AllocationBase) then
           begin
             MBI.AllocationBase := MBI.BaseAddress;
-            InumDict.Add(InumIdx, MBI.AllocationBase);
+            InumDict.Add(MBI.InumIdx, MBI.AllocationBase);
           end;
         end;
 
@@ -361,7 +365,7 @@ begin
         end;
 
         // special case... first empty region
-        if Result.Count = 0 then
+        if AddFirstEmpty and (Result.Count = 0) then
         begin
           FirstMBI := Default(TMemoryBasicInformation);
           FirstMBI.RegionSize := MBI.AllocationBase;

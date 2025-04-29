@@ -50,6 +50,7 @@ uses
   dlgTraceLog,
   dlgSimd87Editor,
   dlgProcExports,
+  dlgMemoryMap,
 
   uni_profiler;
 
@@ -116,6 +117,8 @@ type
     acSaveRawDump: TAction;
     acSBShowInDump: TAction;
     acSBShowInAsm: TAction;
+    acShowInMemoryMap: TAction;
+    acUtilsMM: TAction;
     acUtilsExports: TAction;
     acUtilTraceLog: TAction;
     acViewGoto: TAction;
@@ -165,6 +168,10 @@ type
     acDMText: THexViewByteViewModeAction;
     ilToolBarChars: TImageList;
     memHints: TMemo;
+    miStackShowInMM: TMenuItem;
+    miRegShowInMM: TMenuItem;
+    miAsmShowInMM: TMenuItem;
+    miDumpShowInMM: TMenuItem;
     miSBFollowInDump: TMenuItem;
     miSBShowInDasm: TMenuItem;
     miStackDump: TMenuItem;
@@ -325,7 +332,8 @@ type
     tbRunToUserCode: TToolButton;
     tbSep3: TToolButton;
     tbTraceLog: TToolButton;
-    ToolButton1: TToolButton;
+    tbExports: TToolButton;
+    tbMemoosyMap: TToolButton;
     procedure acAsmReturnToIPExecute(Sender: TObject);
     procedure acAsmReturnToIPUpdate(Sender: TObject);
     procedure acAsmSetNewIPExecute(Sender: TObject);
@@ -362,6 +370,7 @@ type
     procedure acShowInAsmUpdate(Sender: TObject);
     procedure acShowInDumpExecute(Sender: TObject);
     procedure acShowInDumpUpdate(Sender: TObject);
+    procedure acShowInMemoryMapExecute(Sender: TObject);
     procedure acShowInNewDumpExecute(Sender: TObject);
     procedure acShowInStackExecute(Sender: TObject);
     procedure acShowInStackUpdate(Sender: TObject);
@@ -373,7 +382,7 @@ type
     procedure acTEAnsiUpdate(Sender: TObject);
     procedure ActionRegModifyUpdate(Sender: TObject);
     procedure acUtilsExportsExecute(Sender: TObject);
-    procedure acUtilsExportsUpdate(Sender: TObject);
+    procedure acUtilsMMExecute(Sender: TObject);
     procedure acUtilTraceLogExecute(Sender: TObject);
     procedure acViewFitColumnToBestSizeExecute(Sender: TObject);
     procedure acViewGotoExecute(Sender: TObject);
@@ -435,6 +444,7 @@ type
     function GetContext: TCommonCpuContext; virtual; abstract;
     procedure GenerateToolBarImages;
     procedure InitStatusBarValues(APanelIndex: Integer); virtual;
+    procedure OpenMM(AddrVA: Int64);
     function ToDpi(Value: Integer): Integer;
     function ToDefaultDpi(Value: Integer): Integer;
     procedure LockZOrder;
@@ -558,6 +568,8 @@ end;
 
 procedure TfrmCpuView.FormDestroy(Sender: TObject);
 begin
+  FreeAndNil(frmMemoryMap);
+  FreeAndNil(frmProcExports);
   ResetHooks;
   SaveSettings;
   BeforeDbgGateDestroy;
@@ -991,6 +1003,21 @@ begin
   acSBCopyScriptorValue.Enabled := SBPanelValue <> '';
 end;
 
+procedure TfrmCpuView.OpenMM(AddrVA: Int64);
+begin
+  if frmMemoryMap = nil then
+  begin
+    frmMemoryMap := TfrmMemoryMap.Create(Self);
+    frmMemoryMap.Init(FCore, Self, FDbgGate.ProcessID,
+      FDbgGate.PointerSize = 8, AddrVA);
+  end
+  else
+  begin
+    frmMemoryMap.Refresh(AddrVA);
+    frmMemoryMap.BringToFront;
+  end;
+end;
+
 function TfrmCpuView.ToDpi(Value: Integer): Integer;
 begin
   Result := MulDiv(Value, PixelsPerInch, 96);
@@ -1080,9 +1107,9 @@ begin
     frmProcExports.BringToFront;
 end;
 
-procedure TfrmCpuView.acUtilsExportsUpdate(Sender: TObject);
+procedure TfrmCpuView.acUtilsMMExecute(Sender: TObject);
 begin
-  TAction(Sender).Enabled := FDbgGate.DebugState = adsPaused;
+  OpenMM(0);
 end;
 
 procedure TfrmCpuView.acUtilTraceLogExecute(Sender: TObject);
@@ -1157,6 +1184,11 @@ begin
   TAction(Sender).Enabled :=
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInDump(ActiveViewerSelectedValue);
+end;
+
+procedure TfrmCpuView.acShowInMemoryMapExecute(Sender: TObject);
+begin
+  OpenMM(ActiveViewerSelectedValue);
 end;
 
 procedure TfrmCpuView.acShowInNewDumpExecute(Sender: TObject);
@@ -1372,7 +1404,7 @@ end;
 procedure TfrmCpuView.acDbgStepOutExecute(Sender: TObject);
 begin
   LockZOrder;
-  DbgGate.TraceTilReturn;
+  Core.TraceTilReturn;
 end;
 
 procedure TfrmCpuView.acAsmShowSourceUpdate(Sender: TObject);
