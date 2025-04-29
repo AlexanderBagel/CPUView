@@ -50,17 +50,17 @@ type
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; {%H-}Shift: TShiftState);
     procedure FormShow(Sender: TObject);
     procedure lblUrlClick(Sender: TObject);
     procedure lvMemoryMapAdvancedHeaderDraw(Sender: TVTHeader;
-      var PaintInfo: THeaderPaintInfo; const Elements: THeaderPaintElements);
+      var PaintInfo: THeaderPaintInfo; const {%H-}Elements: THeaderPaintElements);
     procedure lvMemoryMapBeforeItemErase(Sender: TBaseVirtualTree;
-      TargetCanvas: TCanvas; Node: PVirtualNode; const ItemRect: TRect;
-      var ItemColor: TColor; var EraseAction: TItemEraseAction);
+      {%H-}TargetCanvas: TCanvas; Node: PVirtualNode; const {%H-}ItemRect: TRect;
+      var ItemColor: TColor; var {%H-}EraseAction: TItemEraseAction);
     procedure lvMemoryMapDblClick(Sender: TObject);
     procedure lvMemoryMapGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
-      Column: TColumnIndex; TextType: TVSTTextType; var CellText: String);
+      Column: TColumnIndex; {%H-}TextType: TVSTTextType; var CellText: String);
     procedure lvMemoryMapHeaderDrawQueryElements(Sender: TVTHeader;
       var PaintInfo: THeaderPaintInfo; var Elements: THeaderPaintElements);
     procedure miCopyAddrClick(Sender: TObject);
@@ -244,6 +244,7 @@ begin
     ptMapped: Result := 'Map';
     ptPrivate: Result := 'Private';
     ptThread: Result := 'Thread';
+    ptHeap: Result := 'Heap';
     ptSystem: Result := 'System';
   else
     Result := 'FREE';

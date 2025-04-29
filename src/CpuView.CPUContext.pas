@@ -255,7 +255,7 @@ type
     function GetViewMode(RegID: Integer): TRegViewMode; override;
     procedure InitKnownRegs; virtual; abstract;
     procedure SetViewMode(RegID: Integer; const Value: TRegViewMode); override;
-    procedure UpdateLastRegData(RegID: Integer; SetModifyed: Boolean); virtual;
+    procedure UpdateLastRegData({%H-}RegID: Integer; SetModifyed: Boolean); virtual;
     procedure UpdateMap(RebuildRegList: Boolean = False);
     property KnownRegs: TListEx<TRegParam> read FKnownRegs;
     property LastReg: TCustomRegData read FLastReg;

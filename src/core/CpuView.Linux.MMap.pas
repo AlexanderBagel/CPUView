@@ -25,8 +25,11 @@ interface
 
 uses
   LCLIntf, LCLType, SysUtils, Generics.Collections, Classes, LazLogger,
+  Types, System.IOUtils,
 
   FWHexView.Common,
+  CpuView.Common,
+  CpuView.IntelContext.Types,
   CpuView.Linux;
 
 const
@@ -172,7 +175,7 @@ type
     property Sections: TSections read FSections;
   end;
 
-  TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptSystem);
+  TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptHeap, ptSystem);
 
   PListItemData = ^TListItemData;
   TListItemData = record
@@ -193,10 +196,15 @@ type
     FGrayed: Boolean;
     FLastPageType: TPageType;
     FList: TList<TListItemData>;
+    procedure AddContains(var AItem: TListItemData; const Value: string);
+    procedure CheckPage(const page: TListItemData);
     function DisplayElf(mmap: TMemoryBasicInformationList; var Idx: Integer): Boolean;
     function ExtractAccess(const mitm: TMemoryBasicInformation): string;
-    procedure GetPageType(const mitm: TMemoryBasicInformation; var AItem: TListItemData);
+    procedure GetPageType(const mitm: TMemoryBasicInformation;
+      var AItem: TListItemData; AThreadID: Cardinal);
     procedure FillMainThread;
+    procedure FillThreads;
+    procedure FillThread(AThreadID: Cardinal);
   public
     constructor Create(APid: Cardinal; AIs64Process: Boolean);
     procedure FillProcessMemoryMap(AList: TList<TListItemData>);
@@ -409,6 +417,30 @@ end;
 
 { TSimpleMemoryMap }
 
+procedure TSimpleMemoryMap.AddContains(var AItem: TListItemData;
+  const Value: string);
+begin
+  if AItem.Contains = '' then
+    AItem.Contains := Value
+  else
+    AItem.Contains := AItem.Contains + ', ' + Value;
+end;
+
+procedure TSimpleMemoryMap.CheckPage(const page: TListItemData);
+var
+  I: Integer;
+begin
+  if not (page.PageType in [ptHeap, ptThread, ptSystem]) then Exit;
+  for I := 0 to FList.Count - 1 do
+  begin
+    if (page.AddrVA = FList[I].AddrVA) and (page.PageType <> FList[I].PageType) then
+    begin
+      if page.EndAddrVA = FList[I].EndAddrVA then
+        FList[I] := page;
+    end;
+  end;
+end;
+
 function TSimpleMemoryMap.DisplayElf(mmap: TMemoryBasicInformationList;
   var Idx: Integer): Boolean;
 var
@@ -455,12 +487,7 @@ begin
           Continue;
         SecVA := Elf.Rebase(sh.Hdr.sh_addr);
         if (SecVA >= page.AddrVA) and (SecVA < page.EndAddrVA) then
-        begin
-          if page.Contains = '' then
-            page.Contains := sh.DisplayName
-          else
-            page.Contains := page.Contains + ', ' + sh.DisplayName;
-        end;
+          AddContains(page, sh.DisplayName);
       end;
       FList.Add(page);
       Inc(Idx);
@@ -480,11 +507,13 @@ begin
   if mitm.Execute then
     Result := Result + 'E';
   if mitm.Shared then
-  Result := Result + ', shared';
+    Result := Result + ', shared';
+  if Result = '' then
+    Result := 'No access';
 end;
 
 procedure TSimpleMemoryMap.GetPageType(const mitm: TMemoryBasicInformation;
-  var AItem: TListItemData);
+  var AItem: TListItemData; AThreadID: Cardinal);
 var
   pt: TPageType;
 begin
@@ -495,14 +524,34 @@ begin
       pt := ptMapped;
       Exit;
     end;
+
     if mitm.Hint <> '' then
     begin
-      if (mitm.Hint = '[stack]') or (mitm.Hint = '[heap]') then
-      begin
-        pt := ptThread;
-        Exit;
+      case IndexOfString(mitm.Hint, ['[stack]', '[heap]', '[vvar]', '[vdso]']) of
+        0:
+        begin
+          AddContains(AItem, 'Stack of main thread');
+          pt := ptThread;
+        end;
+        1:
+        begin
+          AddContains(AItem, 'Heap');
+          pt := ptHeap;
+        end;
+        2:
+        begin
+          AddContains(AItem, 'Virtual variables [vvar]');
+          pt := ptSystem;
+        end;
+        3:
+        begin
+          AddContains(AItem, 'Virtual dynamic shared object [vdso]');
+          pt := ptSystem;
+        end;
+      else
+        AddContains(AItem, mitm.Hint);
+        pt := ptSystem;
       end;
-      pt := ptSystem;
     end;
     if pt <> ptFree then Exit;
     if not (mitm.Read or mitm.Write or mitm.Execute or mitm.Shared) then
@@ -552,7 +601,7 @@ begin
         page.Size := mitm.RegionSize;
         page.EndAddrVA := page.AddrVA + page.Size;
         page.Access := ExtractAccess(mitm);
-        GetPageType(mitm, page);
+        GetPageType(mitm, page, FCurrentPid);
         page.MapedFile := mitm.MappedFile;
         FList.Add(page);
       end
@@ -562,6 +611,45 @@ begin
     end;
   finally
     mmap.Free;
+  end;
+end;
+
+procedure TSimpleMemoryMap.FillThreads;
+var
+  Path, TidPath: string;
+  Dirs: TStringDynArray;
+  Tid: Cardinal;
+  I: Integer;
+begin
+  Path := Format('/proc/%d/task/', [FCurrentPid]);
+  Dirs := TDirectory.GetDirectories(Path, '*', TSearchOption.soTopDirectoryOnly);
+  for I := 0 to Length(Dirs) - 1 do
+  begin
+    TidPath := Dirs[I];
+    Delete(TidPath, 1, Length(Path));
+    if TryStrToUInt(TidPath, Tid) and (Tid <> FCurrentPid) then
+      FillThread(Tid);
+  end;
+end;
+
+procedure TSimpleMemoryMap.FillThread(AThreadID: Cardinal);
+var
+  Ctx: TIntelThreadContext;
+  I: Integer;
+  itm: TListItemData;
+begin
+  if FIs64Process then
+    Ctx := GetIntelContext(AThreadID)
+  else
+    Ctx := GetIntelWow64Context(AThreadID);
+  for I := 0 to FList.Count - 1 do
+  begin
+    itm := FList[I];
+    if (Ctx.Rsp >= itm.AddrVA) and (Ctx.Rsp < itm.EndAddrVA) then
+    begin
+      AddContains(itm, 'Stack of thread: ' + IntToStr(AThreadID));
+      FList[I] := itm;
+    end;
   end;
 end;
 
@@ -577,6 +665,7 @@ begin
   FList := AList;
   FList.Clear;
   FillMainThread;
+  FillThreads;
 end;
 
 end.

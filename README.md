@@ -100,8 +100,9 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 ### Utils
 Started development of a set of built-in utilities.
 
-1. TraceLog - displays all instructions on which a stop occurred during debugging in CpuView
+1. TraceLog - displays all instructions on which a stop occurred during debugging in CpuView.
 2. Exports - displays a list of exported functions by libraries loaded into the address space of the process being debugged.
+3. Memory Map - displays the memory map of the process being debugged.
 
 ### Commands:
 

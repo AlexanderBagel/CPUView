@@ -113,7 +113,7 @@ end;
 
 function TRemoteStream.Read(var Buffer; Count: Longint): Longint;
 begin
-  Result := FUtils.ReadData(Pointer(FPosition), Buffer, Count);
+  Result := FUtils.ReadData({%H-}Pointer(FPosition), Buffer, Count);
   if (Result > 0) and FUtils.NeedUpdateReadData then
     DoUpdated(@Buffer, FPosition, Result);
 end;
@@ -134,7 +134,7 @@ begin
   FSize := Value;
 end;
 
-function TRemoteStream.Write(const Buffer; Count: Longint): Longint;
+function TRemoteStream.{%H-}Write(const Buffer; Count: Longint): Longint;
 begin
   raise EStreamError.Create('Stream is read-only');
 end;
@@ -250,7 +250,7 @@ begin
   end;
 end;
 
-function TBufferedROStream.Write(const Buffer; Count: Longint): Longint;
+function TBufferedROStream.{%H-}Write(const Buffer; Count: Longint): Longint;
 begin
   raise EStreamError.Create('Stream is read-only');
 end;

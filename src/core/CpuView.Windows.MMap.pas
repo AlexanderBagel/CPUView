@@ -32,7 +32,7 @@ uses
   CpuView.Windows;
 
 type
-  TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptSystem);
+  TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptHeap, ptSystem);
 
   TAdvancedInfo = record
     Description: string;

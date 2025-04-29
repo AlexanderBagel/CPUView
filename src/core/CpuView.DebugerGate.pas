@@ -33,8 +33,7 @@ uses
   FWHexView.Common,
   CpuView.Common,
   CpuView.CPUContext,
-  CpuView.Stream,
-  CpuView.Viewers;
+  CpuView.Stream;
 
 const
   UserCodeAddrVANotFound = -1;

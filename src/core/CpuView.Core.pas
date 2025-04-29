@@ -167,7 +167,7 @@ type
     function GetAddrMode: TAddressMode;
     procedure OnAsmCacheEnd(Sender: TObject);
     procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
-      AJmpState: TJmpState; var Handled: Boolean);
+      AJmpState: TJmpState; var {%H-}Handled: Boolean);
     procedure OnAsmQueryComment(Sender: TObject; AddrVA: Int64;
       AColumn: TColumnType; var AComment: string);
     procedure OnAsmScroll(Sender: TObject; AStep: TScrollStepDirection);
@@ -181,7 +181,7 @@ type
     procedure OnJmpTo(Sender: TObject; const AJmpAddr: Int64;
       AJmpState: TJmpState; var Handled: Boolean);
     procedure OnRegQueryComment(Sender: TObject; AddrVA: Int64;
-      AColumn: TColumnType; var AComment: string);
+      {%H-}AColumn: TColumnType; var AComment: string);
     procedure OnRegQueryExternalComment(Sender: TObject;
       const AValue: TRegValue; ARegType: TExternalRegType; var AComment: string);
     procedure OnThreadChange(Sender: TObject);

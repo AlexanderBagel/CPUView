@@ -1,11 +1,12 @@
 object frmMemoryMap: TfrmMemoryMap
   Left = 616
-  Height = 619
+  Height = 928
   Top = 281
-  Width = 1300
+  Width = 1950
   Caption = 'Cpu-View Memory Map'
-  ClientHeight = 619
-  ClientWidth = 1300
+  ClientHeight = 928
+  ClientWidth = 1950
+  DesignTimePPI = 144
   KeyPreview = True
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
@@ -16,22 +17,22 @@ object frmMemoryMap: TfrmMemoryMap
   OnShow = FormShow
   object pnHint: TPanel
     Left = 0
-    Height = 23
-    Top = 596
-    Width = 1300
+    Height = 34
+    Top = 894
+    Width = 1950
     Align = alBottom
-    ClientHeight = 23
-    ClientWidth = 1300
+    ClientHeight = 34
+    ClientWidth = 1950
     TabOrder = 0
     object lblPromt: TLabel
       AnchorSideLeft.Control = pnHint
       AnchorSideTop.Control = pnHint
       AnchorSideTop.Side = asrCenter
-      Left = 6
-      Height = 17
-      Top = 3
-      Width = 196
-      BorderSpacing.Left = 5
+      Left = 9
+      Height = 25
+      Top = 5
+      Width = 279
+      BorderSpacing.Left = 8
       Caption = 'For more detailed information, use:'
     end
     object lblUrl: TLabel
@@ -40,11 +41,11 @@ object frmMemoryMap: TfrmMemoryMap
       AnchorSideTop.Control = pnHint
       AnchorSideTop.Side = asrCenter
       Cursor = crHandPoint
-      Left = 207
-      Height = 17
-      Top = 3
-      Width = 314
-      BorderSpacing.Left = 5
+      Left = 296
+      Height = 25
+      Top = 5
+      Width = 448
+      BorderSpacing.Left = 8
       Caption = 'https://github.com/AlexanderBagel/ProcessMemoryMap'
       Font.Color = clHighlight
       ParentFont = False
@@ -54,9 +55,9 @@ object frmMemoryMap: TfrmMemoryMap
   object lvMemoryMap: TLazVirtualStringTree
     Cursor = 63
     Left = 0
-    Height = 596
+    Height = 894
     Top = 0
-    Width = 1300
+    Width = 1950
     Align = alClient
     DefaultText = 'Node'
     Header.AutoSizeIndex = 8
@@ -64,50 +65,50 @@ object frmMemoryMap: TfrmMemoryMap
       item
         Position = 0
         Text = 'Address'
-        Width = 100
+        Width = 150
       end    
       item
         Position = 1
         Text = 'Size'
-        Width = 100
+        Width = 150
       end    
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAllowFocus]
         Position = 2
         Text = 'Owner'
-        Width = 100
+        Width = 150
       end    
       item
         Position = 3
         Text = 'Section'
-        Width = 67
+        Width = 100
       end    
       item
         Position = 4
         Text = 'Contains'
-        Width = 200
+        Width = 300
       end    
       item
         Position = 5
         Text = 'Type'
-        Width = 67
+        Width = 100
       end    
       item
         Position = 6
         Text = 'Access'
-        Width = 67
+        Width = 100
       end    
       item
         Position = 7
         Text = 'Initial Access'
-        Width = 80
+        Width = 120
       end    
       item
         Position = 8
         Text = 'Mapped as'
-        Width = 517
+        Width = 776
       end>
-    Header.Height = 32
+    Header.Height = 48
     Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoOwnerDraw, hoShowSortGlyphs, hoVisible]
     PopupMenu = pmList
     TabOrder = 1
@@ -120,8 +121,8 @@ object frmMemoryMap: TfrmMemoryMap
     OnHeaderDrawQueryElements = lvMemoryMapHeaderDrawQueryElements
   end
   object pmList: TPopupMenu
-    Left = 389
-    Top = 171
+    Left = 584
+    Top = 257
     object miOpenInCpuView: TMenuItem
       Caption = 'Open In Cpu-View'
       OnClick = miOpenInCpuViewClick

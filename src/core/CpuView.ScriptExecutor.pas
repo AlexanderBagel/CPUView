@@ -29,6 +29,7 @@ uses
   SysUtils,
   Generics.Collections,
   FWHexView.Common,
+  CpuView.Common,
   CpuView.CPUContext,
   CpuView.DebugerGate;
 
@@ -77,16 +78,6 @@ type
   end;
 
 implementation
-
-function IndexOfString(const s: string; Values: array of string): Integer;
-var
-  I: Integer;
-begin
-  for I := Low(Values) to High(Values) do
-    if AnsiCompareText(s, Values[I]) = 0 then
-      Exit(I);
-  Result := -1;
-end;
 
 { TAbstractScriptExecutor }
 

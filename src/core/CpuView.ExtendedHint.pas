@@ -90,8 +90,8 @@ type
     FExtendedRect: TRect;
     FDisplayedItem: TAddrCacheItem;
     FTextHeight, FMaxChainLine, FMaxLine, FMaxHint: Integer;
-    procedure CalculateExecute(MaxWidth: Integer);
-    procedure CalculatePointerValue(MaxWidth: Integer);
+    procedure CalculateExecute({%H-}MaxWidth: Integer);
+    procedure CalculatePointerValue({%H-}MaxWidth: Integer);
     procedure CalculateString(MaxWidth: Integer);
     procedure DrawAddrChain;
     procedure DrawExecuteData;
@@ -100,7 +100,7 @@ type
     function GetAddrString(const AItem: TAddrCacheItem): string;
     function GetPointerValue(APointerValue: TPointerValue): string;
   protected
-    procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
+    procedure CMTextChanged(var {%H-}Message: TMessage); message CM_TEXTCHANGED;
     procedure Paint; override;
   public
     constructor Create(AOwner: TComponent); override;
