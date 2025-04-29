@@ -1622,9 +1622,14 @@ begin
 end;
 
 procedure TCustomAsmView.RestoreViewParam;
+var
+  NoDpiWidth: Integer;
 begin
   inherited RestoreViewParam;
-  Header.ColumnMinWidth[ctAddress] := CalculateColumnBestSize(ctAddress);
+  NoDpiWidth := CalculateColumnBestSize(ctAddress);
+  // revert to default dpi
+  NoDpiWidth := MulDiv(NoDpiWidth, 96, FCurrentPPI);
+  Header.ColumnMinWidth[ctAddress] := NoDpiWidth;
 end;
 
 procedure TCustomAsmView.KeyDown(var Key: Word; Shift: TShiftState);
