@@ -28,18 +28,14 @@ uses
   laz.VirtualTrees,
 
   CpuView.Common,
+  CpuView.Design.DpiFix,
   CpuView.Core;
 
 type
 
   { TLazVirtualStringTree }
 
-  TLazVirtualStringTree = class(laz.VirtualTrees.TLazVirtualStringTree)
-  protected
-    procedure AutoScale; override;
-    procedure DoTextDrawing(var PaintInfo: TVTPaintInfo; const AText: string;
-      CellRect: TRect; DrawFormat: Cardinal); override;
-  end;
+  TLazVirtualStringTree = class(TLazVSTWithDPI);
 
   TRemoteExport = record
     AddrVA: Int64;
@@ -101,32 +97,6 @@ const
   RootCaption = 'CpuView - Exports';
 
 {$R *.lfm}
-
-{ TLazVirtualStringTree }
-
-procedure TLazVirtualStringTree.AutoScale;
-var
-  Enum: TVTVirtualNodeEnumerator;
-begin
-  BeginUpdate;
-  try
-    Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
-    inherited AutoScale;
-    DefaultNodeHeight := Scale96ToFont(DEFAULT_NODE_HEIGHT);
-    Enum := Nodes.GetEnumerator;
-    while Enum.MoveNext do
-      NodeHeight[Enum.Current] := DefaultNodeHeight;
-  finally
-    EndUpdate;
-  end;
-end;
-
-procedure TLazVirtualStringTree.DoTextDrawing(var PaintInfo: TVTPaintInfo;
-  const AText: string; CellRect: TRect; DrawFormat: Cardinal);
-begin
-  PaintInfo.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
-  inherited DoTextDrawing(PaintInfo, AText, CellRect, DrawFormat);
-end;
 
 { TfrmProcExports }
 

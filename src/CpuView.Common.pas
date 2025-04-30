@@ -92,12 +92,14 @@ type
     procedure SetProcessID(const Value: Integer); virtual;
     procedure SetThreadID(AValue: TThreadID); virtual;
   public
+    function GetPageSize: Integer; virtual; abstract;
     function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; virtual; abstract;
     function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; virtual; abstract;
     function NeedUpdateReadData: Boolean; virtual;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; virtual; abstract;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; virtual; abstract;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; virtual; abstract;
+    function SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD): Boolean; virtual; abstract;
     function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; virtual; abstract;
     procedure Update; virtual; abstract;
     property ProcessID: Integer read FProcessID write SetProcessID;

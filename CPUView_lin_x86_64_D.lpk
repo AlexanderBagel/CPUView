@@ -184,6 +184,14 @@
         <Filename Value="dsgn\gui\dlgMemoryMap.pas"/>
         <UnitName Value="dlgMemoryMap"/>
       </Item>
+      <Item>
+        <Filename Value="dsgn\CpuView.Design.DpiFix.pas"/>
+        <UnitName Value="CpuView.Design.DpiFix"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgPageAccess.pas"/>
+        <UnitName Value="dlgPageAccess"/>
+      </Item>
     </Files>
     <RequiredPkgs>
       <Item>

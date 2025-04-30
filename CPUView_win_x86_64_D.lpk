@@ -184,6 +184,14 @@
         <Filename Value="src\core\CpuView.Windows.MMap.pas"/>
         <UnitName Value="CpuView.Windows.MMap"/>
       </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgPageAccess.pas"/>
+        <UnitName Value="dlgPageAccess"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\CpuView.Design.DpiFix.pas"/>
+        <UnitName Value="CpuView.Design.DpiFix"/>
+      </Item>
     </Files>
     <RequiredPkgs>
       <Item>

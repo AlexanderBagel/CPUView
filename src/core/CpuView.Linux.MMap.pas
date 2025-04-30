@@ -177,8 +177,8 @@ type
 
   TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptHeap, ptSystem);
 
-  PListItemData = ^TListItemData;
-  TListItemData = record
+  PPageData= ^TPageData;
+  TPageData = record
     AddrVA, EndAddrVA, Size: Int64;
     PageType: TPageType;
     Image, Section, Contains, Access, IAccess, MapedFile: string;
@@ -195,19 +195,19 @@ type
     FIs64Process: Boolean;
     FGrayed: Boolean;
     FLastPageType: TPageType;
-    FList: TList<TListItemData>;
-    procedure AddContains(var AItem: TListItemData; const Value: string);
-    procedure CheckPage(const page: TListItemData);
+    FPages: TList<TPageData>;
+    procedure AddContains(var AItem: TPageData; const Value: string);
+    procedure CheckPage(const page: TPageData);
     function DisplayElf(mmap: TMemoryBasicInformationList; var Idx: Integer): Boolean;
     function ExtractAccess(const mitm: TMemoryBasicInformation): string;
     procedure GetPageType(const mitm: TMemoryBasicInformation;
-      var AItem: TListItemData; AThreadID: Cardinal);
+      var AItem: TPageData; AThreadID: Cardinal);
     procedure FillMainThread;
     procedure FillThreads;
     procedure FillThread(AThreadID: Cardinal);
   public
     constructor Create(APid: Cardinal; AIs64Process: Boolean);
-    procedure FillProcessMemoryMap(AList: TList<TListItemData>);
+    procedure FillProcessMemoryMap(APages: TList<TPageData>);
   end;
 
 implementation
@@ -417,7 +417,7 @@ end;
 
 { TSimpleMemoryMap }
 
-procedure TSimpleMemoryMap.AddContains(var AItem: TListItemData;
+procedure TSimpleMemoryMap.AddContains(var AItem: TPageData;
   const Value: string);
 begin
   if AItem.Contains = '' then
@@ -426,17 +426,17 @@ begin
     AItem.Contains := AItem.Contains + ', ' + Value;
 end;
 
-procedure TSimpleMemoryMap.CheckPage(const page: TListItemData);
+procedure TSimpleMemoryMap.CheckPage(const page: TPageData);
 var
   I: Integer;
 begin
   if not (page.PageType in [ptHeap, ptThread, ptSystem]) then Exit;
-  for I := 0 to FList.Count - 1 do
+  for I := 0 to FPages.Count - 1 do
   begin
-    if (page.AddrVA = FList[I].AddrVA) and (page.PageType <> FList[I].PageType) then
+    if (page.AddrVA = FPages[I].AddrVA) and (page.PageType <> FPages[I].PageType) then
     begin
-      if page.EndAddrVA = FList[I].EndAddrVA then
-        FList[I] := page;
+      if page.EndAddrVA = FPages[I].EndAddrVA then
+        FPages[I] := page;
     end;
   end;
 end;
@@ -446,7 +446,7 @@ function TSimpleMemoryMap.DisplayElf(mmap: TMemoryBasicInformationList;
 var
   mitm: TMemoryBasicInformation;
   Elf: TSimpleElf;
-  page: TListItemData;
+  page: TPageData;
   sh: TElfSectionHeader;
   RootIdx, SecVA: Int64;
   I: Integer;
@@ -469,7 +469,7 @@ begin
         Dec(Idx);
         Break;
       end;
-      page := Default(TListItemData);
+      page := Default(TPageData);
       page.AddrVA := mitm.BaseAddress;
       page.Size := mitm.RegionSize;
       page.EndAddrVA := page.AddrVA + page.Size;
@@ -489,7 +489,7 @@ begin
         if (SecVA >= page.AddrVA) and (SecVA < page.EndAddrVA) then
           AddContains(page, sh.DisplayName);
       end;
-      FList.Add(page);
+      FPages.Add(page);
       Inc(Idx);
     end;
   finally
@@ -513,7 +513,7 @@ begin
 end;
 
 procedure TSimpleMemoryMap.GetPageType(const mitm: TMemoryBasicInformation;
-  var AItem: TListItemData; AThreadID: Cardinal);
+  var AItem: TPageData; AThreadID: Cardinal);
 var
   pt: TPageType;
 begin
@@ -574,10 +574,10 @@ var
   I: Integer;
   mmap: TMemoryBasicInformationList;
   mitm: TMemoryBasicInformation;
-  page, emptyPage: TListItemData;
+  page, emptyPage: TPageData;
 begin
-  page := Default(TListItemData);
-  emptyPage := Default(TListItemData);
+  page := Default(TPageData);
+  emptyPage := Default(TPageData);
   mmap := LoadVirtualMemoryInformation(FCurrentPid, FCurrentPid, False);
   try
     I := 0;
@@ -592,21 +592,21 @@ begin
         FLastPageType := ptFree;
         FGrayed := not FGrayed;
         emptyPage.Grayed := FGrayed;
-        FList.Add(emptyPage);
+        FPages.Add(emptyPage);
       end;
       if not DisplayElf(mmap, I) then
       begin
-        page := Default(TListItemData);
+        page := Default(TPageData);
         page.AddrVA := mitm.BaseAddress;
         page.Size := mitm.RegionSize;
         page.EndAddrVA := page.AddrVA + page.Size;
         page.Access := ExtractAccess(mitm);
         GetPageType(mitm, page, FCurrentPid);
         page.MapedFile := mitm.MappedFile;
-        FList.Add(page);
+        FPages.Add(page);
       end
       else
-        page := FList.Last;
+        page := FPages.Last;
       Inc(I);
     end;
   finally
@@ -636,19 +636,19 @@ procedure TSimpleMemoryMap.FillThread(AThreadID: Cardinal);
 var
   Ctx: TIntelThreadContext;
   I: Integer;
-  itm: TListItemData;
+  itm: TPageData;
 begin
   if FIs64Process then
     Ctx := GetIntelContext(AThreadID)
   else
     Ctx := GetIntelWow64Context(AThreadID);
-  for I := 0 to FList.Count - 1 do
+  for I := 0 to FPages.Count - 1 do
   begin
-    itm := FList[I];
+    itm := FPages[I];
     if (Ctx.Rsp >= itm.AddrVA) and (Ctx.Rsp < itm.EndAddrVA) then
     begin
       AddContains(itm, 'Stack of thread: ' + IntToStr(AThreadID));
-      FList[I] := itm;
+      FPages[I] := itm;
     end;
   end;
 end;
@@ -660,10 +660,10 @@ begin
   FGrayed := True;
 end;
 
-procedure TSimpleMemoryMap.FillProcessMemoryMap(AList: TList<TListItemData>);
+procedure TSimpleMemoryMap.FillProcessMemoryMap(APages: TList<TPageData>);
 begin
-  FList := AList;
-  FList.Clear;
+  FPages := APages;
+  FPages.Clear;
   FillMainThread;
   FillThreads;
 end;

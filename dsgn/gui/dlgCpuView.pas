@@ -44,6 +44,7 @@ uses
   CpuView.Design.Common,
   CpuView.Design.CrashDump,
   CpuView.Design.DbgLog,
+  CpuView.Design.DpiFix,
 
   dlgCpuView.TemporaryLocker,
   dlgInputBox,
@@ -56,21 +57,9 @@ uses
 
 type
 
-  { TScaledControlHelper }
-
-  TScaledControlHelper = class Helper for TControl
-  public
-    function CurrentPPI: Integer;
-  end;
-
-
   { TStatusBar }
 
-  TStatusBar = class(ComCtrls.TStatusBar)
-  protected
-    procedure CalculatePreferredSize(var PreferredWidth,
-      PreferredHeight: Integer; WithThemeSpace: Boolean); override;
-  end;
+  TStatusBar = class(TStatusBarWithDPI);
 
   { TToolButton }
 
@@ -471,37 +460,6 @@ var
 implementation
 
 {$R *.lfm}
-
-{ TScaledControlHelper }
-
-function TScaledControlHelper.CurrentPPI: Integer;
-var
-  AForm: TCustomForm;
-  AMonitor: TMonitor;
-begin
-  Result := Screen.PixelsPerInch;
-  AForm := GetParentForm(Self);
-  if AForm = nil then Exit;
-  if not AForm.HandleAllocated then Exit;
-  AMonitor := Screen.MonitorFromWindow(AForm.Handle);
-  if AMonitor = nil then Exit;
-  Result := AMonitor.PixelsPerInch;
-end;
-
-{ TStatusBar }
-
-procedure TStatusBar.CalculatePreferredSize(var PreferredWidth,
-  PreferredHeight: Integer; WithThemeSpace: Boolean);
-var
-  AScreenPPI, ACurrentPPI: Integer;
-begin
-  inherited CalculatePreferredSize(PreferredWidth, PreferredHeight,
-    WithThemeSpace);
-  AScreenPPI := Screen.PixelsPerInch;
-  ACurrentPPI := CurrentPPI;
-  if AScreenPPI <> ACurrentPPI then
-    PreferredHeight := MulDiv(PreferredHeight, ACurrentPPI, AScreenPPI);
-end;
 
 { TToolButton }
 

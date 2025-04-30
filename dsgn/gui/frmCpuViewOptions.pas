@@ -24,10 +24,7 @@ interface
 
 uses
   LCLIntf, LMessages, Classes, SysUtils, Forms, Controls, StdCtrls, Dialogs,
-  Graphics, laz.VirtualTrees, ImgList, Spin, Math, Themes,
-  {$IFDEF MSWINDOWS}
-  Win32Themes, UxTheme,
-  {$ENDIF}
+  Graphics, laz.VirtualTrees, ImgList, Spin, Math,
 
   IDEOptEditorIntf,
 
@@ -37,22 +34,10 @@ uses
 
   CpuView.Common,
   CpuView.Settings,
-  CpuView.ExtendedHint;
+  CpuView.ExtendedHint,
+  CpuView.Design.DpiFix;
 
 type
-
-  { TSettingsVST }
-
-  TSettingsVST = class(TLazVirtualStringTree)
-  protected
-    procedure AdjustImageBorder(AImages: TCustomImageList; ABidiMode: TBidiMode;
-      VAlign: Integer; var R: TRect; var ImageInfo: TVTImageInfo); override;
-    procedure AutoScale; override;
-    procedure DoTextDrawing(var PaintInfo: TVTPaintInfo; const AText: string;
-      CellRect: TRect; DrawFormat: Cardinal); override;
-    procedure PaintCheckImage(ACanvas: TCanvas; const ImageInfo: TVTImageInfo;
-      {%H-}ASelected: Boolean); override;
-  end;
 
   TTVCheckStyle = (tvcsNone, tvcsChecked, tvcsUnchecked);
 
@@ -84,7 +69,7 @@ type
     procedure btnResetClick(Sender: TObject);
     procedure cbSymbolsClick(Sender: TObject);
   private
-    tvSettings: TSettingsVST;
+    tvSettings: TLazVSTWithDPI;
     function Add(Root: PVirtualNode; Index: Integer;
       ACheckStyle: TTVCheckStyle): PVirtualNode;
     procedure FillImageList;
@@ -115,77 +100,6 @@ var
   TreeExpandState: array [0..4] of Boolean;
 
 {$R *.lfm}
-
-{ TSettingsVST }
-
-procedure TSettingsVST.AdjustImageBorder(AImages: TCustomImageList;
-  ABidiMode: TBidiMode; VAlign: Integer; var R: TRect;
-  var ImageInfo: TVTImageInfo);
-var
-  {$IFDEF MSWINDOWS}
-  Details: TThemedElementDetails;
-  {$ENDIF}
-  CheckSize: Integer;
-begin
-  if ImageInfo.Images = Images then
-    inherited
-  else
-  begin
-    {$IFDEF MSWINDOWS}
-    if ThemeServices.ThemesAvailable then
-    begin
-      Details := ThemeServices.GetElementDetails(tbCheckBoxCheckedNormal);
-      CheckSize := ThemeServices.GetDetailSizeForPPI(Details, Font.PixelsPerInch).CY;
-    end
-    else
-    {$ENDIF}
-      CheckSize := AImages.Height;
-    inherited AdjustImageBorder(AImages.Width, CheckSize, ABidiMode, VAlign, R, ImageInfo);
-  end;
-end;
-
-procedure TSettingsVST.AutoScale;
-var
-  Enum: TVTVirtualNodeEnumerator;
-begin
-  Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
-  inherited AutoScale;
-  DefaultNodeHeight := Scale96ToFont(DEFAULT_NODE_HEIGHT);
-  Enum := Nodes.GetEnumerator;
-  while Enum.MoveNext do
-    NodeHeight[Enum.Current] := DefaultNodeHeight;
-end;
-
-procedure TSettingsVST.DoTextDrawing(var PaintInfo: TVTPaintInfo;
-  const AText: string; CellRect: TRect; DrawFormat: Cardinal);
-begin
-  PaintInfo.Canvas.Font.PixelsPerInch := Font.PixelsPerInch;
-  inherited DoTextDrawing(PaintInfo, AText, CellRect, DrawFormat);
-end;
-
-procedure TSettingsVST.PaintCheckImage(ACanvas: TCanvas;
-  const ImageInfo: TVTImageInfo; ASelected: Boolean);
-{$IFDEF MSWINDOWS}
-var
-  Details: TThemedElementDetails;
-  CheckSize: Integer;
-  R: TRect;
-{$ENDIF}
-begin
-  {$IFDEF MSWINDOWS}
-  if ThemeServices.ThemesAvailable then
-  begin
-    Details := ThemeServices.GetElementDetails(tbCheckBoxCheckedNormal);
-    CheckSize := ThemeServices.GetDetailSizeForPPI(Details, Font.PixelsPerInch).CX;
-    R := Bounds(ImageInfo.XPos, ImageInfo.YPos, CheckSize, CheckSize);
-    DrawThemeBackground(
-      TWin32ThemeServices(ThemeServices).ThemeForPPI[teButton, Font.PixelsPerInch],
-      ACanvas.Handle, BP_CHECKBOX, ImageInfo.Index - 8, R, nil);
-  end
-  else
-  {$ENDIF}
-    inherited;
-end;
 
 { TCpuViewMainOptionsFrame }
 
@@ -536,7 +450,7 @@ end;
 
 procedure TCpuViewMainOptionsFrame.Setup({%H-}ADialog: TAbstractOptionsEditorDialog);
 begin
-  tvSettings := TSettingsVST.Create(Self);
+  tvSettings := TLazVSTWithDPI.Create(Self);
   tvSettings.Parent := gbViewersSetting;
   tvSettings.Align := alClient;
   tvSettings.Images := ilSettings;

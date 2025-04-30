@@ -40,8 +40,8 @@ type
     PageType: TPageType;
   end;
 
-  PListItemData = ^TListItemData;
-  TListItemData = record
+  PListItemData = ^TPageData;
+  TPageData = record
     AddrVA, EndAddrVA, Size: Int64;
     PageType: TPageType;
     Image, Section, Contains, Access, IAccess, MapedFile: string;
@@ -69,7 +69,7 @@ type
     FIs64Process: Boolean;
     FGrayed: Boolean;
     FLastPageType: TPageType;
-    FList: TList<TListItemData>;
+    FPages: TList<TPageData>;
     procedure AddNewData(const Description: string; Addr: NativeUInt;
       APageType: TPageType = ptSystem); overload;
     procedure AddNewData(const Description: string; Addr: Pointer;
@@ -78,25 +78,25 @@ type
       const Value: DWORD): DWORD;
     function DisplayImageData(hProcess: THandle; const ImagePath: string;
       lpBuffer: TMemoryBasicInformation; var pSectionAddr: NativeUInt): Boolean;
-    procedure DisplayStateAndProtect(var AItem: TListItemData;
+    procedure DisplayStateAndProtect(var APage: TPageData;
       const lpBuffer: TMemoryBasicInformation);
-    function ExtractAccessString(const Value: DWORD): string;
-    function ExtractInitialAccessString(const Value: DWORD): string;
     procedure FillPEBInfo(const hProcess: THandle);
     procedure FillThreadsInfo(const hProcess: THandle);
     function GetContainsDirectory(const Code, Data: Boolean;
       const ImageInfo: LOADED_IMAGE; const SectionAddr, SectionSize: NativeUInt): string;
     function IsExecute(const Value: DWORD): Boolean;
+    function IsPageExecute(const Value: DWORD): Boolean;
     function IsWrite(const Value: DWORD): Boolean;
+    function IsPageWrite(const Value: DWORD): Boolean;
   public
     constructor Create(APid: Cardinal; AIs64Process: Boolean);
-    procedure FillProcessMemoryMap(AList: TList<TListItemData>);
+    procedure FillProcessMemoryMap(APages: TList<TPageData>);
   end;
 
-implementation
+  function ExtractAccessString(const Value: DWORD): string;
+  function ExtractInitialAccessString(const Value: DWORD): string;
 
-var
-  _ItemsData: array of TListItemData;
+implementation
 
 //  Функция приводит пути с использованием символьных ссылок к нормальному виду
 //
@@ -209,6 +209,36 @@ begin
   end;
 end;
 
+function ExtractAccessString(const Value: DWORD): string;
+const
+  PAGE_WRITECOMBINE = $400;
+begin
+  Result := ExtractInitialAccessString(Value);
+  if (Value and PAGE_GUARD) = PAGE_GUARD then
+    Result := Result + ', Guarded';
+  if (Value and PAGE_NOCACHE) = PAGE_NOCACHE then
+    Result := Result + ', No cache';
+  if (Value and PAGE_WRITECOMBINE) = PAGE_WRITECOMBINE then
+    Result := Result + ', Write Combine';
+end;
+
+function ExtractInitialAccessString(const Value: DWORD): string;
+begin
+  Result := '';
+  if (Value and PAGE_EXECUTE) = PAGE_EXECUTE then Result := 'E';
+  if (Value and PAGE_EXECUTE_READ) = PAGE_EXECUTE_READ then Result := 'RE';
+  if (Value and PAGE_EXECUTE_READWRITE) = PAGE_EXECUTE_READWRITE then
+     Result := 'RWE';
+  if (Value and PAGE_EXECUTE_WRITECOPY) = PAGE_EXECUTE_WRITECOPY then
+    Result := 'RWE';
+  if (Value and PAGE_NOACCESS) = PAGE_NOACCESS then Result := 'No access';
+  if (Value and PAGE_READONLY) = PAGE_READONLY then Result := 'R';
+  if (Value and PAGE_READWRITE) = PAGE_READWRITE then Result := 'RW';
+  if (Value and PAGE_WRITECOPY) = PAGE_WRITECOPY then Result := 'W';
+  if (Result = '') and (Value <> 0) then
+    Result := 'Unknown: 0x' + IntToHex(Value, 8);
+end;
+
 { TSimpleMemoryMap }
 
 procedure TSimpleMemoryMap.AddNewData(const Description: string;
@@ -261,7 +291,7 @@ var
   MovedSectionCount: Integer;
   ImageSectionHeader: PImageSectionHeader;
   dwLength: NativeUInt;
-  AItem: TListItemData;
+  APage: TPageData;
   BaseAddr, SectionEnd: NativeUInt;
   NormalizedName: string;
 
@@ -275,6 +305,8 @@ var
     COFFOffset, SectionNameOffset: NativeUInt;
     Index: Integer;
     SectionName: array [0..255] of AnsiChar;
+    pSectionMbi: TMemoryBasicInformation;
+    SectionSize: Int64;
   begin
     if ImageSectionHeader^.VirtualAddress < SectionEnd then
     begin
@@ -282,12 +314,14 @@ var
       COFFOffset := ImageInfo.FileHeader.FileHeader.PointerToSymbolTable +
         ImageInfo.FileHeader.FileHeader.NumberOfSymbols * SizeOf(TCoffSymbol);
 
-      AItem := Default(TListItemData);
-      with AItem do
+      SectionSize := AlignedSectionSize(
+        ImageInfo, ImageSectionHeader^.Misc.VirtualSize);
+
+      APage := Default(TPageData);
+      with APage do
       begin
         AddrVA := Int64(BaseAddr + ImageSectionHeader^.VirtualAddress);
-        Size := AlignedSectionSize(
-          ImageInfo, ImageSectionHeader^.Misc.VirtualSize);
+        Size := SectionSize;
         EndAddrVA := AddrVA + Size;
         Image := ExtractFileName(ImagePath);
         Section := PAnsiChar(@ImageSectionHeader^.Name[0]);
@@ -308,11 +342,50 @@ var
           IsWrite(ImageSectionHeader^.Characteristics),
           ImageInfo, ImageSectionHeader^.VirtualAddress,
           AlignedSectionSize(ImageInfo, ImageSectionHeader^.Misc.VirtualSize));
-        DisplayStateAndProtect(AItem, lpBuffer);
+        DisplayStateAndProtect(APage, lpBuffer);
         ImageIdx := FImageCount;
       end;
 
-      FList.Add(AItem);
+      // Секция из-за вызова VirtualProtect может находиться на нескольких страницах
+
+      // After VirtualProtect is invoked, the section may be on multiple pages
+      pSectionMbi := Default(TMemoryBasicInformation);
+      if VirtualQueryEx(hProcess,
+        Pointer(APage.AddrVA), pSectionMbi, dwLength) <> dwLength then
+        RaiseLastOSError;
+      if pSectionMbi.RegionSize >= APage.Size then
+        FPages.Add(APage)
+      else
+      begin
+        APage.Size := pSectionMbi.RegionSize;
+        APage.EndAddrVA := APage.AddrVA + APage.Size;
+        FPages.Add(APage);
+        Dec(SectionSize, pSectionMbi.RegionSize);
+        Inc(APage.AddrVA, pSectionMbi.RegionSize);
+        while SectionSize > 0 do
+        begin
+          if VirtualQueryEx(hProcess,
+            Pointer(APage.AddrVA), pSectionMbi, dwLength) <> dwLength then
+            RaiseLastOSError;
+          APage := Default(TPageData);
+          with APage do
+          begin
+            AddrVA := Int64(pSectionMbi.BaseAddress);
+            Size := pSectionMbi.RegionSize;
+            EndAddrVA := AddrVA + Size;
+            Image := ExtractFileName(ImagePath);
+            Contains := GetContainsDirectory(
+              IsPageExecute(pSectionMbi.Protect),
+              IsPageWrite(ImageSectionHeader^.Characteristics),
+              ImageInfo, AddrVA, Size);
+            DisplayStateAndProtect(APage, pSectionMbi);
+          end;
+          FPages.Add(APage);
+          Dec(SectionSize, pSectionMbi.RegionSize);
+          Inc(APage.AddrVA, pSectionMbi.RegionSize);
+        end;
+      end;
+
       Inc(ImageSectionHeader);
       Inc(MovedSectionCount);
 
@@ -333,8 +406,8 @@ var
     begin
       if MappedName <> ImagePath then Break;
 
-      AItem := Default(TListItemData);
-      with AItem do
+      APage := Default(TPageData);
+      with APage do
       begin
         AddrVA := Int64(pSectionAddr);
         Size := lpBuffer.RegionSize;
@@ -345,11 +418,11 @@ var
           DataDirectory[IMAGE_DIRECTORY_ENTRY_SECURITY].VirtualAddress;
         if SecAddr = pSectionAddr then
           Contains := 'security';
-        DisplayStateAndProtect(AItem, lpBuffer);
+        DisplayStateAndProtect(APage, lpBuffer);
         ImageIdx := FImageCount;
       end;
 
-      FList.Add(AItem);
+      FPages.Add(APage);
       Inc(pSectionAddr, lpBuffer.RegionSize);
       if VirtualQueryEx(hProcess,
         Pointer(pSectionAddr), lpBuffer, dwLength) <> dwLength then
@@ -395,8 +468,8 @@ begin
       // Если все в порядке, добавляем информацию о найденном РЕ заголовке
 
       // If everything is OK, add the information about the found PE header
-      AItem := Default(TListItemData);
-      with AItem do
+      APage := Default(TPageData);
+      with APage do
       begin
         AddrVA := Int64(lpBuffer.BaseAddress);
 
@@ -413,11 +486,11 @@ begin
 
         Image := ExtractFileName(ImagePath);
         Contains := 'PE Header';
-        DisplayStateAndProtect(AItem, lpBuffer);
+        DisplayStateAndProtect(APage, lpBuffer);
         MapedFile := NormalizedName;
         ImageIdx := FImageCount;
       end;
-      FList.Add(AItem);
+      FPages.Add(APage);
     end
     else
       Exit;
@@ -454,10 +527,10 @@ begin
   end;
 end;
 
-procedure TSimpleMemoryMap.DisplayStateAndProtect(var AItem: TListItemData;
+procedure TSimpleMemoryMap.DisplayStateAndProtect(var APage: TPageData;
   const lpBuffer: TMemoryBasicInformation);
 begin
-  with AItem do
+  with APage do
   begin
     case lpBuffer.State of
       MEM_FREE: PageType := ptFree;
@@ -472,43 +545,12 @@ begin
     Access := ExtractAccessString(lpBuffer.Protect);
     IAccess := ExtractInitialAccessString(lpBuffer.AllocationProtect);
   end;
-  if FLastPageType <> AItem.PageType then
+  if FLastPageType <> APage.PageType then
   begin
-    FLastPageType := AItem.PageType;
+    FLastPageType := APage.PageType;
     FGrayed := not FGrayed;
   end;
-  AItem.Grayed := FGrayed;
-end;
-
-function TSimpleMemoryMap.ExtractAccessString(const Value: DWORD): string;
-const
-  PAGE_WRITECOMBINE = $400;
-begin
-  Result := ExtractInitialAccessString(Value);
-  if (Value and PAGE_GUARD) = PAGE_GUARD then
-    Result := Result + ', Guarded';
-  if (Value and PAGE_NOCACHE) = PAGE_NOCACHE then
-    Result := Result + ', No cache';
-  if (Value and PAGE_WRITECOMBINE) = PAGE_WRITECOMBINE then
-    Result := Result + ', Write Combine';
-end;
-
-function TSimpleMemoryMap.ExtractInitialAccessString(const Value: DWORD
-  ): string;
-begin
-  Result := '';
-  if (Value and PAGE_EXECUTE) = PAGE_EXECUTE then Result := 'E';
-  if (Value and PAGE_EXECUTE_READ) = PAGE_EXECUTE_READ then Result := 'RE';
-  if (Value and PAGE_EXECUTE_READWRITE) = PAGE_EXECUTE_READWRITE then
-     Result := 'RWE';
-  if (Value and PAGE_EXECUTE_WRITECOPY) = PAGE_EXECUTE_WRITECOPY then
-    Result := 'RWE';
-  if (Value and PAGE_NOACCESS) = PAGE_NOACCESS then Result := 'No access';
-  if (Value and PAGE_READONLY) = PAGE_READONLY then Result := 'R';
-  if (Value and PAGE_READWRITE) = PAGE_READWRITE then Result := 'RW';
-  if (Value and PAGE_WRITECOPY) = PAGE_WRITECOPY then Result := 'W';
-  if (Result = '') and (Value <> 0) then
-    Result := 'Unknown: 0x' + IntToHex(Value, 8);
+  APage.Grayed := FGrayed;
 end;
 
 procedure TSimpleMemoryMap.FillPEBInfo(const hProcess: THandle);
@@ -648,7 +690,7 @@ begin
     NativeUInt(SBI.lpMaximumApplicationAddress) and $7FFF0000);
 end;
 
-procedure TSimpleMemoryMap.FillProcessMemoryMap(AList: TList<TListItemData>);
+procedure TSimpleMemoryMap.FillProcessMemoryMap(APages: TList<TPageData>);
 const
   MM_HIGHEST_USER_ADDRESS32 = $7FFEFFFF;
   MM_HIGHEST_USER_ADDRESS64 = $7FFFFFFF0000;
@@ -658,11 +700,11 @@ var
   lpBuffer: TMemoryBasicInformation;
   dwLength: DWORD;
   OwnerName: string;
-  AItem: TListItemData;
+  APage: TPageData;
   I: Integer;
 begin
-  FList := AList;
-  FList.Clear;
+  FPages := APages;
+  FPages.Clear;
   SetLength(FAdvData, 0);
   hProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ,
     False, FCurrentPid);
@@ -726,13 +768,13 @@ begin
 
       // Add page data to ListView
 
-      AItem := Default(TListItemData);
-      with AItem do
+      APage := Default(TPageData);
+      with APage do
       begin
         AddrVA := Int64(lpBuffer.BaseAddress);
         Size := lpBuffer.RegionSize;
         EndAddrVA := AddrVA + Size;
-        DisplayStateAndProtect(AItem, lpBuffer);
+        DisplayStateAndProtect(APage, lpBuffer);
         for I := 0 to Length(FAdvData) - 1 do
         begin
           if (FAdvData[I].Addr >= {%H-}NativeUInt(lpBuffer.BaseAddress)) and
@@ -751,7 +793,7 @@ begin
         if OwnerName <> '' then
           MapedFile := NormalizePath(OwnerName);
       end;
-      FList.Add(AItem);
+      FPages.Add(APage);
     end;
 
   finally
@@ -872,6 +914,17 @@ begin
     IMAGE_SCN_MEM_EXECUTE then Result := True;
 end;
 
+function TSimpleMemoryMap.IsPageExecute(const Value: DWORD): Boolean;
+begin
+  Result := False;
+  if (Value and PAGE_EXECUTE) = PAGE_EXECUTE then Result := True;
+  if (Value and PAGE_EXECUTE_READ) = PAGE_EXECUTE_READ then Result := True;
+  if (Value and PAGE_EXECUTE_READWRITE) = PAGE_EXECUTE_READWRITE then
+     Result := True;
+  if (Value and PAGE_EXECUTE_WRITECOPY) = PAGE_EXECUTE_WRITECOPY then
+    Result := True;
+end;
+
 function TSimpleMemoryMap.IsWrite(const Value: DWORD): Boolean;
 const
   IMAGE_SCN_CNT_UNINITIALIZED_DATA = $00000080;
@@ -881,6 +934,19 @@ begin
   if (Value and IMAGE_SCN_CNT_UNINITIALIZED_DATA) =
     IMAGE_SCN_CNT_UNINITIALIZED_DATA then Result := True;
   if (Value and IMAGE_SCN_MEM_WRITE) = IMAGE_SCN_MEM_WRITE then
+    Result := True;
+end;
+
+function TSimpleMemoryMap.IsPageWrite(const Value: DWORD): Boolean;
+begin
+  Result := False;
+  if (Value and PAGE_READWRITE) = PAGE_EXECUTE_READWRITE then
+     Result := True;
+  if (Value and PAGE_WRITECOPY) = PAGE_EXECUTE_WRITECOPY then
+    Result := True;
+  if (Value and PAGE_EXECUTE_READWRITE) = PAGE_EXECUTE_READWRITE then
+     Result := True;
+  if (Value and PAGE_EXECUTE_WRITECOPY) = PAGE_EXECUTE_WRITECOPY then
     Result := True;
 end;
 

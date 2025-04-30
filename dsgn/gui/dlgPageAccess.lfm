@@ -1,0 +1,169 @@
+object frmPageAccess: TfrmPageAccess
+  Left = 575
+  Height = 557
+  Top = 1281
+  Width = 612
+  Caption = 'Cpu-View Set Page Access'
+  ClientHeight = 557
+  ClientWidth = 612
+  Constraints.MinWidth = 600
+  DesignTimePPI = 144
+  Position = poScreenCenter
+  LCLVersion = '4.99.0.0'
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  object gbPages: TGroupBox
+    Left = 8
+    Height = 495
+    Top = 0
+    Width = 295
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    Caption = 'Select pages:'
+    ClientHeight = 465
+    ClientWidth = 291
+    TabOrder = 0
+    object lvPages: TLazVirtualStringTree
+      Left = 0
+      Height = 465
+      Top = 0
+      Width = 291
+      Align = alClient
+      DefaultText = 'Node'
+      Header.AutoSizeIndex = -1
+      Header.Columns = <>
+      Header.Height = 48
+      Header.MainColumn = -1
+      TabOrder = 0
+      TreeOptions.PaintOptions = [toHideFocusRect, toShowButtons, toShowDropmark, toShowRoot, toShowVertGridLines, toThemeAware, toUseBlendedImages, toUseBlendedSelection, toUseExplorerTheme]
+      TreeOptions.SelectionOptions = [toFullRowSelect, toMultiSelect, toRestoreSelection]
+      OnGetText = lvPagesGetText
+    end
+  end
+  object btnSelAll: TButton
+    Left = 40
+    Height = 38
+    Top = 503
+    Width = 113
+    Anchors = [akLeft, akBottom]
+    Caption = 'Select All'
+    TabOrder = 1
+    OnClick = btnSelAllClick
+  end
+  object btnDeselAll: TButton
+    Left = 160
+    Height = 38
+    Top = 503
+    Width = 113
+    Anchors = [akLeft, akBottom]
+    Caption = 'Deselect All'
+    TabOrder = 2
+    OnClick = btnDeselAllClick
+  end
+  object gbAccess: TGroupBox
+    Left = 319
+    Height = 493
+    Top = 0
+    Width = 278
+    Anchors = [akTop, akRight, akBottom]
+    Caption = 'Select Access:'
+    ClientHeight = 463
+    ClientWidth = 274
+    TabOrder = 3
+    object rbNoAcccess: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 10
+      Width = 120
+      Caption = 'NO ACCESS'
+      TabOrder = 0
+    end
+    object rbReadOnly: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 40
+      Width = 120
+      Caption = 'READ ONLY'
+      TabOrder = 1
+    end
+    object rbReadWrite: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 72
+      Width = 126
+      Caption = 'READ WRITE'
+      TabOrder = 2
+    end
+    object rbExecute: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 104
+      Width = 95
+      Caption = 'EXECUTE'
+      TabOrder = 3
+    end
+    object rbExecuteRead: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 136
+      Width = 145
+      Caption = 'EXECUTE READ'
+      TabOrder = 4
+    end
+    object rbFull: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 168
+      Width = 130
+      Caption = 'FULL ACCESS'
+      Checked = True
+      TabOrder = 8
+      TabStop = True
+    end
+    object rbWriteCopy: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 200
+      Width = 126
+      Caption = 'WRITE COPY'
+      TabOrder = 5
+    end
+    object rbExecuteWriteCopy: TRadioButton
+      Left = 10
+      Height = 29
+      Top = 232
+      Width = 201
+      Caption = 'EXECUTE WRITE COPY'
+      TabOrder = 6
+    end
+    object cbPageGuard: TCheckBox
+      Left = 10
+      Height = 29
+      Top = 264
+      Width = 133
+      Caption = 'PAGE GUARD'
+      TabOrder = 7
+    end
+  end
+  object btnCancel: TButton
+    Left = 482
+    Height = 38
+    Top = 503
+    Width = 113
+    Anchors = [akRight, akBottom]
+    Cancel = True
+    Caption = 'Cancel'
+    ModalResult = 2
+    TabOrder = 4
+  end
+  object Button3: TButton
+    Left = 362
+    Height = 38
+    Top = 503
+    Width = 113
+    Anchors = [akRight, akBottom]
+    Caption = 'OK'
+    Default = True
+    ModalResult = 1
+    TabOrder = 5
+  end
+end

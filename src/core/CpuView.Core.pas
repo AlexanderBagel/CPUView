@@ -255,17 +255,33 @@ type
     property OnReset: TNotifyEvent read FReset write FReset;
   end;
 
-  function TraceLog: TStringList;
+  { TTraceLog }
+
+  TTraceLog = class
+  private
+    FData: TStringList;
+    FChange: TNotifyEvent;
+    procedure DoChange;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Clear;
+    procedure Log(const Value: string; AddTime: Boolean = True);
+    property Data: TStringList read FData;
+    property OnChange: TNotifyEvent read FChange write FChange;
+  end;
+
+  function TraceLog: TTraceLog;
 
 implementation
 
 var
-  _TraceLog: TStringList;
+  _TraceLog: TTraceLog;
 
-function TraceLog: TStringList;
+function TraceLog: TTraceLog;
 begin
   if _TraceLog = nil then
-    _TraceLog := TStringList.Create;
+    _TraceLog := TTraceLog.Create;
   Result := _TraceLog;
 end;
 
@@ -915,30 +931,24 @@ begin
   try
     if (ACurrentAddrVA = 0) and (FDebugger.DebugState = adsFinished) then
     begin
-      TraceLog.Add(FormatDateTime('hh:mm:ss.zzz', Now) + ': debug stop');
+      TraceLog.Log('debug stop');
       Exit;
     end;
 
     if FDebugger.DebugState <> adsPaused then Exit;
 
     if FLastAddrVA = 0 then
-      TraceLog.Add(FormatDateTime('hh:mm:ss.zzz', Now) + ': debug start');
+      TraceLog.Log('debug start');
 
     if not QueryDisasmAtAddr(ACurrentAddrVA, AItem) then Exit;
 
-    TraceLog.Add(Format('%s | %.16x | %s (%s)',
+    TraceLog.Log(Format('%s | %.16x | %s (%s)',
       [
       FormatDateTime('hh:mm:ss.zzz', Now),
       ACurrentAddrVA,
       AItem.FirstAsmLine,
       QuerySymbolAtAddr(ACurrentAddrVA, False)
-      ]));
-
-    if TraceLog.Count > 500 then
-    begin
-      while TraceLog.Count > 250 do
-        TraceLog.Delete(0);
-    end;
+      ]), False);
 
   finally
     FLastAddrVA := ACurrentAddrVA;
@@ -1650,9 +1660,46 @@ begin
   end;
 end;
 
+{ TTraceLog }
+
+procedure TTraceLog.DoChange;
+begin
+  if Assigned(FChange) then
+    FChange(Self);
+end;
+
+constructor TTraceLog.Create;
+begin
+  FData := TStringList.Create;
+end;
+
+destructor TTraceLog.Destroy;
+begin
+  FData.Free;
+  inherited Destroy;
+end;
+
+procedure TTraceLog.Clear;
+begin
+  FData.Clear;
+  DoChange;
+end;
+
+procedure TTraceLog.Log(const Value: string; AddTime: Boolean);
+begin
+  if AddTime then
+    FData.Add(FormatDateTime('hh:mm:ss.zzz', Now) + ': ' + Value)
+  else
+    FData.Add(Value);
+  if FData.Count > 500 then
+    while FData.Count > 250 do
+      FData.Delete(0);
+  DoChange;
+end;
+
 initialization
 
-  _TraceLog := TStringList.Create;
+  _TraceLog := TTraceLog.Create;
 
 finalization
 

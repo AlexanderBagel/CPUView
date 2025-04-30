@@ -67,12 +67,14 @@ type
       MBI: TMemoryBasicInformation): Boolean;
   public
     destructor Destroy; override;
+    function GetPageSize: Integer; override;
     function GetThreadExtendedData({%H-}AThreadID: Integer; {%H-}ThreadIs32: Boolean): TThreadExtendedData; override;
     function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function NeedUpdateReadData: Boolean; override;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
+    function SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD): Boolean; override;
     function SetThreadExtendedData({%H-}AThreadID: Integer; {%H-}ThreadIs32: Boolean; const {%H-}AData: TThreadExtendedData): Boolean; override;
     procedure Update; override;
   end;
@@ -153,6 +155,10 @@ const
   X86_XSTATE_X87_MASK = X86_XSTATE_X87;
   X86_XSTATE_SSE_MASK = X86_XSTATE_X87 or X86_XSTATE_SSE;
   X86_XSTATE_AVX_MASK = X86_XSTATE_SSE_MASK or X86_XSTATE_AVX;
+
+  _SC_PAGESIZE = 30;
+
+  function sysconf (__name : longint) : longint; cdecl; external 'c';
 
 function GetXSaveHeader(XSaveArea: PByte): PXSaveHeader;
 begin
@@ -1029,6 +1035,11 @@ begin
   inherited Destroy;
 end;
 
+function TCommonUtils.GetPageSize: Integer;
+begin
+  Result := sysconf(_SC_PAGESIZE);
+end;
+
 function TCommonUtils.GetThreadExtendedData(AThreadID: Integer;
   ThreadIs32: Boolean): TThreadExtendedData;
 begin
@@ -1134,6 +1145,13 @@ begin
     FillChar(RemainingBuff^, RemainingBytes, 0);
     Result := ASize;
   end;
+end;
+
+function TCommonUtils.SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD
+  ): Boolean;
+begin
+  {$message 'SetPageAccess not yet implemented '}
+  Result := False;
 end;
 
 function TCommonUtils.SetThreadExtendedData(AThreadID: Integer;

@@ -121,6 +121,7 @@ object frmMemoryMap: TfrmMemoryMap
     OnHeaderDrawQueryElements = lvMemoryMapHeaderDrawQueryElements
   end
   object pmList: TPopupMenu
+    OnPopup = pmListPopup
     Left = 584
     Top = 257
     object miOpenInCpuView: TMenuItem
@@ -141,10 +142,28 @@ object frmMemoryMap: TfrmMemoryMap
     object Separator2: TMenuItem
       Caption = '-'
     end
+    object miDump: TMenuItem
+      Caption = 'Dump Memory to File...'
+      OnClick = miDumpClick
+    end
+    object miSetPageAccess: TMenuItem
+      Caption = 'Set Page Access...'
+      OnClick = miSetPageAccessClick
+    end
+    object Separator3: TMenuItem
+      Caption = '-'
+    end
     object miSearchAddr: TMenuItem
       Caption = 'Search Address'
       ShortCut = 16454
       OnClick = miSearchAddrClick
     end
+  end
+  object SaveDialog: TSaveDialog
+    DefaultExt = '.bin'
+    Filter = 'Binary File (*.bin)|*.bin|All Files (*.*)|*.*'
+    Options = [ofOverwritePrompt, ofPathMustExist, ofEnableSizing, ofViewDetail]
+    Left = 480
+    Top = 257
   end
 end

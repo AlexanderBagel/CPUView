@@ -478,11 +478,13 @@ type
     procedure SetProcessID(const Value: Integer); override;
   public
     destructor Destroy; override;
+    function GetPageSize: Integer; override;
     function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
     function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
+    function SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD): Boolean; override;
     function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
     procedure Update; override;
   end;
@@ -1336,6 +1338,14 @@ begin
   inherited;
 end;
 
+function TCommonUtils.GetPageSize: Integer;
+var
+  SBI: TSystemInfo;
+begin
+  GetSystemInfo(SBI);
+  Result := Integer(SBI.dwPageSize);
+end;
+
 function TCommonUtils.GetThreadExtendedData(AThreadID: Integer;
   ThreadIs32: Boolean): TThreadExtendedData;
 begin
@@ -1458,6 +1468,14 @@ begin
     Result := Longint(ReadCount);
 end;
 
+function TCommonUtils.SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD
+  ): Boolean;
+var
+  OldProtect: DWORD;
+begin
+  Result := VirtualProtectEx(FProcessHandle, AddrVA, PtrUInt(Size), Flags, @OldProtect);
+end;
+
 function TCommonUtils.SetThreadExtendedData(AThreadID: Integer;
   ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean;
 begin
@@ -1484,7 +1502,8 @@ begin
   inherited;
   if ProcessID <> 0 then
     FProcessHandle := OpenProcess(
-      PROCESS_QUERY_INFORMATION or PROCESS_VM_READ or PROCESS_VM_WRITE, False, ProcessID);
+      PROCESS_QUERY_INFORMATION or PROCESS_VM_OPERATION or
+      PROCESS_VM_READ or PROCESS_VM_WRITE, False, ProcessID);
 end;
 
 procedure TCommonUtils.Update;

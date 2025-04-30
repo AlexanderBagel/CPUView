@@ -18,7 +18,8 @@ uses
   CpuView.IntelContext, CpuView.IntelContext.Types, 
   CpuView.ScriptExecutor.Intel, dlgCpuView.TemporaryLocker, dlgInputBox, 
   dlgTraceLog, dlgSimd87Editor, dlgProcExports, dlgMemoryMap, 
-  CpuView.Windows.MMap, LazarusPackageIntf;
+  CpuView.Windows.MMap, dlgPageAccess, CpuView.Design.DpiFix, 
+  LazarusPackageIntf;
 
 implementation
 

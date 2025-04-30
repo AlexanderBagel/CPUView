@@ -17,14 +17,16 @@
 
 unit dlgTraceLog;
 
-{$mode objfpc}{$H+}
+{$mode delphi}
 {$WARN 5024 off : Parameter "$1" not used}
 
 interface
 
 uses
   LCLType, LCLIntf, Messages, Classes, SysUtils, Forms, Controls, Graphics,
-  Dialogs, StdCtrls, Menus;
+  Dialogs, StdCtrls, Menus,
+
+  CpuView.Core;
 
 type
 
@@ -48,9 +50,10 @@ type
     procedure miSelectAllClick(Sender: TObject);
     procedure mnuCopyClick(Sender: TObject);
   private
-    FTraceLog: TStringList;
+    FTraceLog: TTraceLog;
+    procedure TraceLogChanged(Sender: TObject);
   public
-    procedure UpdateTraceLog(Value: TStringList);
+    procedure UpdateTraceLog(Value: TTraceLog);
   end;
 
 var
@@ -67,22 +70,29 @@ begin
   memLog.CopyToClipboard;
 end;
 
-procedure TfrmTraceLog.UpdateTraceLog(Value: TStringList);
+procedure TfrmTraceLog.TraceLogChanged(Sender: TObject);
+begin
+  memLog.Lines.Assign(FTraceLog.Data);
+  SendMessage(frmTraceLog.memLog.Handle, WM_VSCROLL, SB_BOTTOM, 0);
+end;
+
+procedure TfrmTraceLog.UpdateTraceLog(Value: TTraceLog);
 begin
   FTraceLog := Value;
-  memLog.Lines.Assign(Value);
-  SendMessage(frmTraceLog.memLog.Handle, WM_VSCROLL, SB_BOTTOM, 0);
+  FTraceLog.OnChange := TraceLogChanged;
+  TraceLogChanged(Value);
 end;
 
 procedure TfrmTraceLog.miClearClick(Sender: TObject);
 begin
-  memLog.Clear;
   FTraceLog.Clear;
 end;
 
 procedure TfrmTraceLog.FormClose(Sender: TObject; var CloseAction: TCloseAction
   );
 begin
+  if Assigned(FTraceLog) then
+    FTraceLog.OnChange := nil;
   CloseAction := caFree;
 end;
 
