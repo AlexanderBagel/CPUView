@@ -74,7 +74,7 @@ type
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
-    function SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD): Boolean; override;
+    function SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: Cardinal): Boolean; override;
     function SetThreadExtendedData({%H-}AThreadID: Integer; {%H-}ThreadIs32: Boolean; const {%H-}AData: TThreadExtendedData): Boolean; override;
     procedure Update; override;
   end;
@@ -1147,8 +1147,8 @@ begin
   end;
 end;
 
-function TCommonUtils.SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD
-  ): Boolean;
+function TCommonUtils.SetPageAccess(AddrVA: Pointer; Size: Integer;
+  Flags: Cardinal): Boolean;
 begin
   {$message 'SetPageAccess not yet implemented '}
   Result := False;

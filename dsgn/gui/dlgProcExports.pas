@@ -22,6 +22,8 @@ unit dlgProcExports;
 
 interface
 
+{$I CpuViewCfg.inc}
+
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, Clipbrd, Menus,
   Generics.Collections, Generics.Defaults,

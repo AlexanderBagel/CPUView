@@ -484,7 +484,7 @@ type
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
-    function SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD): Boolean; override;
+    function SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: Cardinal): Boolean; override;
     function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; override;
     procedure Update; override;
   end;
@@ -1468,8 +1468,8 @@ begin
     Result := Longint(ReadCount);
 end;
 
-function TCommonUtils.SetPageAccess(AddrVA: Pointer; Size: Integer; Flags: DWORD
-  ): Boolean;
+function TCommonUtils.SetPageAccess(AddrVA: Pointer; Size: Integer;
+  Flags: Cardinal): Boolean;
 var
   OldProtect: DWORD;
 begin
