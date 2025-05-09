@@ -20,12 +20,36 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   inherited ToolBar: TToolBar
     inherited tbSep1: TToolButton
       Left = 71
+      Height = 33
     end
     inherited tbBreakPoint: TToolButton
       Left = 79
     end
+    inherited tbSep2: TToolButton
+      Left = 149
+      Height = 33
+    end
     inherited tbRunTillRet: TToolButton
       Left = 114
+    end
+    inherited tbRunTo: TToolButton
+      Left = 157
+    end
+    inherited tbRunToUserCode: TToolButton
+      Left = 192
+    end
+    inherited tbSep3: TToolButton
+      Left = 227
+      Height = 33
+    end
+    inherited tbTraceLog: TToolButton
+      Left = 235
+    end
+    inherited tbExports: TToolButton
+      Left = 270
+    end
+    inherited tbMemoosyMap: TToolButton
+      Left = 305
     end
   end
   inherited pnDumps: TPanel
@@ -200,6 +224,10 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     end
     inherited acUtilsExports: TAction[84]
     end
+    inherited acUtilsMM: TAction[85]
+    end
+    inherited acShowInMemoryMap: TAction[86]
+    end
   end
   inherited pmDump: TPopupMenu
     Left = 176
@@ -243,14 +271,14 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     object miRegIntelSep2: TMenuItem
       Caption = '-'
     end
-    object miRegIntelFit: TMenuItem
-      Action = acViewFitColumnToBestSize
+    object miRegIntelCopy: TMenuItem
+      Action = acCopy
     end
     object miRegIntelSep3: TMenuItem
       Caption = '-'
     end
-    object miRegIntelCopy: TMenuItem
-      Action = acCopy
+    object miRegIntelFit: TMenuItem
+      Action = acViewFitColumnToBestSize
     end
   end
 end
