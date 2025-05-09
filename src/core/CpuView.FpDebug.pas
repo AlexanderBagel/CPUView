@@ -32,6 +32,7 @@ uses
   LCLType,
   LCLIntf,
   Maps,
+  LazVersion,
 
   SysUtils,
   Classes,
@@ -86,6 +87,10 @@ uses
   CpuView.CPUContext,
   CpuView.DebugerGate,
   CpuView.Design.DbgLog;
+
+{$if laz_major >= 4}
+  {$define ExtendedFpDebug}
+{$endif}
 
 type
 
@@ -958,6 +963,7 @@ begin
       LocalLib.Name := Lib.Name;
       LocalSymbol := Default(TLocalSymbol);
       FLocalSymbols.Add(LocalLib);
+      {$ifdef ExtendedFpDebug}
       L := Lib.SymbolTableInfo.SymbolCount - 1;
       if L > 0 then
       begin
@@ -980,6 +986,7 @@ begin
           LocalLib.Symbols.List[L].EndVA := RegionData.BaseAddr + RegionData.RegionSize;
         LocalLib.HighAddr := LocalLib.Symbols.List[L].EndVA;
       end;
+      {$endif}
       Iterator.Next;
     end;
   finally
@@ -1107,6 +1114,7 @@ begin
       Iterator.GetData(Lib);
       if Lib.ModuleHandle = AModule.hInstance then
       begin
+        {$ifdef ExtendedFpDebug}
         for I := 0 to Lib.SymbolTableInfo.SymbolCount - 1 do
         begin
           Sym := Lib.SymbolTableInfo.Symbols[I];
@@ -1114,6 +1122,7 @@ begin
           RemProc.AddrVA := Sym.Address.Address;
           Result.Add(RemProc);
         end;
+        {$endif}
         Break;
       end;
       Iterator.Next;
