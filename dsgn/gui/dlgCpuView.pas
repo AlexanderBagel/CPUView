@@ -51,9 +51,7 @@ uses
   dlgTraceLog,
   dlgSimd87Editor,
   dlgProcExports,
-  dlgMemoryMap,
-
-  uni_profiler;
+  dlgMemoryMap;
 
 type
 
@@ -169,8 +167,6 @@ type
     miSBCopyText: TMenuItem;
     miSBCopyValue: TMenuItem;
     miStackFollowRbp: TMenuItem;
-    miProfilerSaveDump: TMenuItem;
-    miResetProfiler: TMenuItem;
     miDebugGenException: TMenuItem;
     miDumpsCloseRight: TMenuItem;
     miAsmRunTo: TMenuItem;
@@ -384,8 +380,6 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyPress(Sender: TObject; var Key: char);
     procedure miDebugGenExceptionClick(Sender: TObject);
-    procedure miProfilerSaveDumpClick(Sender: TObject);
-    procedure miResetProfilerClick(Sender: TObject);
     procedure pcDumpsChange(Sender: TObject);
     procedure pmStatusBarPopup(Sender: TObject);
     procedure RegViewDblClick(Sender: TObject);
@@ -549,16 +543,6 @@ end;
 procedure TfrmCpuView.miDebugGenExceptionClick(Sender: TObject);
 begin
   raise Exception.Create('Test exception');
-end;
-
-procedure TfrmCpuView.miProfilerSaveDumpClick(Sender: TObject);
-begin
-  uprof.SaveToFile(DebugFolder + 'profile.txt');
-end;
-
-procedure TfrmCpuView.miResetProfilerClick(Sender: TObject);
-begin
-  uprof.Reset;
 end;
 
 procedure TfrmCpuView.pcDumpsChange(Sender: TObject);
