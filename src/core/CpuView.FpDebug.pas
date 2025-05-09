@@ -88,6 +88,7 @@ uses
   CpuView.DebugerGate,
   CpuView.Design.DbgLog;
 
+{$message 'Disable when stable = 4.0'}
 {$if laz_major >= 4}
   {$define ExtendedFpDebug}
 {$endif}
