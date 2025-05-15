@@ -1,12 +1,11 @@
 object frmMemoryMap: TfrmMemoryMap
   Left = 616
-  Height = 928
+  Height = 619
   Top = 281
-  Width = 1950
+  Width = 1300
   Caption = 'Cpu-View Memory Map'
-  ClientHeight = 928
-  ClientWidth = 1950
-  DesignTimePPI = 144
+  ClientHeight = 619
+  ClientWidth = 1300
   KeyPreview = True
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
@@ -17,22 +16,22 @@ object frmMemoryMap: TfrmMemoryMap
   OnShow = FormShow
   object pnHint: TPanel
     Left = 0
-    Height = 34
-    Top = 894
-    Width = 1950
+    Height = 23
+    Top = 596
+    Width = 1300
     Align = alBottom
-    ClientHeight = 34
-    ClientWidth = 1950
+    ClientHeight = 23
+    ClientWidth = 1300
     TabOrder = 0
     object lblPromt: TLabel
       AnchorSideLeft.Control = pnHint
       AnchorSideTop.Control = pnHint
       AnchorSideTop.Side = asrCenter
-      Left = 9
-      Height = 25
-      Top = 5
-      Width = 279
-      BorderSpacing.Left = 8
+      Left = 6
+      Height = 17
+      Top = 3
+      Width = 196
+      BorderSpacing.Left = 5
       Caption = 'For more detailed information, use:'
     end
     object lblUrl: TLabel
@@ -41,11 +40,11 @@ object frmMemoryMap: TfrmMemoryMap
       AnchorSideTop.Control = pnHint
       AnchorSideTop.Side = asrCenter
       Cursor = crHandPoint
-      Left = 296
-      Height = 25
-      Top = 5
-      Width = 448
-      BorderSpacing.Left = 8
+      Left = 207
+      Height = 17
+      Top = 3
+      Width = 314
+      BorderSpacing.Left = 5
       Caption = 'https://github.com/AlexanderBagel/ProcessMemoryMap'
       Font.Color = clHighlight
       ParentFont = False
@@ -55,9 +54,9 @@ object frmMemoryMap: TfrmMemoryMap
   object lvMemoryMap: TLazVirtualStringTree
     Cursor = 63
     Left = 0
-    Height = 894
+    Height = 596
     Top = 0
-    Width = 1950
+    Width = 1300
     Align = alClient
     DefaultText = 'Node'
     Header.AutoSizeIndex = 8
@@ -65,50 +64,50 @@ object frmMemoryMap: TfrmMemoryMap
       item
         Position = 0
         Text = 'Address'
-        Width = 150
+        Width = 140
       end    
       item
         Position = 1
         Text = 'Size'
-        Width = 150
+        Width = 100
       end    
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAllowFocus]
         Position = 2
         Text = 'Owner'
-        Width = 150
+        Width = 100
       end    
       item
         Position = 3
         Text = 'Section'
-        Width = 100
+        Width = 67
       end    
       item
         Position = 4
         Text = 'Contains'
-        Width = 300
+        Width = 200
       end    
       item
         Position = 5
         Text = 'Type'
-        Width = 100
+        Width = 67
       end    
       item
         Position = 6
         Text = 'Access'
-        Width = 100
+        Width = 67
       end    
       item
         Position = 7
         Text = 'Initial Access'
-        Width = 120
+        Width = 80
       end    
       item
         Position = 8
         Text = 'Mapped as'
-        Width = 776
+        Width = 477
       end>
-    Header.Height = 48
+    Header.Height = 32
     Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoOwnerDraw, hoShowSortGlyphs, hoVisible]
     PopupMenu = pmList
     TabOrder = 1
@@ -122,8 +121,8 @@ object frmMemoryMap: TfrmMemoryMap
   end
   object pmList: TPopupMenu
     OnPopup = pmListPopup
-    Left = 584
-    Top = 257
+    Left = 389
+    Top = 171
     object miOpenInCpuView: TMenuItem
       Caption = 'Open In Cpu-View'
       OnClick = miOpenInCpuViewClick
@@ -154,8 +153,8 @@ object frmMemoryMap: TfrmMemoryMap
       Caption = '-'
     end
     object miSearchAddr: TMenuItem
-      Caption = 'Search Address'
-      ShortCut = 16454
+      Caption = 'Go to Address...'
+      ShortCut = 16455
       OnClick = miSearchAddrClick
     end
   end
@@ -163,7 +162,7 @@ object frmMemoryMap: TfrmMemoryMap
     DefaultExt = '.bin'
     Filter = 'Binary File (*.bin)|*.bin|All Files (*.*)|*.*'
     Options = [ofOverwritePrompt, ofPathMustExist, ofEnableSizing, ofViewDetail]
-    Left = 480
-    Top = 257
+    Left = 320
+    Top = 171
   end
 end

@@ -175,17 +175,6 @@ type
     property Sections: TSections read FSections;
   end;
 
-  TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptHeap, ptSystem);
-
-  PPageData= ^TPageData;
-  TPageData = record
-    AddrVA, EndAddrVA, Size: Int64;
-    PageType: TPageType;
-    Image, Section, Contains, Access, IAccess, MapedFile: string;
-    ImageIdx: Integer;
-    Grayed: Boolean;
-  end;
-
   { TSimpleMemoryMap }
 
   TSimpleMemoryMap = class
@@ -196,7 +185,8 @@ type
     FGrayed: Boolean;
     FLastPageType: TPageType;
     FPages: TList<TPageData>;
-    procedure AddContains(var AItem: TPageData; const Value: string);
+    procedure AddContains(var AItem: TPageData; const Value: string); overload;
+    procedure AddContains(var AItem: TPageData; const ASection: TElfSectionHeader); overload;
     procedure CheckPage(const page: TPageData);
     function DisplayElf(mmap: TMemoryBasicInformationList; var Idx: Integer): Boolean;
     function ExtractAccess(const mitm: TMemoryBasicInformation): string;
@@ -417,13 +407,33 @@ end;
 
 { TSimpleMemoryMap }
 
-procedure TSimpleMemoryMap.AddContains(var AItem: TPageData;
-  const Value: string);
+procedure TSimpleMemoryMap.AddContains(var AItem: TPageData; const Value: string
+  );
 begin
-  if AItem.Contains = '' then
-    AItem.Contains := Value
+  if AItem.ContainsStr = '' then
+    AItem.ContainsStr := Value
   else
-    AItem.Contains := AItem.Contains + ', ' + Value;
+    AItem.ContainsStr := AItem.ContainsStr + ', ' + Value;
+end;
+
+procedure TSimpleMemoryMap.AddContains(var AItem: TPageData;
+  const ASection: TElfSectionHeader);
+var
+  L: Integer;
+begin
+  L := Length(AItem.Contains);
+  if AItem.ContainsStr = '' then
+    AItem.ContainsStr := ASection.DisplayName
+  else
+    AItem.ContainsStr := AItem.ContainsStr + ', ' + ASection.DisplayName;
+  SetLength(AItem.Contains, L + 1);
+  with AItem.Contains[L] do
+  begin
+    AddrVA := ASection.Hdr.sh_addr;
+    Size := ASection.Hdr.sh_size;
+    EndAddrVA := AddrVA + Size;
+    Caption := ASection.DisplayName;
+  end;
 end;
 
 procedure TSimpleMemoryMap.CheckPage(const page: TPageData);
@@ -487,7 +497,10 @@ begin
           Continue;
         SecVA := Elf.Rebase(sh.Hdr.sh_addr);
         if (SecVA >= page.AddrVA) and (SecVA < page.EndAddrVA) then
-          AddContains(page, sh.DisplayName);
+        begin
+          sh.Hdr.sh_addr := SecVA;
+          AddContains(page, sh);
+        end;
       end;
       FPages.Add(page);
       Inc(Idx);

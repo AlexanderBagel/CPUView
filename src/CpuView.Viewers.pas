@@ -216,7 +216,6 @@ type
     function IgnoreSelectionWhenCopyAddress: Boolean; override;
     procedure InitPainters; override;
     function IsJumpValid(AJmpToAddr: Int64): Boolean; override;
-    procedure RestoreViewParam; override;
   protected
     // Lock Vertical Scroll
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -1619,17 +1618,6 @@ var
 begin
   DoQueryAddrType(AJmpToAddr, AddrType);
   Result := AddrType = atExecute;
-end;
-
-procedure TCustomAsmView.RestoreViewParam;
-var
-  NoDpiWidth: Integer;
-begin
-  inherited RestoreViewParam;
-  NoDpiWidth := CalculateColumnBestSize(ctAddress);
-  // revert to default dpi
-  NoDpiWidth := MulDiv(NoDpiWidth, 96, FCurrentPPI);
-  Header.ColumnMinWidth[ctAddress] := NoDpiWidth;
 end;
 
 procedure TCustomAsmView.KeyDown(var Key: Word; Shift: TShiftState);

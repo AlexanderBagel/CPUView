@@ -82,6 +82,23 @@ type
       1: (Linked: array [0..9] of Boolean);
   end;
 
+  TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptHeap, ptSystem);
+
+  TContains = record
+    AddrVA, EndAddrVA, Size: Int64;
+    Caption: string;
+  end;
+
+  PPageData= ^TPageData;
+  TPageData = record
+    AddrVA, EndAddrVA, Size: Int64;
+    PageType: TPageType;
+    Image, Section, ContainsStr, Access, IAccess, MapedFile: string;
+    ImageIdx: Integer;
+    Grayed: Boolean;
+    Contains: array of TContains;
+  end;
+
   { TCommonAbstractUtils }
 
   TCommonAbstractUtils = class

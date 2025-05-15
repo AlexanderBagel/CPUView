@@ -21,8 +21,6 @@ unit CpuView.Settings;
   {$MODE Delphi}
 {$ENDIF}
 
-{$I CpuViewCfg.inc}
-
 interface
 
 uses
@@ -53,6 +51,8 @@ uses
   CpuView.IntelContext,
   CpuView.XML,
   CpuView.ExtendedHint;
+
+  {$I CpuViewCfg.inc}
 
 {$IFDEF FPC}
 type
@@ -668,6 +668,7 @@ begin
   FAsmSettings := Default(TAsmSettings);
   FAsmSettings.ColumnWidth[ctWorkSpace] := 32;
   FAsmSettings.ColumnWidth[ctJmpLine] := 82;
+  FAsmSettings.ColumnWidth[ctAddress] := 128;
   FAsmSettings.ColumnWidth[ctOpcode] := 170;
   FAsmSettings.ColumnWidth[ctDescription] := 250;
   FAsmSettings.ColumnWidth[ctComment] := 440;

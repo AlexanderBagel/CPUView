@@ -288,8 +288,9 @@ begin
 end;
 
 function DefaultMBIComparer({$IFDEF USE_CONSTREF}constref{$ELSE}const{$ENDIF} A, B: TMemoryBasicInformation): Integer;
+
 begin
-  if A.BaseAddress < B.BaseAddress then
+  if QWord(A.BaseAddress) < QWord(B.BaseAddress) then
     Result := -1
   else
     if A.BaseAddress = B.BaseAddress then

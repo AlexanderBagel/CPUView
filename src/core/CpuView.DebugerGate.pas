@@ -22,8 +22,6 @@ unit CpuView.DebugerGate;
   {$WARN 5024 off : Parameter "$1" not used}
 {$ENDIF}
 
-{$I CpuViewCfg.inc}
-
 interface
 
 uses
@@ -34,6 +32,8 @@ uses
   CpuView.Common,
   CpuView.CPUContext,
   CpuView.Stream;
+
+  {$I CpuViewCfg.inc}
 
 const
   UserCodeAddrVANotFound = -1;

@@ -85,7 +85,7 @@ type
     function CheckAddressCallback(ANewAddrVA: Int64): Boolean;
     procedure HighLightAddr(AAddrVA: Int64);
     function PageTypeToStr(Value: TPageType): string;
-    function Search(AAddrVA: Int64): Integer;
+    function Search(AAddrVA: Int64; out Index, ChildIndex: Integer): Boolean;
   public
     procedure Init(ACore: TCpuViewCore; AGui: IGuiImplementation;
       APid: Cardinal; AIs64Process: Boolean; AAddrVA: Int64);
@@ -99,16 +99,27 @@ implementation
 
 {$R *.lfm}
 
+type
+  PNodeData = ^TNodeData;
+  TNodeData = record
+    RootIndex, ChildIndex: Integer;
+  end;
+
 { TfrmMemoryMap }
 
 procedure TfrmMemoryMap.lvMemoryMapDblClick(Sender: TObject);
 var
   Address: Int64;
   E: TVTVirtualNodeEnumerator;
+  pData: PNodeData;
 begin
   E := lvMemoryMap.SelectedNodes.GetEnumerator;
   if not E.MoveNext then Exit;
-  Address := FPages[E.Current^.Index].AddrVA;
+  pData := lvMemoryMap.GetNodeData(E.Current);
+  if pData^.ChildIndex < 0 then
+    Address := FPages[pData^.RootIndex].AddrVA
+  else
+    Address := FPages[pData^.RootIndex].Contains[pData^.ChildIndex].AddrVA;
   if FCore.AddrInAsm(Address) then
     FGui.OpenInDisassembler(Address)
   else
@@ -121,21 +132,39 @@ end;
 procedure TfrmMemoryMap.lvMemoryMapGetText(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType;
   var CellText: String);
+var
+  pData: PNodeData;
 begin
   {$IFDEF LINUX}
   if Column >= 3 then Inc(Column);
   if Column = 7 then Inc(Column);
   {$ENDIF}
+  pData := lvMemoryMap.GetNodeData(Node);
+  if pData^.ChildIndex < 0 then
+  begin
+    case Column of
+      0: CellText := IntToHex(FPages[pData^.RootIndex].AddrVA, 8);
+      1: CellText := IntToHex(FPages[pData^.RootIndex].Size, 8);
+      2: CellText := FPages[pData^.RootIndex].Image;
+      3: CellText := FPages[pData^.RootIndex].Section;
+      4:
+        if lvMemoryMap.Expanded[Node] then
+          CellText := ''
+        else
+          CellText := FPages[pData^.RootIndex].ContainsStr;
+      5: CellText := PageTypeToStr(FPages[pData^.RootIndex].PageType);
+      6: CellText := FPages[pData^.RootIndex].Access;
+      7: CellText := FPages[pData^.RootIndex].IAccess;
+      8: CellText := FPages[pData^.RootIndex].MapedFile;
+    end;
+    Exit;
+  end;
   case Column of
-    0: CellText := IntToHex(FPages[Node.Index].AddrVA, 8);
-    1: CellText := IntToHex(FPages[Node.Index].Size, 8);
-    2: CellText := FPages[Node.Index].Image;
-    3: CellText := FPages[Node.Index].Section;
-    4: CellText := FPages[Node.Index].Contains;
-    5: CellText := PageTypeToStr(FPages[Node.Index].PageType);
-    6: CellText := FPages[Node.Index].Access;
-    7: CellText := FPages[Node.Index].IAccess;
-    8: CellText := FPages[Node.Index].MapedFile;
+    0: CellText := IntToHex(FPages[pData^.RootIndex].Contains[pData^.ChildIndex].AddrVA, 8);
+    1: CellText := IntToHex(FPages[pData^.RootIndex].Contains[pData^.ChildIndex].Size, 8);
+    4: CellText := FPages[pData^.RootIndex].Contains[pData^.ChildIndex].Caption;
+  else
+    CellText := '';
   end;
 end;
 
@@ -149,59 +178,85 @@ end;
 
 procedure TfrmMemoryMap.miCopyAddrClick(Sender: TObject);
 var
+  Address: Int64;
+  pData: PNodeData;
   E: TVTVirtualNodeEnumerator;
 begin
   E := lvMemoryMap.SelectedNodes.GetEnumerator;
   if not E.MoveNext then Exit;
-  Clipboard.AsText := IntToHex(FPages[E.Current^.Index].AddrVA, 1);
+  pData := lvMemoryMap.GetNodeData(E.Current);
+  if pData^.ChildIndex < 0 then
+    Address := FPages[pData^.RootIndex].AddrVA
+  else
+    Address := FPages[pData^.RootIndex].Contains[pData^.ChildIndex].AddrVA;
+  Clipboard.AsText := IntToHex(Address, 1);
 end;
 
 procedure TfrmMemoryMap.miCopyLineClick(Sender: TObject);
 var
+  pData: PNodeData;
   E: TVTVirtualNodeEnumerator;
 begin
   E := lvMemoryMap.SelectedNodes.GetEnumerator;
   if not E.MoveNext then Exit;
-  Clipboard.AsText :=
-    IntToHex(FPages[E.Current^.Index].AddrVA, 8) + #9 +
-    IntToHex(FPages[E.Current^.Index].Size, 8) + #9 +
-    FPages[E.Current^.Index].Image + #9 +
-    {$IFNDEF LINUX}
-    FPages[E.Current^.Index].Section + #9 +
-    {$ENDIF}
-    FPages[E.Current^.Index].Contains + #9 +
-    PageTypeToStr(FPages[E.Current^.Index].PageType) + #9 +
-    FPages[E.Current^.Index].Access + #9 +
-    {$IFNDEF LINUX}
-    FPages[E.Current^.Index].IAccess + #9 +
-    {$ENDIF}
-    FPages[E.Current^.Index].MapedFile;
+  pData := lvMemoryMap.GetNodeData(E.Current);
+  if pData^.ChildIndex < 0 then
+    Clipboard.AsText :=
+      IntToHex(FPages[pData^.RootIndex].AddrVA, 8) + #9 +
+      IntToHex(FPages[pData^.RootIndex].Size, 8) + #9 +
+      FPages[pData^.RootIndex].Image + #9 +
+      {$IFNDEF LINUX}
+      FPages[pData^.RootIndex].Section + #9 +
+      {$ENDIF}
+      FPages[pData^.RootIndex].ContainsStr + #9 +
+      PageTypeToStr(FPages[pData^.RootIndex].PageType) + #9 +
+      FPages[pData^.RootIndex].Access + #9 +
+      {$IFNDEF LINUX}
+      FPages[pData^.RootIndex].IAccess + #9 +
+      {$ENDIF}
+      FPages[pData^.RootIndex].MapedFile
+  else
+    Clipboard.AsText :=
+      IntToHex(FPages[pData^.RootIndex].Contains[pData^.ChildIndex].AddrVA, 8) + #9 +
+      IntToHex(FPages[pData^.RootIndex].Contains[pData^.ChildIndex].Size, 8) + #9 +
+      FPages[pData^.RootIndex].Contains[pData^.ChildIndex].Caption;
 end;
 
 procedure TfrmMemoryMap.miDumpClick(Sender: TObject);
 var
   F: TFileStream;
+  pData: PNodeData;
   E: TVTVirtualNodeEnumerator;
-  Page: TPageData;
   Buff: array of Byte;
   BuffSize: Integer;
+  AddrVA, PageSize: Int64;
 begin
   E := lvMemoryMap.SelectedNodes.GetEnumerator;
   if not E.MoveNext then Exit;
-  Page := FPages[E.Current^.Index];
-  SaveDialog.FileName := '0x' + IntToHex(Page.AddrVA) + '.bin';
+  pData := lvMemoryMap.GetNodeData(E.Current);
+  if pData^.ChildIndex < 0 then
+  begin
+    AddrVA := FPages[pData^.RootIndex].AddrVA;
+    PageSize := FPages[pData^.RootIndex].Size;
+  end
+  else
+  begin
+    AddrVA := FPages[pData^.RootIndex].Contains[pData^.ChildIndex].AddrVA;
+    PageSize := FPages[pData^.RootIndex].Contains[pData^.ChildIndex].Size;
+  end;
+  SaveDialog.FileName := '0x' + IntToHex(AddrVA) + '.bin';
   if SaveDialog.Execute then
   begin
     F := TFileStream.Create(SaveDialog.FileName, fmCreate);
     try
-      BuffSize := FCore.Debugger.Utils.GetPageSize;
+      BuffSize := Min(FCore.Debugger.Utils.GetPageSize, PageSize);
       SetLength(Buff, BuffSize);
-      while Page.Size > 0 do
+      while PageSize > 0 do
       begin
-        FCore.Debugger.Utils.ReadData(Pointer(Page.AddrVA), Buff[0], BuffSize);
+        FCore.Debugger.Utils.ReadData(Pointer(AddrVA), Buff[0], BuffSize);
         F.Write(Buff[0], BuffSize);
-        Inc(Page.AddrVA, BuffSize);
-        Dec(Page.Size, BuffSize);
+        Inc(AddrVA, BuffSize);
+        Dec(PageSize, BuffSize);
       end;
     finally
       F.Free;
@@ -233,14 +288,16 @@ end;
 var
   E: TVTVirtualNodeEnumerator;
   Page: TPageData;
+  pData: PNodeData;
   PageSize, I: Integer;
   Flags: Cardinal;
 begin
   E := lvMemoryMap.SelectedNodes.GetEnumerator;
   if not E.MoveNext then Exit;
+  pData := lvMemoryMap.GetNodeData(E.Current);
   frmPageAccess := TfrmPageAccess.Create(Application);
   try
-    Page := FPages[E.Current^.Index];
+    Page := FPages[pData^.RootIndex];
     PageSize := FCore.Debugger.Utils.GetPageSize;
     if frmPageAccess.ShowPageAccess(Page.AddrVA, Page.Size, PageSize) <> mrOK then Exit;
     Flags := 0;
@@ -271,11 +328,13 @@ end;
 
 procedure TfrmMemoryMap.pmListPopup(Sender: TObject);
 var
+  pData: PNodeData;
   E: TVTVirtualNodeEnumerator;
 begin
   E := lvMemoryMap.SelectedNodes.GetEnumerator;
   if not E.MoveNext then Exit;
-  miDump.Enabled := not (FPages[E.Current^.Index].PageType in [ptFree, ptReserved]);
+  pData := lvMemoryMap.GetNodeData(E.Current);
+  miDump.Enabled := not (FPages[pData^.RootIndex].PageType in [ptFree, ptReserved]);
   miOpenInCpuView.Enabled := miDump.Enabled;
   miSetPageAccess.Enabled := miDump.Enabled;
   {$IFDEF LINUX}
@@ -284,22 +343,25 @@ begin
 end;
 
 function TfrmMemoryMap.CheckAddressCallback(ANewAddrVA: Int64): Boolean;
+var
+  I, A: Integer;
 begin
-  Result := Search(ANewAddrVA) >= 0;
+  Result := Search(ANewAddrVA, I, A);
 end;
 
 procedure TfrmMemoryMap.HighLightAddr(AAddrVA: Int64);
 var
   E: TVTVirtualNodeEnumerator;
-  Idx: Integer;
+  Idx, cIdx: Integer;
+  pData: PNodeData;
 begin
-  Idx := Search(AAddrVA);
-  if Idx >= 0 then
+  if Search(AAddrVA, Idx, cIdx) then
   begin
     E := lvMemoryMap.Nodes.GetEnumerator;
     repeat
       if not E.MoveNext then Break;
-    until Integer(E.Current^.Index) = Idx;
+      pData := lvMemoryMap.GetNodeData(E.Current);
+    until (pData^.RootIndex = Idx) and (pData^.ChildIndex = cIdx);
     if E.Current = nil then Exit;
     lvMemoryMap.Selected[E.Current] := True;
     lvMemoryMap.ScrollIntoView(E.Current, True);
@@ -321,26 +383,56 @@ begin
   end;
 end;
 
-function TfrmMemoryMap.Search(AAddrVA: Int64): Integer;
+function TfrmMemoryMap.Search(AAddrVA: Int64; out Index, ChildIndex: Integer
+  ): Boolean;
 var
-  I: Integer;
+  I, A: Integer;
 begin
-  Result := -1;
+  Result := False;
+  Index := -1;
+  ChildIndex := -1;
   for I := 0 to FPages.Count - 1 do
     if (AAddrVA >= FPages[I].AddrVA) and (AAddrVA < FPages[I].EndAddrVA) then
-      Exit(I);
+    begin
+      Index := I;
+      Result := True;
+      for A := 0 to Length(FPages[I].Contains) - 1 do
+        if (AAddrVA >= FPages[I].Contains[A].AddrVA) and (AAddrVA < FPages[I].Contains[A].EndAddrVA) then
+        begin
+          ChildIndex := A;
+          Exit;
+        end;
+    end;
 end;
 
 procedure TfrmMemoryMap.Refresh(AAddrVA: Int64);
 var
   Map: TSimpleMemoryMap;
+  I, A: Integer;
+  pData: PNodeData;
+  ANode, AChildNode: PVirtualNode;
 begin
   lvMemoryMap.BeginUpdate;
   try
     Map := TSimpleMemoryMap.Create(FPid, FIs64Process);
     try
       Map.FillProcessMemoryMap(FPages);
-      lvMemoryMap.RootNodeCount := FPages.Count;
+      lvMemoryMap.RootNodeCount := 0;
+      lvMemoryMap.NodeDataSize := SizeOf(TPageData);
+      for I := 0 to FPages.Count - 1 do
+      begin
+        ANode := lvMemoryMap.AddChild(lvMemoryMap.RootNode, nil);
+        pData := lvMemoryMap.GetNodeData(ANode);
+        pData^.RootIndex := I;
+        pData^.ChildIndex := -1;
+        for A := 0 to Length(FPages[I].Contains) - 1 do
+        begin
+          AChildNode := lvMemoryMap.AddChild(ANode, nil);
+          pData := lvMemoryMap.GetNodeData(AChildNode);
+          pData^.RootIndex := I;
+          pData^.ChildIndex := A;
+        end;
+      end;
       if not FAutoFited then
       begin
         lvMemoryMap.Header.AutoFitColumns(False);
@@ -411,9 +503,12 @@ end;
 procedure TfrmMemoryMap.lvMemoryMapBeforeItemErase(Sender: TBaseVirtualTree;
   TargetCanvas: TCanvas; Node: PVirtualNode; const ItemRect: TRect;
   var ItemColor: TColor; var EraseAction: TItemEraseAction);
+var
+  pData: PNodeData;
 begin
   if Node = nil then Exit;
-  if FPages[Node.Index].Grayed then
+  pData := lvMemoryMap.GetNodeData(Node);
+  if FPages[pData^.RootIndex].Grayed then
     ItemColor := $EEEEEE;
 end;
 

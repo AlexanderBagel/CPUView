@@ -206,6 +206,10 @@ type
 
   PPVOID = ^Pointer;
 
+  {$IFNDEF FPC}
+  HANDLE = THandle;
+  {$ENDIF}
+
   PPEB = ^TPEB;
   TPEB = record
     InheritedAddressSpace: BOOLEAN;
@@ -518,9 +522,8 @@ type
     ProcessInformation: Pointer;
     ProcessInformationLength: Cardinal;
     ReturnLength: PCardinal): NTStatus; stdcall; external ntdll;
-  function ImageDirectoryEntryToDataEx(Base: Pointer; MappedAsImage: ByteBool;
-    DirectoryEntry: Word; var Size: ULONG;
-    var FoundHeader: PImageSectionHeader): Pointer; stdcall;
+  function ImageDirectoryEntryToData(Base: Pointer; MappedAsImage: ByteBool;
+    DirectoryEntry: Word; var Size: ULONG): Pointer; stdcall;
     external imagehlp;
   function MapAndLoad(ImageName, DllPath: LPSTR; LoadedImage: PLoadedImage;
     DotDll, ReadOnly: Bool): Bool; stdcall; external imagehlp;
@@ -754,6 +757,7 @@ var
   SimdReg: PXMMRegister;
   I: Integer;
 begin
+  Result := False;
   ContextSize := 0;
   ContextFlags := CONTEXT_ALL or CONTEXT_XSTATE;
 
@@ -1473,7 +1477,7 @@ function TCommonUtils.SetPageAccess(AddrVA: Pointer; Size: Integer;
 var
   OldProtect: DWORD;
 begin
-  Result := VirtualProtectEx(FProcessHandle, AddrVA, PtrUInt(Size), Flags, @OldProtect);
+  Result := VirtualProtectEx(FProcessHandle, AddrVA, NativeUInt(Size), Flags, @OldProtect);
 end;
 
 function TCommonUtils.SetThreadExtendedData(AThreadID: Integer;

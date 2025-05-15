@@ -23,15 +23,16 @@ unit CpuView.ScriptExecutor;
 
 interface
 
-{$I CpuViewCfg.inc}
-
 uses
   SysUtils,
+  StrUtils,
   Generics.Collections,
   FWHexView.Common,
   CpuView.Common,
   CpuView.CPUContext,
   CpuView.DebugerGate;
+
+  {$I CpuViewCfg.inc}
 
 type
   TExpressionType = (etMem, etReg, etRip, etImm, etSizePfx, etSimdX87);
@@ -186,8 +187,8 @@ begin
   SecondParam := '';
   ThirdParam := '';
   Idx1 := Pos(' ', Script);
-  Idx2 := Pos(':', Script);
-  Idx3 := Pos('+', Script);
+  Idx2 := PosEx(':', Script, Idx1);
+  Idx3 := PosEx('+', Script, Idx2);
   if Idx1 = 0 then Exit;
   if Idx2 = 0 then
   begin
@@ -210,6 +211,8 @@ begin
       ThirdParam := Copy(Script, Idx3, Length(Script));
     end;
   end;
+  if (ThirdParam <> '') and not TryStrToInt(ThirdParam, Idx3) then
+    ThirdParam := '';
 end;
 
 function TAbstractScriptExecutor.InternalGetProcAddress(const Script: string;

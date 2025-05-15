@@ -19,8 +19,6 @@ unit CpuView.Reg;
 
 interface
 
-{$I CpuViewCfg.inc}
-
 uses
   Classes,
 {$IFDEF FPC}
@@ -48,6 +46,8 @@ uses
 {$ENDIF}
   CpuView.Actions,
   CpuView.Viewers;
+
+  {$I CpuViewCfg.inc}
 
 {$IFNDEF FPC}
 type

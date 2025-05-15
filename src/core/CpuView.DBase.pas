@@ -21,8 +21,6 @@ unit CpuView.DBase;
   {$MODE DELPHI}
 {$ENDIF}
 
-{$I CpuViewCfg.inc}
-
 interface
 
 uses
@@ -31,6 +29,8 @@ uses
   LazIDEIntf, Laz2_XMLRead, Laz2_DOM,
   {$ENDIF}
   Generics.Collections;
+
+  {$I CpuViewCfg.inc}
 
 type
 

@@ -29,24 +29,14 @@ uses
   LCLIntf, LCLType, Windows, SysUtils, Generics.Collections,
 
   FWHexView.Common,
+  CpuView.Common,
   CpuView.Windows;
 
 type
-  TPageType = (ptFree, ptReserved, ptPrivate, ptMapped, ptImage, ptThread, ptHeap, ptSystem);
-
   TAdvancedInfo = record
     Description: string;
     Addr: NativeUInt;
     PageType: TPageType;
-  end;
-
-  PListItemData = ^TPageData;
-  TPageData = record
-    AddrVA, EndAddrVA, Size: Int64;
-    PageType: TPageType;
-    Image, Section, Contains, Access, IAccess, MapedFile: string;
-    ImageIdx: Integer;
-    Grayed: Boolean;
   end;
 
   TCoffSymbol = packed record
@@ -82,8 +72,8 @@ type
       const lpBuffer: TMemoryBasicInformation);
     procedure FillPEBInfo(const hProcess: THandle);
     procedure FillThreadsInfo(const hProcess: THandle);
-    function GetContainsDirectory(const Code, Data: Boolean;
-      const ImageInfo: LOADED_IMAGE; const SectionAddr, SectionSize: NativeUInt): string;
+    function GetContainsDirectory(var APage: TPageData; const Code, Data: Boolean;
+      const ImageInfo: LOADED_IMAGE; const BaseAddr, SectionAddr, SectionSize: NativeUInt): string;
     function IsExecute(const Value: DWORD): Boolean;
     function IsPageExecute(const Value: DWORD): Boolean;
     function IsWrite(const Value: DWORD): Boolean;
@@ -337,10 +327,10 @@ var
             Section := string(PAnsiChar(@SectionName[0]));
           end;
         end;
-        Contains := GetContainsDirectory(
+        ContainsStr := GetContainsDirectory(APage,
           IsExecute(ImageSectionHeader^.Characteristics),
           IsWrite(ImageSectionHeader^.Characteristics),
-          ImageInfo, ImageSectionHeader^.VirtualAddress,
+          ImageInfo, BaseAddr, ImageSectionHeader^.VirtualAddress,
           AlignedSectionSize(ImageInfo, ImageSectionHeader^.Misc.VirtualSize));
         DisplayStateAndProtect(APage, lpBuffer);
         ImageIdx := FImageCount;
@@ -374,10 +364,10 @@ var
             Size := pSectionMbi.RegionSize;
             EndAddrVA := AddrVA + Size;
             Image := ExtractFileName(ImagePath);
-            Contains := GetContainsDirectory(
+            ContainsStr := GetContainsDirectory(APage,
               IsPageExecute(pSectionMbi.Protect),
               IsPageWrite(ImageSectionHeader^.Characteristics),
-              ImageInfo, AddrVA, Size);
+              ImageInfo, 0, AddrVA, Size);
             DisplayStateAndProtect(APage, pSectionMbi);
           end;
           FPages.Add(APage);
@@ -417,7 +407,7 @@ var
           ImageInfo.FileHeader.OptionalHeader.
           DataDirectory[IMAGE_DIRECTORY_ENTRY_SECURITY].VirtualAddress;
         if SecAddr = pSectionAddr then
-          Contains := 'security';
+          ContainsStr := 'security';
         DisplayStateAndProtect(APage, lpBuffer);
         ImageIdx := FImageCount;
       end;
@@ -485,7 +475,7 @@ begin
         EndAddrVA := AddrVA + Size;
 
         Image := ExtractFileName(ImagePath);
-        Contains := 'PE Header';
+        ContainsStr := 'PE Header';
         DisplayStateAndProtect(APage, lpBuffer);
         MapedFile := NormalizedName;
         ImageIdx := FImageCount;
@@ -781,13 +771,13 @@ begin
             (FAdvData[I].Addr < {%H-}NativeUInt(lpBuffer.BaseAddress) +
             lpBuffer.RegionSize) then
           begin
-            if Contains = '' then
+            if ContainsStr = '' then
             begin
-              Contains := FAdvData[I].Description;
+              ContainsStr := FAdvData[I].Description;
               PageType := FAdvData[I].PageType;
             end
             else
-              Contains := Contains + ', ' + FAdvData[I].Description;
+              ContainsStr := ContainsStr + ', ' + FAdvData[I].Description;
           end;
         end;
         if OwnerName <> '' then
@@ -856,9 +846,9 @@ begin
   end;
 end;
 
-function TSimpleMemoryMap.GetContainsDirectory(const Code, Data: Boolean;
-  const ImageInfo: LOADED_IMAGE; const SectionAddr, SectionSize: NativeUInt
-  ): string;
+function TSimpleMemoryMap.GetContainsDirectory(var APage: TPageData;
+  const Code, Data: Boolean; const ImageInfo: LOADED_IMAGE; const BaseAddr,
+  SectionAddr, SectionSize: NativeUInt): string;
 const
   DirectoryStr: array [0..14] of String =
     ('export', 'import', 'resource', 'exception',
@@ -867,9 +857,9 @@ const
     'iat', 'delay_import', 'com');
 var
   dwDirSize: DWORD;
-  ish: PImageSectionHeader;
-  I: Integer;
-  Done: Boolean;
+  I, L: Integer;
+  AAddrVA: Int64;
+  DirAddr: Pointer;
 begin
   if Code then
     Result := 'code'
@@ -880,23 +870,29 @@ begin
       Result := 'data'
     else
       Result := Result + ', data';
+  L := Length(APage.Contains);
   for I := 0 to 14 do
   begin
     dwDirSize := 0;
-    ish := nil;
-    if (ImageDirectoryEntryToDataEx(ImageInfo.MappedAddress,
-      False, I, dwDirSize, ish) <> nil) and (ish <> nil) then
+    DirAddr := ImageDirectoryEntryToData(ImageInfo.MappedAddress, True, I, dwDirSize);
+    if DirAddr <> nil then
     begin
-      if I = IMAGE_DIRECTORY_ENTRY_TLS then
-        Done := ish^.VirtualAddress = SectionAddr + SectionSize
-      else
-        Done := ish^.VirtualAddress = SectionAddr;
-      if Done then
+      AAddrVA := NativeInt(DirAddr) - NativeInt(ImageInfo.MappedAddress);
+      if (AAddrVA >= SectionAddr) and (AAddrVA < SectionAddr + SectionSize) then
       begin
         if Result = '' then
           Result := DirectoryStr[I]
         else
           Result := Result + ', ' + DirectoryStr[I];
+        SetLength(APage.Contains, L + 1);
+        with APage.Contains[L] do
+        begin
+          AddrVA := BaseAddr + AAddrVA;
+          Size := dwDirSize;
+          EndAddrVA := BaseAddr + AAddrVA + dwDirSize;
+          Caption := DirectoryStr[I];
+        end;
+        Inc(L);
       end;
     end;
   end;
