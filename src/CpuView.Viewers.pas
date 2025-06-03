@@ -1392,12 +1392,10 @@ end;
 
 function TCustomAsmView.CalculateColumnBestSize(Value: TColumnType): Integer;
 begin
-  case Value of
-    ctOpcode: Result := ToDpi(170);
-    ctDescription: Result := ToDpi(250);
+  if Value = ctOpcode then
+    Result := ToDpi(170)
   else
     Result := inherited;
-  end;
 end;
 
 function TCustomAsmView.CalculateJmpToRow(JmpFromRow: Int64): Int64;

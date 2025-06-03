@@ -503,7 +503,6 @@ begin
   pmRegSelected.Images := IDEImages.Images_16;
   pmStack.Images := IDEImages.Images_16;
   SetHooks;
-  LoadSettings;
   GenerateToolBarImages;
   CpuViewDebugLog.Reset;
   CpuViewDebugLog.Log('TfrmCpuView: start', True, False);

@@ -72,7 +72,10 @@ procedure StartCpuView(Sender: TObject);
 begin
   if DebugBoss = nil then Exit;
   if frmCpuView = nil then
+  begin
     frmCpuView := TfrmCpuViewImpl.Create(DebugBoss);
+    frmCpuView.LoadSettings;
+  end;
   frmCpuView.BringToFront;
   frmCpuView.Show;
 end;
