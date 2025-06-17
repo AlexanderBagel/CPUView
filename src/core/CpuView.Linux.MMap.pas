@@ -25,7 +25,7 @@ interface
 
 uses
   LCLIntf, LCLType, SysUtils, Generics.Collections, Classes, LazLogger,
-  Types, System.IOUtils,
+  Types,
 
   FWHexView.Common,
   CpuView.Common,
@@ -630,18 +630,22 @@ end;
 procedure TSimpleMemoryMap.FillThreads;
 var
   Path, TidPath: string;
-  Dirs: TStringDynArray;
+  SR: TSearchRec;
   Tid: Cardinal;
   I: Integer;
 begin
-  Path := Format('/proc/%d/task/', [FCurrentPid]);
-  Dirs := TDirectory.GetDirectories(Path, '*', TSearchOption.soTopDirectoryOnly);
-  for I := 0 to Length(Dirs) - 1 do
-  begin
-    TidPath := Dirs[I];
-    Delete(TidPath, 1, Length(Path));
-    if TryStrToUInt(TidPath, Tid) and (Tid <> FCurrentPid) then
-      FillThread(Tid);
+  Path := Format('/proc/%d/task/*', [FCurrentPid]);
+  if FindFirst(Path, faDirectory, SR) = 00 then
+  try
+    repeat
+      if SR.Attr and faDirectory = 0 then Continue;
+      if SR.Name = '.' then Continue;
+      if SR.Name = '..' then Continue;
+      if TryStrToUInt(SR.Name, Tid) and (Tid <> FCurrentPid) then
+        FillThread(Tid);
+    until FindNext(SR) <> 0;
+  finally
+    FindClose(SR);
   end;
 end;
 
