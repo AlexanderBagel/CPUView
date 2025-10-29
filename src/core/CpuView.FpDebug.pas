@@ -31,8 +31,8 @@ interface
 uses
   LCLType,
   LCLIntf,
-  Maps,
   LazVersion,
+  Maps,
 
   SysUtils,
   Classes,
@@ -46,16 +46,12 @@ uses
 
   // DebuggerIntf
   DbgIntfDebuggerBase,
-  DbgIntfMiscClasses,
 
   // IDEIntf
-  LazIDEIntf,
-  IDEWindowIntf,
   SrcEditorIntf,
 
   // LazDebuggerIntf
   LazDebuggerIntfBaseTypes,
-  LazDebuggerIntf,
 
   // LazDebuggerFp
   FpDebugDebugger,
@@ -74,17 +70,24 @@ uses
   LazLoggerBase,
 
   // CodeTools
-  CodeCache,
   CodeToolManager,
 
   {$IFDEF LINUX}
   CpuView.Linux,
   {$ENDIF}
 
+  {$IFDEF MSWINDOWS}
+  CpuView.Windows,
+  {$ENDIF}
+
   FWHexView.Common,
+  FWHexView.AsmTokenizer,
   CpuView.Common,
-  CpuView.Stream,
+  CpuView.CommonDebug,
   CpuView.CPUContext,
+  CpuView.Context.Params,
+  CpuView.Context.Intel.Types,
+  CpuView.Context.Intel,
   CpuView.DebugerGate,
   CpuView.Design.DbgLog;
 
@@ -95,7 +98,7 @@ uses
 
 type
 
-  TCpuViewDebugGate = class;
+  TFpDebugGate = class;
 
   { TThreadWorkerMaskBreakpoints }
 
@@ -115,131 +118,50 @@ type
 
   TThreadWorkerChangeThreadContext = class(TFpDbgDebggerThreadWorkerItem)
   private
-    FDbgIntf: TCpuViewDebugGate;
+    FDbgIntf: TFpDebugGate;
   protected
     procedure DoExecute; override;
   public
-    constructor Create(ADbgIntf: TCpuViewDebugGate);
+    constructor Create(ADbgIntf: TFpDebugGate);
   end;
 
-  TUpdateWaitingState = (uwsBreakpoint, uwsContext);
-  TUpdateWaitingStates = set of TUpdateWaitingState;
+  { TFpDebugGate }
 
-  TCheckUserCodeState = (ucFound, ucNotFound, ucNeedWait);
-
-  TLocalSymbol = record
-    AddrVA, EndVA: Int64;
-    Duplicate: Boolean;
-    Name: string;
-  end;
-
-  TLocalSymbols = TListEx<TLocalSymbol>;
-
-  { TLocalLibrary }
-
-  TLocalLibrary = class
+  TFpDebugGate = class(TCommonDebugGate)
   private
-    FHighAddr: TDBGPtr;
-    FLowAddr: TDBGPtr;
-    FName: string;
-    FSymbols: TLocalSymbols;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    property HighAddr: TDBGPtr read FHighAddr write FHighAddr;
-    property LowAddr: TDBGPtr read FLowAddr write FLowAddr;
-    property Name: string read FName write FName;
-    property Symbols: TLocalSymbols read FSymbols;
-  end;
-
-  { TCpuViewDebugGate }
-
-  TCpuViewDebugGate = class(TAbstractDebugger)
-  private
-    FBreakPoints: TIDEBreakPoints;
-    FBreakpointsNotification: TIDEBreakPointsNotification;
-    FCallStackMonitor: TIdeCallStackMonitor;
-    FCallStackNotification: TCallStackNotification;
-    FDebugger: TDebuggerIntf;
     FDbgController: TDbgController;
-    FErrorOnInit: Boolean;
     FProcess: TDbgProcess;
-    FRegisterInDebugBoss, FRegisterDestroyNotification: Boolean;
-    FReturnAddrVA: Int64;
-    FSupportStream: TRemoteStream;
-    FPreviosSrcLine: Integer;
-    FPreviosSrcFuncName, FPreviosSrcFileName: string;
-    FLocalSymbols: TObjectList<TLocalLibrary>;
-    FLockTimeOut: Int64;
-    FSnapshotManager:  TSnapshotManager;
-    FTemporaryIP: TDictionary<Integer, Int64>;
-    FThreadsMonitor: TIdeThreadsMonitor;
-    FThreadsNotification: TThreadsNotification;
-    FUpdateWaiting: TUpdateWaitingStates;
-    FUserCodeAddrVA: Int64;
-    FWaitCheckUserCode: Boolean;
-    procedure BreakPointChanged;
-    function CheckCanWork: Boolean;
-    function CheckUserCodeWithIdeCallStack: TCheckUserCodeState;
-    function CurrentInstruction: TInstruction;
-    function FormatSymbol(AddrVA: Int64; ASym: TFpSymbol; AParam: TQuerySymbol): string;
-    function GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
-    procedure DoDebuggerDestroy(Sender: TObject);
     function FormatAsmCode(const Value: string; var AnInfo: TDbgInstInfo;
         CodeSize: Integer): string;
-    function IsMainThreadId: Boolean;
-    procedure OnBreakPointChanged(const {%H-}ASender: TIDEBreakPoints;
-      const {%H-}ABreakpoint: TIDEBreakPoint);
-    procedure OnCallStackChanged(Sender: TObject);
-    procedure OnCallStackCtxChanged(Sender: TObject);
-    procedure OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
-    procedure Reset;
     procedure StopAllWorkers;
-    procedure UpdateDebugger(ADebugger: TDebuggerIntf);
     procedure UpdateLocalSymbols;
   protected
-    procedure UpdateContext; override;
+    function GetSymbolAtAddr(AddrVA: Int64): TFpSymbol; override;
+    function GetLineAddresses(const AFileName: string;
+      ALine: Cardinal; var AResultList: TDBGPtrArray): Boolean; override;
+    function GetThreadID: Cardinal; override;
+    function IsMainThreadId: Boolean; override;
+    procedure InitContext(AValue: TCommonCpuContext); override;
+    function GetEndOnProcToken: string; override;
+    procedure Reset; override;
+    procedure RefreshCallStack(AStack: TIdeCallStack); override;
+    function UpdateContext: Boolean; override;
+    procedure UpdateDebugger(ADebugger: TDebuggerIntf); override;
   public
-    constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); override;
-    destructor Destroy; override;
-    function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; override;
-    function CurrentInstructionPoint: Int64; override;
-    function DebugState: TAbstractDebugState; override;
-    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer;
-      AShowSourceLines: Boolean): TListEx<TInstruction>; override;
-    function IsActive: Boolean; override;
-    function IsActiveJmp: Boolean; override;
-    function IsUserCode(AAddrVA: Int64): Boolean; override;
-    procedure FillThreadStackFrames(ALimit: TStackLimit;
-      AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
-      AFrames: TList<TStackFrame>); override;
+    function Disassembly(AddrVA, LastKnownAddrVA: Int64; pBuff: PByte; nSize: Integer;
+      AShowSourceLines, AShowCallFuncName: Boolean): TListEx<TInstruction>; override;
     function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; override;
     function GetRemoteModules: TList<TRemoteModule>; override;
     function GetRemoteProcList(const AModule: TRemoteModule): TList<TRemoteProc>; override;
-    function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; override;
-    function GetReturnAddrVA: Int64; override;
-    function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
-      out ASourceLine: Integer): Boolean; override;
-    function GetUserCodeAddrVA: Int64; override;
-    procedure Pause; override;
+    function GetRemoteProcAddress(const AModule: TRemoteModule; const AProcName: string): Int64; override;
+    function GetTokenizerMode: TTokenizerMode; override;
+    function IsDebuggerLocked: Boolean; override;
     function PointerSize: Integer; override;
     function ProcessID: Cardinal; override;
-    function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): TQuerySymbolValue; override;
-    function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; override;
-    procedure Run; override;
-    procedure Stop; override;
-    procedure SetNewIP(AddrVA: Int64); override;
-    procedure ToggleBreakPoint(AddrVA: Int64); override;
-    function ThreadStackLimit: TStackLimit; override;
-    function ThreadID: Cardinal; override;
-    procedure TraceIn; override;
-    procedure TraceOut; override;
-    procedure TraceTilReturn; override;
     procedure TraceTo(AddrVA: Int64); override;
     procedure TraceToList(AddrVA: array of Int64); override;
     function UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue): Boolean; override;
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); override;
-    property Debugger: TDebuggerIntf read FDebugger;
     property DbgController: TDbgController read FDbgController;
   end;
 
@@ -272,353 +194,68 @@ procedure TThreadWorkerChangeThreadContext.DoExecute;
 var
   DebugThread: TDbgThread;
 begin
-  FDbgIntf.DbgController.CurrentProcess.GetThread(FDbgIntf.ThreadID, DebugThread);
+  FDbgIntf.DbgController.CurrentProcess.GetThread(FDbgIntf.CurrentThreadID, DebugThread);
   if DebugThread <> nil then
     DebugThread.BeforeContinue;
 end;
 
-constructor TThreadWorkerChangeThreadContext.Create(ADbgIntf: TCpuViewDebugGate);
+constructor TThreadWorkerChangeThreadContext.Create(ADbgIntf: TFpDebugGate);
 begin
   inherited Create((ADbgIntf.Debugger as TFpDebugDebugger), twpContinue);
   FDbgIntf := ADbgIntf;
 end;
 
-{ TLocalLibrary }
+{ TFpDebugGate }
 
-function LocalSymbolComparer({$IFDEF USE_CONSTREF}constref{$ELSE}const{$ENDIF} A, B: TLocalSymbol): Integer;
+function TFpDebugGate.GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
 begin
-  if A.AddrVA < B.AddrVA then
-    Result := -1
+  Result := inherited;
+  if UseDebugInfo and (Result = nil) and Assigned(FDbgController) then
+    Result := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
+end;
+
+function TFpDebugGate.GetLineAddresses(const AFileName: string;
+  ALine: Cardinal; var AResultList: TDBGPtrArray): Boolean;
+begin
+  if FProcess = nil then
+    Result := False
   else
-    if A.AddrVA = B.AddrVA then
-      Result := 0
+    Result := FProcess.GetLineAddresses(AFileName, ALine, AResultList);
+end;
+
+function TFpDebugGate.GetThreadID: Cardinal;
+var
+  Snapshot: TSnapshot;
+begin
+  if Assigned(FDbgController) then
+  begin
+    if Assigned(SnapshotManager) then
+      Snapshot := SnapshotManager.SelectedEntry
     else
-      Result := 1;
-end;
-
-constructor TLocalLibrary.Create;
-begin
-  FSymbols := TListEx<TLocalSymbol>.Create(
-    TComparer<TLocalSymbol>.Construct(LocalSymbolComparer));
-end;
-
-destructor TLocalLibrary.Destroy;
-begin
-  FSymbols.Free;
-  inherited Destroy;
-end;
-
-{ TCpuViewDebugGate }
-
-function TCpuViewDebugGate.CheckCanWork: Boolean;
-begin
-  Result := False;
-  if FDbgController = nil then Exit;
-  if FDebugger = nil then Exit;
-  if FDebugger.State <> dsPause then Exit;
-  Result := True;
-end;
-
-function TCpuViewDebugGate.CheckUserCodeWithIdeCallStack: TCheckUserCodeState;
-var
-  Snap: TSnapshot;
-  IdeStack: TIdeCallStack;
-  Entry: TIdeCallStackEntry;
-  I: Integer;
-begin
-  Result := ucNotFound;
-  FReturnAddrVA := 0;
-  if FCallStackMonitor = nil then Exit;
-  if Assigned(FSnapshotManager) then
-    Snap := FSnapshotManager.SelectedEntry
-  else
-    Snap := nil;
-  if Snap = nil then
-    IdeStack := FCallStackMonitor.CurrentCallStackList.EntriesForThreads[ThreadID]
-  else
-    IdeStack := FCallStackMonitor.Snapshots[Snap].EntriesForThreads[ThreadID];
-  if IdeStack <> nil then
-  begin
-    IdeStack.CountLimited(50);
-    if IdeStack.CountValidity <> ddsValid then Exit(ucNeedWait);
-    IdeStack.PrepareRange(0, IdeStack.Count);
-    for I := 0 to IdeStack.Count - 1 do
+      Snapshot := nil;
+    if Assigned(ThreadsMonitor) then
     begin
-      Entry := IdeStack.Entries[I];
-      if (Entry = nil) or (Entry.Validity <> ddsValid) then
-        Exit(ucNeedWait);
-      if I = 1 then
-        FReturnAddrVA := Entry.Address;
-      if IsUserCode(Entry.Address) then
-      begin
-        FUserCodeAddrVA := Entry.Address;
-        Result := ucFound;
-        Break;
-      end;
-    end;
-  end;
-end;
-
-procedure TCpuViewDebugGate.BreakPointChanged;
-var
-  I, A: Integer;
-  BP: TIDEBreakPoint;
-  BPList: TDBGPtrArray;
-  BBP: TBasicBreakPoint;
-  DuplicateController: TDictionary<Int64, Boolean>;
-  LineAddressesPresent: Boolean;
-begin
-  CpuViewDebugLog.Log('DebugGate: BreakPointChanged start', True);
-
-  if not CheckCanWork then
-  begin
-    Include(FUpdateWaiting, uwsBreakpoint);
-    CpuViewDebugLog.Log('DebugGate: BreakPointChanged not ready yet.', False);
-    Exit;
-  end;
-
-  BreakPointList.Clear;
-  if FBreakPoints = nil then Exit;
-  if FProcess = nil then Exit;
-  DuplicateController := TDictionary<Int64, Boolean>.Create;
-  try
-    for I := 0 to FBreakPoints.Count - 1 do
-    begin
-      // вот тут идут дубли - надо их контролировать!!!
-      // this is where the duplicates come in - we need to control them!!!!
-      BP := FBreakPoints.Items[I];
-      case BP.Kind of
-        bpkAddress:
-        begin
-          BBP.AddrVA := BP.Address;
-          BBP.Active := BP.Enabled;
-          if DuplicateController.TryAdd(BBP.AddrVA, BBP.Active) then
-            BreakPointList.Add(BBP);
-        end;
-        bpkSource:
-        begin
-          BPList := nil;
-
-          // Can raise an exception: "String list does not allow duplicates"
-          // Investigate the problem, possibly due to a previously missing pause test
-          LineAddressesPresent := FProcess.GetLineAddresses(BP.Source, BP.Line, BPList);
-
-          if not LineAddressesPresent then
-            Continue;
-          for A := 0 to Length(BPList) - 1 do
-          begin
-            BBP.AddrVA := BPList[A];
-            BBP.Active := BP.Enabled;
-            if DuplicateController.TryAdd(BBP.AddrVA, BBP.Active) then
-              BreakPointList.Add(BBP);
-          end;
-        end
+      if Assigned(Snapshot) then
+        Result := ThreadsMonitor.Snapshots[Snapshot].CurrentThreadId
       else
-        Continue;
-      end;
-    end;
-  finally
-    DuplicateController.Free;
-  end;
-
-  Exclude(FUpdateWaiting, uwsBreakpoint);
-  DoBreakPointsChange;
-
-  CpuViewDebugLog.Log('DebugGate: BreakPointChanged end', False);
-end;
-
-function TCpuViewDebugGate.CurrentInstruction: TInstruction;
-var
-  CurrentIP: Int64;
-  ALen: Integer;
-  InstructionOpcode: array of Byte;
-  List: TListEx<TInstruction>;
-begin
-  Result := Default(TInstruction);
-  CurrentIP := CurrentInstructionPoint;
-  SetLength(InstructionOpcode{%H-}, 16);
-  FSupportStream.Position := CurrentIP;
-  ALen := FSupportStream.Read(InstructionOpcode[0], 16);
-  if ALen = 0 then Exit;
-  List := Disassembly(CurrentIP, @InstructionOpcode[0], 16, False);
-  try
-    Result := List[0];
-  finally
-    List.Free;
-  end;
-end;
-
-function TCpuViewDebugGate.FormatSymbol(AddrVA: Int64; ASym: TFpSymbol; AParam: TQuerySymbol
-  ): string;
-var
-  PasSource: TCodeBuffer;
-  Editor: TSourceEditorInterface;
-  ASrcLineNumber: Cardinal;
-  ASrcFileName: string;
-begin
-  Result := '';
-  if ASym = nil then Exit;
-  try
-
-    if (AParam = qsName) or (ASym.Line <= 0) then
-    begin
-      Result := ASym.Name;
-      if Result = '' then Exit;
-      if ASym.{%H-}Parent <> nil then
-        Result := ASym.{%H-}Parent.Name + '.' + Result;
-      if ASym.Line > 0 then
-        Result := Format('%s %s:%d', [
-          Result, ExtractFileName(ASym.FileName), ASym.Line])
-      else
-      begin
-        if AParam <> qsName then
-        begin
-          if FPreviosSrcFuncName = Result then
-          begin
-            Result := '';
-            Exit;
-          end;
-          FPreviosSrcFuncName := Result;
-        end;
-        if AddrVA <> ASym.Address.Address then
-          Result := Format('%s+%d', [Result, AddrVA - ASym.Address.Address]);
-      end;
-      Exit;
-    end;
-
-    ASrcFileName := ASym.FileName;
-    ASrcLineNumber := ASym.Line;
-    if (FPreviosSrcLine = ASrcLineNumber) and (FPreviosSrcFileName = ASrcFileName) then
-      Exit;
-    FPreviosSrcLine := ASrcLineNumber;
-    FPreviosSrcFileName := ASrcFileName;
-    FPreviosSrcFuncName := ASym.Name;
-
-    if DebugBoss.GetFullFilename(ASrcFileName, False) then
-    begin
-      PasSource := CodeToolBoss.LoadFile(ASrcFileName, True, False);
-      if Assigned(PasSource) then
-      begin
-        Editor := SourceEditorManagerIntf.SourceEditorIntfWithFilename(ASrcFileName);
-        if Editor <> nil then
-          ASrcLineNumber := Editor.DebugToSourceLine(ASrcLineNumber);
-        Result := Format('%s:%d %s', [
-          ExtractFileName(ASrcFileName), ASrcLineNumber,
-          Trim(PasSource.GetLine(ASrcLineNumber - 1, False))]);
-      end;
-    end;
-  finally
-    ASym.ReleaseReference;
-  end;
-end;
-
-// Патч для TArrayHelper<T>.BinarySearch я делал для FPC 3.3.1,
-// но необходима поддержка стабильной версии 3.2.2,
-// поэтому поиск будет выполнятся самостоятельно.
-
-// I made a patch for TArrayHelper<T>.BinarySearch for FPC 3.3.1,
-// but support for stable version 3.2.2 is required,
-// so the search will be done by itself.
-
-function SearchLocalSymbol(List: TLocalSymbols; AddrVA: Int64;
-  out AFoundIndex: SizeInt): Boolean;
-var
-  imin, imax, imid: Int32;
-  LCompare: SizeInt;
-  AItem: TLocalSymbol;
-begin
-  if List.Count = 0 then
-  begin
-    AFoundIndex := -1;
-    Exit(False);
-  end;
-  imin := 0;
-  imax := List.Count - 1;
-  AItem.AddrVA := AddrVA;
-  while (imin < imax) do
-  begin
-    imid := imin + ((imax - imin) shr 1);
-    LCompare := LocalSymbolComparer(List.List[imid], AItem);
-    if (LCompare < 0) then
-      imin := imid + 1
+        Result := ThreadsMonitor.CurrentThreads.CurrentThreadId;
+    end
     else
-    begin
-      imax := imid;
-      if LCompare = 0 then
-      begin
-        AFoundIndex := imid;
-        Exit(True);
-      end;
-    end;
-  end;
-  AFoundIndex := imin;
-  LCompare := LocalSymbolComparer(List.List[imin], AItem);
-  Result := (imax = imin) and (LCompare = 0);
-  if not Result and (LCompare < 0) then
-    Inc(AFoundIndex);
-end;
-
-function TCpuViewDebugGate.GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
-var
-  I: Integer;
-  Idx: SizeInt;
-  LocalLib: TLocalLibrary;
-  LocalSymbol: TLocalSymbol;
-  Found: Boolean;
-  Pfx: string;
-begin
-  if UseDebugInfo and Assigned(FDbgController) then
-  begin
-    Result := nil;
-    if UseCacheFoExternalSymbols then
-    begin
-      for I := 0 to FLocalSymbols.Count - 1 do
-      begin
-        LocalLib := FLocalSymbols[I];
-        if (AddrVA >= LocalLib.LowAddr) and (AddrVA < LocalLib.HighAddr) then
-        begin
-          Found := SearchLocalSymbol(LocalLib.Symbols, AddrVA, Idx);
-          if Found then
-            LocalSymbol := LocalLib.Symbols[Idx]
-          else
-          begin
-            if Idx > 0 then Dec(Idx);
-            if Idx >= 0 then
-            begin
-              LocalSymbol := LocalLib.Symbols[Idx];
-              Found := (AddrVA >= LocalSymbol.AddrVA) and (AddrVA < LocalSymbol.EndVA);
-            end;
-          end;
-          if Found then
-          begin
-            while LocalSymbol.Duplicate do
-            begin
-              Dec(Idx);
-              LocalSymbol := LocalLib.Symbols[Idx];
-            end;
-            Pfx := ChangeFileExt(ExtractFileName(LocalLib.Name), ':');
-            Result := TFpSymbolTableProc.Create(Pfx + LocalSymbol.Name, LocalSymbol.AddrVA);
-          end;
-        end;
-      end;
-    end;
-    if Result = nil then
-      Result := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
+      Result := FDbgController.CurrentProcess.ThreadID
   end
   else
-    Result := nil;
+    Result := 0;
 end;
 
-procedure TCpuViewDebugGate.DoDebuggerDestroy(Sender: TObject);
+function TFpDebugGate.IsDebuggerLocked: Boolean;
 begin
-  CpuViewDebugLog.Log('DebugGate: DoDebuggerDestroy start', True);
-
-  Reset;
-
-  CpuViewDebugLog.Log('DebugGate: DoDebuggerDestroy end', False);
+  if FDbgController = nil then
+    Result := True
+  else
+    Result := inherited;
 end;
 
-function TCpuViewDebugGate.FormatAsmCode(const Value: string;
+function TFpDebugGate.FormatAsmCode(const Value: string;
   var AnInfo: TDbgInstInfo; CodeSize: Integer): string;
 var
   I, Len, Cursor: Integer;
@@ -731,263 +368,125 @@ begin
   SetLength(Result, Cursor - 1);
 end;
 
-function TCpuViewDebugGate.IsMainThreadId: Boolean;
+function TFpDebugGate.IsMainThreadId: Boolean;
 begin
   if Assigned(FDbgController) then
-    Result := ThreadID = FDbgController.CurrentProcess.ThreadID
+    Result := CurrentThreadID = FDbgController.CurrentProcess.ThreadID
   else
     Result := True;
 end;
 
-function TCpuViewDebugGate.IsUserCode(AAddrVA: Int64): Boolean;
-var
-  Sym: TFpSymbol;
+procedure TFpDebugGate.InitContext(AValue: TCommonCpuContext);
 begin
-  Result := False;
-  if FDbgController = nil then Exit;
-  Sym := FDbgController.CurrentProcess.FindProcSymbol(AAddrVA);
-  if Sym <> nil then
-    Result := Sym.FileName <> '';
+  ContextQueryParams.GetDefContext := GetIntelContext;
+  ContextQueryParams.Get32Context := GetIntelWow64Context;
+  ContextQueryParams.SetDefContext := SetIntelContext;
+  ContextQueryParams.Set32Context := SetIntelWow64Context;
 end;
 
-procedure TCpuViewDebugGate.OnBreakPointChanged(const ASender: TIDEBreakPoints;
-  const ABreakpoint: TIDEBreakPoint);
+function TFpDebugGate.GetEndOnProcToken: string;
 begin
-  BreakPointChanged;
+  Result := 'RET';
 end;
 
-procedure TCpuViewDebugGate.OnCallStackChanged(Sender: TObject);
+procedure TFpDebugGate.Reset;
 begin
-  if FWaitCheckUserCode then
-    FWaitCheckUserCode := CheckUserCodeWithIdeCallStack = ucNeedWait;
-end;
+  CpuViewDebugLog.Log('FpDebugGate: Reset start', True);
 
-procedure TCpuViewDebugGate.OnCallStackCtxChanged(Sender: TObject);
-begin
-  CpuViewDebugLog.Log('DebugGate: OnCallStackCtxChanged start', True);
+  inherited;
 
-  if not CheckCanWork then
-  begin
-    Include(FUpdateWaiting, uwsContext);
-    CpuViewDebugLog.Log('DebugGate: OnCallStackCtxChanged not ready yet.', False);
-    Exit;
-  end;
-
-  UpdateContext;
-  DoThreadChange;
-  DoStateChange;
-
-  CpuViewDebugLog.Log('DebugGate: OnCallStackCtxChanged end', False);
-end;
-
-procedure TCpuViewDebugGate.OnState(ADebugger: TDebuggerIntf;
-  AOldState: TDBGState);
-begin
-  CpuViewDebugLog.Log(Format('DebugGate: OnState(%s, %s)', [dbgs(ADebugger.State), dbgs(AOldState)]), True);
-
-  case ADebugger.State of
-    dsNone,
-    dsStop,
-    dsError,
-    dsDestroying:
-      Reset;
-    dsIdle, dsRun, dsInternalPause:;
-    dsPause,
-    dsInit:
-    begin
-      FTemporaryIP.Clear;
-      if FDebugger <> ADebugger then
-        UpdateDebugger(ADebugger)
-      else
-        UpdateContext;
-      if uwsBreakpoint in FUpdateWaiting then
-        BreakPointChanged;
-    end;
-  end;
-  DoStateChange;
-
-  CpuViewDebugLog.Log('DebugGate: OnState end', False);
-end;
-
-procedure TCpuViewDebugGate.Reset;
-begin
-  CpuViewDebugLog.Log('DebugGate: Reset start', True);
-
-  FTemporaryIP.Clear;
-  if Assigned(FDebugger) then
-  begin
-    if FRegisterDestroyNotification then
-    begin
-      FDebugger.RemoveNotifyEvent(dnrDestroy, DoDebuggerDestroy);
-      FRegisterDestroyNotification := False;
-    end;
-    FDebugger := nil;
-  end;
   {$message 'Bad approach, utilitarianism should stand alone'}
   {$IFDEF LINUX}
   LinuxDebugger := nil;
   {$ENDIF}
+
   FDbgController := nil;
   FProcess := nil;
-  Utils.ProcessID := 0;
-  if Assigned(FBreakPoints) then
-  begin
-    FBreakPoints.RemoveNotification(FBreakpointsNotification);
-    FBreakPoints := nil;
-  end;
-  if Assigned(FThreadsMonitor) then
-  begin
-    FThreadsMonitor.RemoveNotification(FThreadsNotification);
-    FThreadsMonitor := nil;
-  end;
-  if Assigned(FCallStackMonitor) then
-  begin
-    FCallStackMonitor.RemoveNotification(FCallStackNotification);
-    FCallStackMonitor := nil;
-  end;
-  FSnapshotManager := nil;
-  FLocalSymbols.Clear;
 
-  CpuViewDebugLog.Log('DebugGate: Reset end', False);
+  CpuViewDebugLog.Log('FpDebugGate: Reset end', False);
 end;
 
-procedure TCpuViewDebugGate.StopAllWorkers;
+procedure TFpDebugGate.RefreshCallStack(AStack: TIdeCallStack);
 begin
-  CpuViewDebugLog.Log('DebugGate: StopAllWorkers start', True);
-
-  if Assigned(FDebugger) then
-    TFpDebugDebuggerAccess(FDebugger).StopAllWorkers(True);
-
-  CpuViewDebugLog.Log('DebugGate: StopAllWorkers end', False);
+  AStack.CountLimited(50);
 end;
 
-procedure TCpuViewDebugGate.UpdateContext;
+procedure TFpDebugGate.StopAllWorkers;
 begin
-  CpuViewDebugLog.Log('DebugGate: UpdateContext start', True);
+  CpuViewDebugLog.Log('FpDebugGate: StopAllWorkers start', True);
 
-  if not CheckCanWork then
-  begin
-    Include(FUpdateWaiting, uwsContext);
-    CpuViewDebugLog.Log('DebugGate: UpdateContext not ready yet.', False);
-    Exit;
-  end;
-  inherited UpdateContext;
-  UpdateLocalSymbols;
-  Exclude(FUpdateWaiting, uwsContext);
+  if Assigned(Debugger) then
+    TFpDebugDebuggerAccess(Debugger).StopAllWorkers(True);
 
-  CpuViewDebugLog.Log('DebugGate: UpdateContext end', False);
+  CpuViewDebugLog.Log('FpDebugGate: StopAllWorkers end', False);
 end;
 
-procedure TCpuViewDebugGate.UpdateDebugger(ADebugger: TDebuggerIntf);
+function TFpDebugGate.UpdateContext: Boolean;
 begin
-  CpuViewDebugLog.Log('DebugGate: UpdateDebugger start', True);
+  CpuViewDebugLog.Log('FpDebugGate: UpdateContext start', True);
 
-  FDebugger := ADebugger;
-  if Assigned(FDebugger) then
+  Result := inherited;
+  if Result then
+    UpdateLocalSymbols;
+
+  CpuViewDebugLog.Log('FpDebugGate: UpdateContext end', False);
+end;
+
+procedure TFpDebugGate.UpdateDebugger(ADebugger: TDebuggerIntf);
+begin
+  CpuViewDebugLog.Log('FpDebugGate: UpdateDebugger start', True);
+
+  inherited;
+
+  if Assigned(Debugger) then
   begin
-    if FDebugger is TFpDebugDebugger then
+    if Debugger is TFpDebugDebugger then
     begin
-      FErrorOnInit := False;
+      ErrorOnInit := False;
       DoError('');
       {$IFDEF LINUX}
-      LinuxDebugger := TFpDebugDebugger(FDebugger);
+      LinuxDebugger := TFpDebugDebugger(Debugger);
       {$ENDIF}
-      FDbgController := TFpDebugDebugger(FDebugger).DbgController;
+      FDbgController := TFpDebugDebugger(Debugger).DbgController;
       FProcess := FDbgController.CurrentProcess;
+      DebugStorage.AutoLoadLibrary := False;
+      DebugStorage.ExecutableFilePath := Debugger.FileName;
       if Assigned(FProcess) and not FProcess.GotExitProcess then
       begin
-        FDebugger.AddNotifyEvent(dnrDestroy, DoDebuggerDestroy);
-        FRegisterDestroyNotification := True;
-        if Assigned(DebugBoss) then
-        begin
-          if Assigned(DebugBoss.BreakPoints) then
-          begin
-            FBreakPoints := DebugBoss.BreakPoints;
-            FBreakPoints.AddNotification(FBreakpointsNotification);
-            BreakPointChanged;
-          end;
-          if Assigned(DebugBoss.Threads) then
-          begin
-            FThreadsMonitor := DebugBoss.Threads;
-            FThreadsMonitor.AddNotification(FThreadsNotification);
-          end;
-          if Assigned(DebugBoss.Snapshots) then
-            FSnapshotManager := DebugBoss.Snapshots;
-          if Assigned(DebugBoss.CallStack) then
-          begin
-            FCallStackMonitor := DebugBoss.CallStack;
-            FCallStackMonitor.AddNotification(FCallStackNotification);
-          end;
-        end;
-        Utils.ProcessID := ProcessID;
-        Utils.ThreadID := ThreadID;
-        if ADebugger.State = dsPause then
-          UpdateContext;
-        CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);
+        InitDebugger;
+        CpuViewDebugLog.Log('FpDebugGate: UpdateDebugger end', False);
         Exit;
       end;
     end
     else
     begin
-      FErrorOnInit := True;
-      DoError('Unsupported debugger: "' + FDebugger.ClassName + '". Requires FpDebug.');
+      ErrorOnInit := True;
+      DoError('Unsupported debugger: "' + Debugger.ClassName + '". Requires FpDebug.');
     end;
   end;
 
   Reset;
 
-  CpuViewDebugLog.Log('DebugGate: UpdateDebugger end', False);
+  CpuViewDebugLog.Log('FpDebugGate: UpdateDebugger end', False);
 end;
 
-procedure TCpuViewDebugGate.UpdateLocalSymbols;
+procedure TFpDebugGate.UpdateLocalSymbols;
 var
   LibraryMap: TLibraryMap;
   Iterator: TMapIterator;
   Lib: TDbgLibrary;
-  Symbol: TFpSymbol;
-  LocalLib: TLocalLibrary;
-  LocalSymbol: TLocalSymbol;
-  I, L: Integer;
-  RegionData: TRegionData;
 begin
   if FDbgController = nil then Exit;
   LibraryMap := FDbgController.CurrentProcess.LibMap;
   if LibraryMap = nil then Exit;
-  if LibraryMap.Count = FLocalSymbols.Count then Exit;
-  FLocalSymbols.Clear;
+  if LibraryMap.Count = DebugStorage.Count then Exit;
+  DebugStorage.Clear;
   Iterator := TMapIterator.Create(LibraryMap);
   try
     while not Iterator.EOM do
     begin
       Iterator.GetData(Lib);
-      LocalLib := TLocalLibrary.Create;
-      LocalLib.Name := Lib.Name;
-      LocalSymbol := Default(TLocalSymbol);
-      FLocalSymbols.Add(LocalLib);
-      {$ifdef ExtendedFpDebug}
-      L := Lib.SymbolTableInfo.SymbolCount - 1;
-      if L > 0 then
-      begin
-        for I := 0 to L do
-        begin
-          Symbol := Lib.SymbolTableInfo.Symbols[I];
-          LocalSymbol.Name := Symbol.Name;
-          LocalSymbol.AddrVA := Symbol.Address.Address;
-          LocalLib.Symbols.Add(LocalSymbol);
-        end;
-        LocalLib.Symbols.Sort;
-        LocalLib.LowAddr := LocalLib.Symbols.List[0].AddrVA;
-        for I := 1 to L do
-        begin
-          LocalLib.Symbols.List[I].Duplicate :=
-            LocalLib.Symbols.List[I - 1].AddrVA = LocalLib.Symbols.List[I].AddrVA;
-          LocalLib.Symbols.List[I - 1].EndVA := LocalLib.Symbols.List[I].AddrVA;
-        end;
-        if Utils.QueryRegion(LocalLib.Symbols.List[L].AddrVA, RegionData) then
-          LocalLib.Symbols.List[L].EndVA := RegionData.BaseAddr + RegionData.RegionSize;
-        LocalLib.HighAddr := LocalLib.Symbols.List[L].EndVA;
-      end;
-      {$endif}
+      DebugStorage.AddDbgInfo(Lib.Name, Lib.LoaderList.ImageBase, Lib.SymbolTableInfo);
       Iterator.Next;
     end;
   finally
@@ -995,42 +494,7 @@ begin
   end;
 end;
 
-procedure TCpuViewDebugGate.FillThreadStackFrames(ALimit: TStackLimit;
-  AddrStack, AddrFrame: Int64; AStream: TRemoteStream; AFrames: TList<
-  TStackFrame>);
-var
-  I: Integer;
-  CallStackCheck: TCheckUserCodeState;
-  FrameRetAddrVA: Int64;
-begin
-  inherited;
-  FUserCodeAddrVA := UserCodeAddrVAFound;
-  FWaitCheckUserCode := False;
-  if FDbgController = nil then Exit;
-  if IsUserCode(CurrentInstructionPoint) then Exit;
-
-  // First we check IdeCallStack
-  CallStackCheck := CheckUserCodeWithIdeCallStack;
-  FWaitCheckUserCode := CallStackCheck = ucNeedWait;
-  if CallStackCheck = ucFound then Exit;;
-
-  // If no suitable address is found, we look for a suitable one in the stack frames
-
-  FrameRetAddrVA := 0;
-  for I := 0 to AFrames.Count - 1 do
-  begin
-    ReadMemory(AFrames[I].AddrPC, FrameRetAddrVA, PointerSize);
-    if IsUserCode(FrameRetAddrVA) then
-    begin
-      FUserCodeAddrVA := FrameRetAddrVA;
-      Exit;
-    end;
-  end;
-
-  FUserCodeAddrVA := UserCodeAddrVANotFound;
-end;
-
-function TCpuViewDebugGate.GetRemoteModuleHandle(const ALibraryName: string
+function TFpDebugGate.GetRemoteModuleHandle(const ALibraryName: string
   ): TRemoteModule;
 var
   LibraryMap: TLibraryMap;
@@ -1067,7 +531,7 @@ begin
   end;
 end;
 
-function TCpuViewDebugGate.GetRemoteModules: TList<TRemoteModule>;
+function TFpDebugGate.GetRemoteModules: TList<TRemoteModule>;
 var
   LibraryMap: TLibraryMap;
   Iterator: TMapIterator;
@@ -1094,7 +558,7 @@ begin
   end;
 end;
 
-function TCpuViewDebugGate.GetRemoteProcList(const AModule: TRemoteModule
+function TFpDebugGate.GetRemoteProcList(const AModule: TRemoteModule
   ): TList<TRemoteProc>;
 var
   LibraryMap: TLibraryMap;
@@ -1133,7 +597,7 @@ begin
   end;
 end;
 
-function TCpuViewDebugGate.GetRemoteProcAddress(ALibHandle: TLibHandle;
+function TFpDebugGate.GetRemoteProcAddress(const AModule: TRemoteModule;
   const AProcName: string): Int64;
 var
   LibraryMap: TLibraryMap;
@@ -1150,7 +614,7 @@ begin
     while not Iterator.EOM do
     begin
       Iterator.GetData(Lib);
-      if Lib.ModuleHandle = ALibHandle then
+      if Lib.ModuleHandle = AModule.hInstance then
       begin
         Sym := nil;
         if Lib.DbgInfo <> nil then
@@ -1168,140 +632,28 @@ begin
   end;
 end;
 
-function TCpuViewDebugGate.GetReturnAddrVA: Int64;
+function TFpDebugGate.GetTokenizerMode: TTokenizerMode;
 begin
-  Result := FReturnAddrVA;
+  Result := tmIntel;
 end;
 
-constructor TCpuViewDebugGate.Create(AOwner: TComponent;
-  AUtils: TCommonAbstractUtils);
-begin
-  inherited;
-  FTemporaryIP := TDictionary<Integer, Int64>.Create;
-  FSupportStream := TRemoteStream.Create(Utils);
-  FSupportStream.OnUpdated := UpdateRemoteStream;
-  FBreakpointsNotification := TIDEBreakPointsNotification.Create;
-  FBreakpointsNotification.AddReference;
-  FBreakpointsNotification.OnAdd := OnBreakPointChanged;
-  FBreakpointsNotification.OnUpdate := OnBreakPointChanged;
-  FBreakpointsNotification.OnRemove := OnBreakPointChanged;
-  FThreadsNotification := TThreadsNotification.Create;
-  FThreadsNotification.AddReference;
-  FThreadsNotification.OnChange := OnCallStackCtxChanged;
-  FCallStackNotification := TCallStackNotification.Create;
-  FCallStackNotification.AddReference;
-  FCallStackNotification.OnChange := OnCallStackChanged;
-  FLocalSymbols := TObjectList<TLocalLibrary>.Create;
-  if Assigned(DebugBoss) then
-  begin
-    DebugBoss.RegisterStateChangeHandler(OnState);
-    FRegisterInDebugBoss := True;
-    UpdateDebugger(DebugBoss.Snapshots.Debugger);
-  end;
-end;
-
-destructor TCpuViewDebugGate.Destroy;
-begin
-  if FRegisterInDebugBoss and Assigned(DebugBoss) then
-    DebugBoss.UnregisterStateChangeHandler(OnState);
-  Reset;
-  FLocalSymbols.Free;
-  FSupportStream.Free;
-  FBreakpointsNotification.OnAdd := nil;
-  FBreakpointsNotification.OnRemove := nil;
-  FBreakpointsNotification.OnUpdate := nil;
-  ReleaseRefAndNil(FBreakpointsNotification);
-  FThreadsNotification.OnChange := nil;
-  ReleaseRefAndNil(FThreadsNotification);
-  FCallStackNotification.OnChange := nil;
-  ReleaseRefAndNil(FCallStackNotification);
-  FTemporaryIP.Free;
-  inherited Destroy;
-end;
-
-function TCpuViewDebugGate.CommandAvailable(ACommand: TInterfaceDebugCommand
-  ): Boolean;
-const
-  RemapCmd: array [idcRun..idcStepOut] of TDBGCommand = (
-    dcRun, dcRunTo, dcPause, dcStepInto, dcStepOver, dcStepOut
-  );
-var
-  AvailableCommands: TDBGCommands;
-begin
-  Result := False;
-  if FDebugger = nil then Exit;
-  if ACommand = idcBreakPoint then
-    Exit(DebugState = adsPaused);
-  if ACommand = idcRunToUserCode then
-    Exit(GetUserCodeAddrVA <> 0);
-  if FDebugger.State = dsStop then
-    AvailableCommands := FDebugger.SupportedCommandsFor(dsStop)
-  else
-    AvailableCommands := FDebugger.Commands;
-  Result := RemapCmd[ACommand] in AvailableCommands;
-end;
-
-function TCpuViewDebugGate.CurrentInstructionPoint: Int64;
-var
-  AEntry: TThreadEntry;
-begin
-  Result := 0;
-  if CheckCanWork then
-  begin
-    if not FTemporaryIP.TryGetValue(ThreadID, Result) then
-    begin
-      if IsMainThreadId then
-        Result := FDebugger.GetLocation.Address
-      else
-        if Assigned(FThreadsMonitor) then
-        begin
-          AEntry := FThreadsMonitor.Threads.EntryById[ThreadID];
-          if Assigned(AEntry) then
-            Result := AEntry.TopFrame.Address;
-          if Result = 0 then
-            Result := FDebugger.GetLocation.Address;
-        end;
-    end;
-  end;
-end;
-
-function TCpuViewDebugGate.DebugState: TAbstractDebugState;
-begin
-  if Assigned(FDebugger) then
-  begin
-    case FDebugger.State of
-      dsInit: Result := adsStart;
-      dsPause: Result := adsPaused;
-      dsRun: Result := adsRunning;
-      dsInternalPause: Result := adsRunning;
-      dsStop: Result := adsStoped;
-    else
-      Result := adsFinished;
-    end;
-  end
-  else
-    if FErrorOnInit then
-      Result := adsError
-    else
-      Result := adsFinished;
-end;
-
-function TCpuViewDebugGate.Disassembly(AddrVA: Int64; pBuff: PByte;
-  nSize: Integer; AShowSourceLines: Boolean): TListEx<TInstruction>;
+function TFpDebugGate.Disassembly(AddrVA, LastKnownAddrVA: Int64; pBuff: PByte;
+  nSize: Integer; AShowSourceLines, AShowCallFuncName: Boolean): TListEx<
+  TInstruction>;
 var
   Disasm: TDbgAsmDecoder;
   Process: TDbgProcess;
-  Instruction: TInstruction;
+  Instruction, SrcLine: TInstruction;
   PrevVA: Int64;
   ACodeBytes, ACode, RipSimbol: string;
   AnInfo: TDbgInstInfo;
   ExternalAddr, RipAddr: Int64;
-  SpaceIndex: Integer;
-  HasMem: Boolean;
+  SpaceIndex, MemBracketIndex: Integer;
+  HasMem, IsCallJmp: Boolean;
   PrevSymAddrVA, MissCount: TDBGPtr;
   Sym: TFpSymbol;
 begin
-  CpuViewDebugLog.Log(Format('DebugGate: Disassembly(AddrVA: 0x%x, nSize: %d)', [AddrVA, nSize]), True);
+  CpuViewDebugLog.Log(Format('FpDebugGate: Disassembly(AddrVA: 0x%x, nSize: %d)', [AddrVA, nSize]), True);
 
   Result := TListEx<TInstruction>.Create;
   if FDbgController = nil then Exit;
@@ -1309,59 +661,59 @@ begin
   if Process = nil then Exit;
   Disasm := Process.Disassembler;
   if Disasm = nil then Exit;
-  PrevSymAddrVA := 0;
+  PrevSymAddrVA := LastKnownAddrVA;
+  SrcLine := Default(TInstruction);
   while nSize > 0 do
   begin
     Sym := GetSymbolAtAddr(AddrVA);
-    if Sym <> nil then
-    begin
-      if PrevSymAddrVA = 0 then
-        PrevSymAddrVA := Sym.Address.Address
-      else
+    try
+      if Sym <> nil then
       begin
-        if PrevSymAddrVA <> Sym.Address.Address then
+        if PrevSymAddrVA = 0 then
+          PrevSymAddrVA := Sym.Address.Address
+        else
         begin
-          PrevSymAddrVA := Sym.Address.Address;
-          if (AddrVA > PrevSymAddrVA) and (Result.Count > 0) then
+          if PrevSymAddrVA <> Sym.Address.Address then
           begin
-            MissCount := AddrVA - PrevSymAddrVA;
-            Instruction := Result.Last;
-            if Instruction.Len > MissCount then
+            PrevSymAddrVA := Sym.Address.Address;
+            if (AddrVA > PrevSymAddrVA) and (Result.Count > 0) then
             begin
-              Result.Delete(Result.Count - 1);
-              Dec(Instruction.Len, MissCount);
-              Instruction.AsString := '???';
-              Instruction.JmpTo := 0;
-              Instruction.Hint := '';
-              Result.Add(Instruction);
-              Dec(pBuff, MissCount);
-              Dec(AddrVA, MissCount);
-              Inc(nSize, MissCount);
+              MissCount := AddrVA - PrevSymAddrVA;
+              Instruction := Result.Last;
+              if Instruction.Len > MissCount then
+              begin
+                Result.Delete(Result.Count - 1);
+                Dec(Instruction.Len, MissCount);
+                Instruction.Mnemonic := InvalidAsmLine;
+                Result.Add(Instruction);
+                Dec(pBuff, MissCount);
+                Dec(AddrVA, MissCount);
+                Inc(nSize, MissCount);
+              end;
             end;
           end;
         end;
       end;
-    end;
 
-    if AShowSourceLines then
-    begin
-      Instruction.AsString := FormatSymbol(AddrVA, Sym, qsSourceLine);
-      if Instruction.AsString <> '' then
+      if AShowSourceLines then
       begin
-        Instruction.AddrVA := AddrVA;
-        Instruction.Hint := '';
-        Instruction.JmpTo := 0;
-        Instruction.Len := 0;
-        Result.Add(Instruction);
+        SrcLine.AddrVA := AddrVA;
+        SrcLine.Mnemonic := FormatSymbol(AddrVA, Sym, qsSourceLine);
       end;
+    finally
+      if Sym <> nil then
+        Sym.ReleaseReference;
     end;
 
     PrevVA := {%H-}Int64(pBuff);
     Disasm.Disassemble(pBuff, ACodeBytes, ACode, AnInfo);
+    Instruction := Default(TInstruction);
     Instruction.AddrVA := AddrVA;
-    Instruction.AsString := FormatAsmCode(ACode, AnInfo, Length(ACodeBytes) shr 1);
+    Instruction.Mnemonic := FormatAsmCode(ACode, AnInfo, Length(ACodeBytes) shr 1);
+    RipSimbol := '';
 
-    HasMem := (AnInfo.InstrType = itJump) and (Pos('[', Instruction.AsString) > 0);
+    MemBracketIndex := Pos('[', Instruction.Mnemonic);
+    HasMem := (AnInfo.InstrType = itJump) and (MemBracketIndex > 0);
     if HasMem then
     begin
       // Error in TX86AsmDecoder.Disassemble, AnInfo.InstrTargetOffs is not returned correctly.
@@ -1374,26 +726,49 @@ begin
 
     if AnInfo.InstrTargetOffs <> 0 then
     begin
-      Instruction.Hint := QuerySymbolAtAddr(ExternalAddr, qsName).Description;
-      if Instruction.Hint = '' then
+      RipSimbol := QuerySymbolAtAddr(ExternalAddr, qsName).Description;
+      if RipSimbol = '' then
         Instruction.Hint := '0x' + IntToHex(ExternalAddr, 1)
       else
         if HasMem then
-          Instruction.Hint := '[0x' + IntToHex(ExternalAddr, 1) + '] -> ' + Instruction.Hint;
+          Instruction.Hint := '[0x' + IntToHex(ExternalAddr, 1) + '] -> ' + RipSimbol;
     end
     else
       Instruction.Hint := '';
 
-    if AnInfo.InstrType = itJump then
+    IsCallJmp :=
+      Instruction.Mnemonic.StartsWith('CALL') or
+      (Instruction.Mnemonic[1] = 'J');
+
+    if (AnInfo.InstrType = itJump) and not HasMem then
     begin
       Instruction.JmpTo := ExternalAddr;
-      if ShowFullAddress and not HasMem then
+      SpaceIndex := Pos(' ', Instruction.Mnemonic);
+      if SpaceIndex > 0 then
       begin
-        SpaceIndex := Pos(' ', Instruction.AsString);
-        if SpaceIndex > 0 then
+        // jmp/call +32 -> jmp/call 0x123456789
+        if ShowFullAddress then
         begin
-          SetLength(Instruction.AsString, SpaceIndex);
-          Instruction.AsString := Instruction.AsString + '0x' + IntToHex(ExternalAddr, 1);
+          SetLength(Instruction.Mnemonic, SpaceIndex);
+          Instruction.Mnemonic := Instruction.Mnemonic + '0x' + IntToHex(ExternalAddr, 1);
+        end;
+        // call +32 -> call function_name with hiperlink
+        if AShowCallFuncName and (Instruction.Mnemonic[1] = 'C') then
+        begin
+          Instruction.JmpToPosStart := SpaceIndex;
+          SetLength(Instruction.Mnemonic, SpaceIndex);
+          Instruction.JmpToPosLength := Pos(' ', RipSimbol) - 1;
+          if Instruction.JmpToPosLength <= 0 then
+            Instruction.JmpToPosLength := Length(RipSimbol);
+          Instruction.Mnemonic := Instruction.Mnemonic +
+            Copy(RipSimbol, 1, Instruction.JmpToPosLength);
+          Instruction.Hint := '';
+        end
+        else
+        // jmp/call +32 -> jmp/call +32 with hiperlink
+        begin
+          Instruction.JmpToPosStart := SpaceIndex;
+          Instruction.JmpToPosLength := Length(Instruction.Mnemonic) - SpaceIndex;
         end;
       end;
     end
@@ -1402,17 +777,23 @@ begin
       Instruction.JmpTo := 0;
       if AnInfo.InstrTargetOffs <> 0 then
       begin
-        RipSimbol := '';
         RipAddr := 0;
-        ReadMemory(ExternalAddr, RipAddr, PointerSize);
-        if RipAddr <> 0 then
+        if (RipSimbol = '') or IsCallJmp then
         begin
-          RipSimbol := QuerySymbolAtAddr(RipAddr, qsName).Description;
-          if Instruction.AsString.StartsWith('CALL') then
-            Instruction.JmpTo := RipAddr;
+          ReadMemory(ExternalAddr, RipAddr, PointerSize);
+          if RipAddr <> 0 then
+          begin
+            RipSimbol := QuerySymbolAtAddr(RipAddr, qsName).Description;
+            if IsCallJmp then
+            begin
+              Instruction.JmpTo := RipAddr;
+              Instruction.JmpToPosStart := MemBracketIndex;
+              Instruction.JmpToPosLength := Pos(']', Instruction.Mnemonic) - MemBracketIndex - 1;
+            end;
+          end;
         end;
-        if RipSimbol = '' then
-          Instruction.Hint := Format('RIP (0x%.1x) %s', [ExternalAddr, Instruction.Hint])
+        if RipAddr = 0 then
+          Instruction.Hint := Format('RIP (0x%.1x) %s', [ExternalAddr, RipSimbol])
         else
           Instruction.Hint := Format('RIP (0x%.1x -> 0x%.1x) %s', [ExternalAddr, RipAddr, RipSimbol]);
       end;
@@ -1422,77 +803,17 @@ begin
     Inc(AddrVA, Instruction.Len);
     Dec(nSize, Instruction.Len);
     if nSize >= 0 then
-      Result.Add(Instruction);
-  end;
-
-  CpuViewDebugLog.Log('DebugGate: Disassembly end', False);
-end;
-
-function TCpuViewDebugGate.IsActive: Boolean;
-begin
-  Result := not (DebugState in [adsStoped, adsFinished]);
-end;
-
-function TCpuViewDebugGate.IsActiveJmp: Boolean;
-var
-  Inst: TInstruction;
-begin
-  Result := False;
-  Inst := CurrentInstruction;
-  if Inst.JmpTo = 0 then Exit;
-  Result := Context.IsActiveJump(Inst.AsString);
-end;
-
-function TCpuViewDebugGate.GetSourceLine(AddrVA: Int64; out
-  ASourcePath: string; out ASourceLine: Integer): Boolean;
-var
-  Sym: TFpSymbol;
-  PasSource: TCodeBuffer;
-  Editor: TSourceEditorInterface;
-begin
-  ASourcePath := '';
-  ASourceLine := 0;
-  if FDbgController = nil then Exit;
-  Sym := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
-  if Sym = nil then Exit;
-  try
-    ASourcePath := Sym.FileName;
-    ASourceLine := Sym.Line;
-  finally
-    Sym.ReleaseReference;
-  end;
-  if ASourceLine <= 0 then Exit;
-  if DebugBoss.GetFullFilename(ASourcePath, False) then
-  begin
-    PasSource := CodeToolBoss.LoadFile(ASourcePath, True, False);
-    if Assigned(PasSource) then
     begin
-      Editor := SourceEditorManagerIntf.SourceEditorIntfWithFilename(ASourcePath);
-      if Editor <> nil then
-        ASourceLine := Editor.DebugToSourceLine(ASourceLine);
-      Result := ASourceLine > 0;
+      if SrcLine.Mnemonic <> '' then
+        Result.Add(SrcLine);
+      Result.Add(Instruction);
     end;
   end;
+
+  CpuViewDebugLog.Log('FpDebugGate: Disassembly end', False);
 end;
 
-function TCpuViewDebugGate.GetUserCodeAddrVA: Int64;
-begin
-  if DebugState = adsPaused then
-    Result := FUserCodeAddrVA
-  else
-    Result := 0;
-end;
-
-procedure TCpuViewDebugGate.Pause;
-begin
-  CpuViewDebugLog.Log('DebugGate: Pause start', True);
-
-  FDebugger.Pause;
-
-  CpuViewDebugLog.Log('DebugGate: Pause end', False);
-end;
-
-function TCpuViewDebugGate.PointerSize: Integer;
+function TFpDebugGate.PointerSize: Integer;
 begin
   if Assigned(FDbgController) then
     Result := FDbgController.CurrentProcess.PointerSize
@@ -1500,7 +821,7 @@ begin
     Result := 0;
 end;
 
-function TCpuViewDebugGate.ProcessID: Cardinal;
+function TFpDebugGate.ProcessID: Cardinal;
 begin
   if Assigned(FDbgController) then
     Result := FDbgController.CurrentProcess.ProcessID
@@ -1508,206 +829,32 @@ begin
     Result := 0;
 end;
 
-function TCpuViewDebugGate.QuerySymbolAtAddr(AddrVA: Int64;
-  AParam: TQuerySymbol): TQuerySymbolValue;
-var
-  ASymbol: TFpSymbol;
-begin
-  ASymbol := GetSymbolAtAddr(AddrVA);
-  if ASymbol = nil then
-  begin
-    Result.AddrVA := AddrVA;
-    Result.Description := '';
-  end
-  else
-  begin
-    Result.AddrVA := ASymbol.Address.Address;
-    if AParam = qsAddrVA then
-      Result.Description := ''
-    else
-      Result.Description := FormatSymbol(AddrVA, ASymbol, AParam);
-  end;
-end;
-
-function TCpuViewDebugGate.ReadMemory(AddrVA: Int64; var Buff; Size: Integer
-  ): Boolean;
-begin
-  FSupportStream.Position := AddrVA;
-  Result := FSupportStream.Read(Buff, Size) = Size;
-end;
-
-procedure TCpuViewDebugGate.Run;
-begin
-  CpuViewDebugLog.Log('DebugGate: Run start', True);
-
-  FDebugger.Run;
-
-  CpuViewDebugLog.Log('DebugGate: Run end', False);
-end;
-
-procedure TCpuViewDebugGate.Stop;
-begin
-  CpuViewDebugLog.Log('DebugGate: Stop start', True);
-
-  FDebugger.Stop;
-
-  CpuViewDebugLog.Log('DebugGate: Stop end', False);
-end;
-
-procedure TCpuViewDebugGate.SetNewIP(AddrVA: Int64);
-var
-  RegIP: TRegValue;
-begin
-  CpuViewDebugLog.Log(Format('DebugGate: SetNewIP(0x%x)', [AddrVA]), True);
-
-  RegIP := Default(TRegValue);
-  RegIP.QwordValue := AddrVA;
-  UpdateRegValue(Context.InstructonPointID, RegIP);
-
-  CpuViewDebugLog.Log('DebugGate: SetNewIP end', False);
-end;
-
-procedure TCpuViewDebugGate.ToggleBreakPoint(AddrVA: Int64);
-var
-  Sym: TFpSymbol;
-  Bp: TIDEBreakPoint;
-  AFileName: string;
-  I, ALine: Integer;
-  BPList: TDBGPtrArray;
-  AddrIsSourceLine: Boolean;
-begin
-  CpuViewDebugLog.Log(Format('DebugGate: ToggleBreakPoint(0x%x)', [AddrVA]), True);
-  if FDbgController = nil then Exit;
-  AFileName := '';
-  ALine := -1;
-  Bp := nil;
-  AddrIsSourceLine := False;
-  Sym := FDbgController.CurrentProcess.FindProcSymbol(AddrVA);
-  if Assigned(Sym) then
-  try
-    AFileName := Sym.FileName;
-    ALine := Sym.Line;
-  finally
-    Sym.ReleaseReference;
-  end;
-  if ALine > 0 then
-  begin
-    if FProcess.GetLineAddresses(AFileName, ALine, BPList{%H-}) then
-    begin
-      for I := 0 to Length(BPList) - 1 do
-        if BPList[I] = AddrVA then
-        begin
-          AddrIsSourceLine := True;
-          Bp := FBreakPoints.Find(AFileName, ALine);
-          Break;
-        end;
-    end
-  end;
-  if Bp = nil then
-    Bp := FBreakPoints.Find(AddrVA);
-  if Assigned(Bp) then
-  begin
-    Bp.ReleaseReference;
-    CpuViewDebugLog.Log('DebugGate: ToggleBreakPoint end', False);
-    Exit;
-  end;
-  DebugBoss.LockCommandProcessing;
-  try
-    if AddrIsSourceLine then
-      DebugBoss.DoCreateBreakPoint(AFileName, ALine, True, Bp)
-    else
-      DebugBoss.DoCreateBreakPoint(AddrVA, True, Bp);
-  finally
-    DebugBoss.UnLockCommandProcessing;
-  end;
-
-  CpuViewDebugLog.Log('DebugGate: ToggleBreakPoint end', False);
-end;
-
-function TCpuViewDebugGate.ThreadStackLimit: TStackLimit;
-begin
-  Result := Utils.GetThreadStackLimit(ThreadId, PointerSize = 4);
-end;
-
-function TCpuViewDebugGate.ThreadID: Cardinal;
-var
-  Snapshot: TSnapshot;
-begin
-  if Assigned(FDbgController) then
-  begin
-    if Assigned(FSnapshotManager) then
-      Snapshot := FSnapshotManager.SelectedEntry
-    else
-      Snapshot := nil;
-    if Assigned(FThreadsMonitor) then
-    begin
-      if Assigned(Snapshot) then
-        Result := FThreadsMonitor.Snapshots[Snapshot].CurrentThreadId
-      else
-        Result := FThreadsMonitor.CurrentThreads.CurrentThreadId;
-    end
-    else
-      Result := FDbgController.CurrentProcess.ThreadID
-  end
-  else
-    Result := 0;
-end;
-
-procedure TCpuViewDebugGate.TraceIn;
-begin
-  CpuViewDebugLog.Log('DebugGate: TraceIn start', True);
-
-  FLockTimeOut := GetTickCount64;
-  FDebugger.StepIntoInstr;
-
-  CpuViewDebugLog.Log('DebugGate: TraceIn end', False);
-end;
-
-procedure TCpuViewDebugGate.TraceOut;
-begin
-  CpuViewDebugLog.Log('DebugGate: TraceOut start', True);
-
-  FLockTimeOut := GetTickCount64;
-  FDebugger.StepOverInstr;
-
-  CpuViewDebugLog.Log('DebugGate: TraceOut end', False);
-end;
-
-procedure TCpuViewDebugGate.TraceTilReturn;
-begin
-  CpuViewDebugLog.Log('DebugGate: TraceTilReturn start', True);
-
-  FDebugger.StepOut;
-
-  CpuViewDebugLog.Log('DebugGate: TraceTilReturn end', False);
-end;
-
-procedure TCpuViewDebugGate.TraceTo(AddrVA: Int64);
+procedure TFpDebugGate.TraceTo(AddrVA: Int64);
 var
   ALocation: TDBGPtrArray;
 begin
-  if not CheckCanWork then Exit;
+  if IsDebuggerLocked then Exit;
 
-  CpuViewDebugLog.Log(Format('DebugGate: TraceTo(0x%x)', [AddrVA]), True);
+  CpuViewDebugLog.Log(Format('FpDebugGate: TraceTo(0x%x)', [AddrVA]), True);
 
   StopAllWorkers;
 
   SetLength(ALocation{%H-}, 1);
   ALocation[0] := QWord(AddrVA);
   FDbgController.InitializeCommand(TDbgControllerRunToCmd.Create(FDbgController, ALocation));
-  TFpDebugDebuggerAccess(FDebugger).StartDebugLoop;
+  TFpDebugDebuggerAccess(Debugger).StartDebugLoop;
 
-  CpuViewDebugLog.Log('DebugGate: TraceTo end', False);
+  CpuViewDebugLog.Log('FpDebugGate: TraceTo end', False);
 end;
 
-procedure TCpuViewDebugGate.TraceToList(AddrVA: array of Int64);
+procedure TFpDebugGate.TraceToList(AddrVA: array of Int64);
 var
   ALocation: TDBGPtrArray;
   I: Integer;
 begin
-  if not CheckCanWork then Exit;
+  if IsDebuggerLocked then Exit;
 
-  CpuViewDebugLog.Log('DebugGate: TraceToList', True);
+  CpuViewDebugLog.Log('FpDebugGate: TraceToList', True);
 
   StopAllWorkers;
 
@@ -1715,24 +862,24 @@ begin
   for I := 0 to Length(AddrVA) - 1 do
     ALocation[I] := QWord(AddrVA[I]);
   FDbgController.InitializeCommand(TDbgControllerRunToCmd.Create(FDbgController, ALocation));
-  TFpDebugDebuggerAccess(FDebugger).StartDebugLoop;
+  TFpDebugDebuggerAccess(Debugger).StartDebugLoop;
 
-  CpuViewDebugLog.Log('DebugGate: TraceToList end', False);
+  CpuViewDebugLog.Log('FpDebugGate: TraceToList end', False);
 end;
 
-function TCpuViewDebugGate.UpdateRegValue(RegID: Integer;
+function TFpDebugGate.UpdateRegValue(RegID: Integer;
   ANewRegValue: TRegValue): Boolean;
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
   WorkItem: TThreadWorkerChangeThreadContext;
 begin
-  if not CheckCanWork then Exit;
+  if IsDebuggerLocked then Exit(False);
 
-  CpuViewDebugLog.Log(Format('DebugGate: UpdateRegValue(RegID: %d, ANewRegValue: 0x%x)', [RegID, ANewRegValue.QwordValue]), True);
+  CpuViewDebugLog.Log(Format('FpDebugGate: UpdateRegValue(RegID: %d, ANewRegValue: 0x%x)', [RegID, ANewRegValue.QwordValue]), True);
 
   StopAllWorkers;
 
-  WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
+  WorkQueue := TFpDebugDebugger(Debugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
     WorkItem := TThreadWorkerChangeThreadContext.Create(Self);
@@ -1741,20 +888,12 @@ begin
     WorkItem.DecRef;
   end;
 
-  Context.ThreadID := ThreadID;
-  Context.BeginUpdate;
-  try
-    Result := Context.RegSetValue(RegID, ANewRegValue);
-    if Result and (RegID = Context.InstructonPointID) then
-      FTemporaryIP.AddOrSetValue(ThreadID, ANewRegValue.QwordValue);
-  finally
-    Context.EndUpdate;
-  end;
+  Result := inherited;
 
-  CpuViewDebugLog.Log('DebugGate: UpdateRegValue end', False);
+  CpuViewDebugLog.Log('FpDebugGate: UpdateRegValue end', False);
 end;
 
-procedure TCpuViewDebugGate.UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64;
+procedure TFpDebugGate.UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64;
   ASize: Int64);
 var
   WorkQueue: TFpThreadPriorityWorkerQueue;
@@ -1763,7 +902,7 @@ var
   NeedUpdate: Boolean;
   I: Integer;
 begin
-  if not CheckCanWork then Exit;
+  if IsDebuggerLocked then Exit;
 
   NeedUpdate := False;
   Limit := AAddrVA + ASize;
@@ -1779,24 +918,23 @@ begin
 
   if not NeedUpdate then Exit;
 
-  CpuViewDebugLog.Log(Format('DebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
+  CpuViewDebugLog.Log(Format('FpDebugGate: UpdateRemoteStream(AAddrVA: 0x%x, ASize: %d)', [AAddrVA, ASize]), True);
 
   // Вызов опасен, если оставить его то будет AV при остановке процесса через паузу
   // The call is dangerous, if leave it there will be AV when stop the process via pause
   //StopAllWorkers;
 
-
-  WorkQueue := TFpDebugDebugger(FDebugger).WorkQueue;
+  WorkQueue := TFpDebugDebugger(Debugger).WorkQueue;
   if Assigned(WorkQueue) then
   begin
     WorkItem := TThreadWorkerMaskBreakpoints.Create(
-      TFpDebugDebugger(FDebugger), pBuff, AAddrVA, ASize);
+      TFpDebugDebugger(Debugger), pBuff, AAddrVA, ASize);
     WorkQueue.PushItem(WorkItem);
     WorkQueue.WaitForItem(WorkItem, True);
     WorkItem.DecRef;
   end;
 
-  CpuViewDebugLog.Log('DebugGate: UpdateRemoteStream end', False);
+  CpuViewDebugLog.Log('FpDebugGate: UpdateRemoteStream end', False);
 end;
 
 end.

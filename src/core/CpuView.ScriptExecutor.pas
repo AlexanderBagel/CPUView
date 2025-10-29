@@ -57,6 +57,7 @@ type
     FContext: TCommonCpuContext;
     FCurrentRIPOffset: Int64;
     FDebugger: TAbstractDebugger;
+    FExtendedSyntax: Boolean;
     function BreakPointPresent(AddrVA: Int64): Boolean;
     function ConvertToLibName(const AValue: string): string;
     function ExecuteGetModuleHandle(const Script: string; out ExecuteResult: string): Boolean;
@@ -64,7 +65,7 @@ type
     function ExecuteBreakPointSet(const Script: string; out ExecuteResult: string): Boolean;
     function ExecuteBreakPointClear(const Script: string; out ExecuteResult: string): Boolean;
     procedure ExtractParams(const Script: string; out FirstParam, SecondParam, ThirdParam: string);
-    function InternalGetProcAddress(const Script: string; out ExecuteResult: string; out AddrVA: Int64): Boolean;
+    function InternalGetProcAddress(const Script: string; out ExecuteResult: string; out AddrVA: Int64; AUpdate: Boolean = True): Boolean;
   protected
     function DoExecute(const Script: string; out ExecuteResult: string): Boolean; virtual; abstract;
   public
@@ -76,6 +77,7 @@ type
     property Context: TCommonCpuContext read FContext write FContext;
     property CurrentRIPOffset: Int64 read FCurrentRIPOffset write FCurrentRIPOffset;
     property Debugger: TAbstractDebugger read FDebugger write FDebugger;
+    property ExtendedSyntax: Boolean read FExtendedSyntax write FExtendedSyntax;
   end;
 
 implementation
@@ -121,6 +123,7 @@ begin
   Result := False;
   ExtractParams(Script, LibName, Dummee, Dummee);
   LibName := ConvertToLibName(LibName);
+  FDebugger.UpdateRemoteModulesData;
   RemoteModule := FDebugger.GetRemoteModuleHandle(LibName);
   if RemoteModule.hInstance = 0 then
     ExecuteResult := Format('"%s" not found.', [LibName])
@@ -216,7 +219,7 @@ begin
 end;
 
 function TAbstractScriptExecutor.InternalGetProcAddress(const Script: string;
-  out ExecuteResult: string; out AddrVA: Int64): Boolean;
+  out ExecuteResult: string; out AddrVA: Int64; AUpdate: Boolean): Boolean;
 var
   LibName, LibNameWithExt, ProcName, Offset: string;
   RemoteModule: TRemoteModule;
@@ -226,6 +229,8 @@ var
 begin
   Result := False;
   ExtractParams(Script, LibName, ProcName, Offset);
+  if AUpdate then
+    FDebugger.UpdateRemoteModulesData;
   if ProcName = '' then
   begin
     Libs := FDebugger.GetRemoteModules;
@@ -233,7 +238,7 @@ begin
       for I := 0 to Libs.Count - 1 do
       begin
         Result := InternalGetProcAddress(Format('gpa %s:%s',
-          [ExtractFileName(Libs[I].LibraryPath), LibName + Offset]), ExecuteResult, AddrVA);
+          [ExtractFileName(Libs[I].LibraryPath), LibName + Offset]), ExecuteResult, AddrVA, False);
         if Result then
           Exit;
       end;
@@ -249,7 +254,7 @@ begin
     ExecuteResult := Format('"%s" not found.', [LibNameWithExt])
   else
   begin
-    AddrVA := FDebugger.GetRemoteProcAddress(RemoteModule.hInstance, ProcName);
+    AddrVA := FDebugger.GetRemoteProcAddress(RemoteModule, ProcName);
     if AddrVA = 0 then
       ExecuteResult := Format('"%s:%s" not found.', [LibName, ProcName])
     else

@@ -1,67 +1,66 @@
 object frmInputBox: TfrmInputBox
   Left = 699
-  Height = 143
+  Height = 95
   Top = 235
-  Width = 443
+  Width = 295
   BorderStyle = bsDialog
   Caption = 'frmInputBox'
-  ClientHeight = 143
-  ClientWidth = 443
-  DesignTimePPI = 144
+  ClientHeight = 95
+  ClientWidth = 295
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
   object lblPromt: TLabel
-    Left = 16
-    Height = 25
-    Top = 8
-    Width = 68
+    Left = 11
+    Height = 17
+    Top = 5
+    Width = 55
     Caption = 'lblPromt'
   end
   object edAddress: TEdit
-    Left = 16
-    Height = 33
-    Top = 40
-    Width = 408
+    Left = 11
+    Height = 36
+    Top = 27
+    Width = 272
     TabOrder = 0
     Text = '0x0'
     OnChange = edAddressChange
   end
   object lblWrong: TLabel
-    Left = 16
-    Height = 25
-    Top = 80
-    Width = 119
+    Left = 11
+    Height = 17
+    Top = 53
+    Width = 99
     Caption = 'Invalid address'
     Font.Color = clRed
     ParentFont = False
     Visible = False
   end
   object btnCancel: TButton
-    Left = 311
-    Height = 38
-    Top = 96
-    Width = 113
+    Left = 207
+    Height = 25
+    Top = 64
+    Width = 75
     Cancel = True
     Caption = 'Cancel'
     ModalResult = 2
     TabOrder = 1
   end
   object btnOk: TButton
-    Left = 192
-    Height = 38
-    Top = 96
-    Width = 113
+    Left = 128
+    Height = 25
+    Top = 64
+    Width = 75
     Caption = 'Ok'
     Default = True
     ModalResult = 1
     TabOrder = 2
   end
   object cbList: TComboBox
-    Left = 16
-    Height = 33
-    Top = 40
-    Width = 406
-    ItemHeight = 25
+    Left = 11
+    Height = 36
+    Top = 27
+    Width = 271
+    ItemHeight = 0
     Style = csDropDownList
     TabOrder = 3
     Visible = False

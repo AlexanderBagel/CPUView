@@ -173,7 +173,7 @@ constructor TBufferedROStream.Create(AStream: TRemoteStream;
 begin
   FStream := AStream;
   FOwnership := AOwnership;
-  BufferSize := 1024 * 1024;
+  BufferSize := 4096;
 end;
 
 destructor TBufferedROStream.Destroy;
@@ -242,7 +242,7 @@ end;
 procedure TBufferedROStream.SetBufferSize(Value: Integer);
 begin
   if Value < 0 then
-    Value := 16 * 1024;
+    Value := 4096;
   if FBuffSize <> Value then
   begin
     FBuffSize := Value;

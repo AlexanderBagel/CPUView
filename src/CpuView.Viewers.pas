@@ -182,7 +182,7 @@ type
   private
     FBreakPoints: TDictionary<Int64, Boolean>;
     FKeyScrollDirection: TScrollStepDirection;
-    FLockKeyScroll: Boolean;
+    FLockKeyScroll, FLockScroll: Boolean;
     FTokenizer: TAsmTokenizer;
     FOnScroll: TOnVerticalScrollEvent;
     FInstructionPoint: Int64;
@@ -339,6 +339,7 @@ type
   private
     FHightLightSelected: Boolean;
     FLastInvalidAddrRect: TRect;
+    FLockScroll: Boolean;
     FOnQueryAddr: TOnQueryAddrType;
     FValidateAddress: Boolean;
     FValidateType: array [TAddrValidationType] of Boolean;
@@ -352,6 +353,8 @@ type
   protected
     function CanDrawValidation(AAddrType: TAddrType): Boolean;
     procedure DoChange(ChangeCode: Integer); override;
+    function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
+      MousePos: TPoint): Boolean; override;
     procedure DoSelectionChage(AStartAddr, AEndAddr: Int64); override;
     procedure DoQueryAddrType(AddrVA: Int64; out AddrType: TAddrType);
     procedure InitDefault; override;
@@ -412,6 +415,8 @@ type
     function GetDefaultPainterClass: TPrimaryRowPainterClass; override;
     procedure InitDefault; override;
     procedure UpdateView; override;
+  public
+    function SelectedAddr: Int64;
   end;
 
   { TDumpView }
@@ -858,7 +863,7 @@ type
     function TextMetric: TAbstractTextMetric; override;
   end;
 
-  TRegEditCommentPainter = class(TSecondaryRowPainter)
+  TEditCommentPainter = class(TSecondaryRowPainter)
   strict private
     FFullRowRect: TRect;
     function View: TCustomEditView;
@@ -1522,11 +1527,16 @@ procedure TCustomAsmView.DoScrollStep(AStep: TScrollStepDirection);
 var
   SavedColumn: TColumnType;
 begin
-  if FLockKeyScroll then Exit;
-  SavedColumn := CaretPosData.Column;
-  if Assigned(FOnScroll) then
-    FOnScroll(Self, AStep);
-  UpdateCaretColumn(SavedColumn);
+  if FLockKeyScroll or FLockScroll then Exit;
+  FLockScroll := True;
+  try
+    SavedColumn := CaretPosData.Column;
+    if Assigned(FOnScroll) then
+      FOnScroll(Self, AStep);
+    UpdateCaretColumn(SavedColumn);
+  finally
+    FLockScroll := False;
+  end;
 end;
 
 function TCustomAsmView.GetCaretNextRowIndex(FromIndex: Int64;
@@ -1809,6 +1819,18 @@ begin
   inherited;
   if ChangeCode = cmFont then
     FitColumnsToBestSize;
+end;
+
+function TCustomAddressView.DoMouseWheel(Shift: TShiftState;
+  WheelDelta: Integer; MousePos: TPoint): Boolean;
+begin
+  if FLockScroll then Exit;
+  FLockScroll := True;
+  try
+    Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
+  finally
+    FLockScroll := False;
+  end;
 end;
 
 procedure TCustomAddressView.DoQueryAddrType(AddrVA: Int64;
@@ -2291,6 +2313,11 @@ begin
   inherited;
 
   FitColumnsToBestSize;
+end;
+
+function TCustomDumpView.SelectedAddr: Int64;
+begin
+  Result := SelectPointToAddress(LeftSelPoint);
 end;
 
 { TStackColorMap }
@@ -2843,7 +2870,7 @@ begin
 
     // Value addr validation mark
     if not View.ValidateAddress then Continue;
-    if Info.ValueType = crtValue then
+    if Info.ValueType = crtGeneralPurposeReg then
     begin
       if not FContext.RegParam(Info.RegID, AParam) then Continue;
       if rfValidation in AParam.Flags then
@@ -3128,7 +3155,7 @@ begin
   case Value of
     csAsText: Result := True;
     csBytes: Result := (SelStart >= 0) and (SelStart = SelEnd) and
-      (FSelectedRegister.ValueType in [crtValue, crtExtra]);
+      (FSelectedRegister.ValueType in [crtGeneralPurposeReg..crtExtra]);
   else
     Result := False;
   end;
@@ -3150,7 +3177,7 @@ begin
     csAsText, csAddress: inherited;
     csBytes:
     begin
-      if not (FSelectedRegister.ValueType in [crtValue, crtExtra]) then Exit;
+      if not (FSelectedRegister.ValueType in [crtGeneralPurposeReg..crtExtra]) then Exit;
       if not Context.RegParam(FSelectedRegister.RegID, AParam) then Exit;
       NeedCopyAsRawBuff := (FSelectedRegValue.ValueSize >= 8) and
         ((AParam.SupportedViewMode = vmX87Reg64) or
@@ -3159,7 +3186,20 @@ begin
       if NeedCopyAsRawBuff then
         Clipboard.AsText := RawBufToHex(@FSelectedRegValue.Ext32[0], FSelectedRegValue.ValueSize, True)
       else
+      begin
+        if FSelectedRegister.ValueType = crtFloatingPointReg then
+        begin
+          if AParam.ViewMode in [rvmFloat32, rvmFloat64] then
+          begin
+            if AParam.ViewMode = rvmFloat32 then
+              Clipboard.AsText := FloatToStr(FSelectedRegValue.SingleValue)
+            else
+              Clipboard.AsText := FloatToStr(FSelectedRegValue.DoubleValue);
+            Exit;
+          end;
+        end;
         Clipboard.AsText := IntToHex(FSelectedRegValue.QwordValue, 1);
+      end;
     end;
   end;
 end;
@@ -3228,7 +3268,7 @@ begin
     // field type check, for selection
     // you can work only with real registers and their flags
     FSelectedRegister := Context.RegInfo(RegID);
-    if not (FSelectedRegister.ValueType in [crtValue..crtEnumValue]) then
+    if not (FSelectedRegister.ValueType in [crtGeneralPurposeReg..crtEnumValue]) then
       RegID := -1;
   end;
   if RegID >= 0 then
@@ -3584,9 +3624,9 @@ begin
   Result := TCustomEditView(Owner);
 end;
 
-{ TRegEditCommentPainter }
+{ TEditCommentPainter }
 
-function TRegEditCommentPainter.ColumnAsString(AColumn: TColumnType): string;
+function TEditCommentPainter.ColumnAsString(AColumn: TColumnType): string;
 const
   s07 =
     '     0-1      2-3      4-5      6-7';
@@ -3624,7 +3664,7 @@ begin
   end;
 end;
 
-procedure TRegEditCommentPainter.DrawColumn(ACanvas: TCanvas;
+procedure TEditCommentPainter.DrawColumn(ACanvas: TCanvas;
   AColumn: TColumnType; var ARect: TRect);
 begin
   case AColumn of
@@ -3644,7 +3684,7 @@ begin
   end;
 end;
 
-function TRegEditCommentPainter.View: TCustomEditView;
+function TEditCommentPainter.View: TCustomEditView;
 begin
   Result := TCustomEditView(Owner);
 end;
@@ -3859,7 +3899,7 @@ end;
 procedure TCustomEditView.InitPainters;
 begin
   inherited;
-  Painters.Add(GetOverloadPainterClass(TRegEditCommentPainter).Create(Self));
+  Painters.Add(GetOverloadPainterClass(TEditCommentPainter).Create(Self));
 end;
 
 function TCustomEditView.InternalGetRowPainter(

@@ -189,7 +189,10 @@ begin
   else
   begin
     AStopWatch := GetStopWatch;
-    APrevStopWatch := FStopWatch.Pop;
+    if FStopWatch.Count > 0 then
+      APrevStopWatch := FStopWatch.Pop
+    else
+      APrevStopWatch := -1;
     if APrevStopWatch = -1 then
       AStopWatch := 0
     else

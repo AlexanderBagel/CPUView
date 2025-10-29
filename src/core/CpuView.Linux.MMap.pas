@@ -17,11 +17,11 @@
 
 unit CpuView.Linux.MMap;
 
-{$IFDEF FPC}
-  {$MODE Delphi}
-{$ENDIF}
+{$MODE Delphi}
 
 interface
+
+{$I CpuViewCfg.inc}
 
 uses
   LCLIntf, LCLType, SysUtils, Generics.Collections, Classes, LazLogger,
@@ -29,7 +29,7 @@ uses
 
   FWHexView.Common,
   CpuView.Common,
-  CpuView.IntelContext.Types,
+  CpuView.Context.Params,
   CpuView.Linux;
 
 const
@@ -635,7 +635,7 @@ var
   I: Integer;
 begin
   Path := Format('/proc/%d/task/*', [FCurrentPid]);
-  if FindFirst(Path, faDirectory, SR) = 00 then
+  if FindFirst(Path, faDirectory, SR) = 0 then
   try
     repeat
       if SR.Attr and faDirectory = 0 then Continue;
@@ -651,18 +651,15 @@ end;
 
 procedure TSimpleMemoryMap.FillThread(AThreadID: Cardinal);
 var
-  Ctx: TIntelThreadContext;
+  ThreadStackPoint: Int64;
   I: Integer;
   itm: TPageData;
 begin
-  if FIs64Process then
-    Ctx := GetIntelContext(AThreadID)
-  else
-    Ctx := GetIntelWow64Context(AThreadID);
+  ThreadStackPoint := GetThreadStackPoint(AThreadID, FIs64Process);
   for I := 0 to FPages.Count - 1 do
   begin
     itm := FPages[I];
-    if (Ctx.Rsp >= itm.AddrVA) and (Ctx.Rsp < itm.EndAddrVA) then
+    if (ThreadStackPoint >= itm.AddrVA) and (ThreadStackPoint < itm.EndAddrVA) then
     begin
       AddContains(itm, 'Stack of thread: ' + IntToStr(AThreadID));
       FPages[I] := itm;

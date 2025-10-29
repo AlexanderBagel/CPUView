@@ -47,15 +47,30 @@ const
   vmX87Reg64: TRegViewModes = [rvmHex, rvmHexW, rvmFloat32, rvmFloat64];
   vmX87Reg80: TRegViewModes = [rvmHex, rvmHexW];
   vmSimdReg: TRegViewModes = [rvmHex..rvmHexQ, rvmIntW..rvmFloat64];
+  vmSingleReg: TRegViewModes = [rvmHex, rvmFloat32];
+  vmDoubleReg: TRegViewModes = [rvmHex, rvmFloat64];
 
 type
+  TContextFeature = (
+    cfDebug,   // Debug reg available (DR0..DR7)
+    cfMmx,     // MMX reg available (MM0..MM7)
+    cfFloat,   // ST reg available (ST0..ST7)
+    cfSse,     // XMM reg available (XMM0..XMM15)
+    cfAvx,     // YMM reg available (YMM0..YMM15)
+    cfAvx512   // ZMM and K reg available (ZMM0..ZMM15 and K0..K7)
+  );
+  TContextFeatures = set of TContextFeature;
+
   TContextRegType = (
-    crtValue,           // ordinary register
-    crtExtra,           // special register EFlags, MSRCX etc...
-    crtBitValue,        // flag containing the bit value of the register
-    crtEnumValue,       // register part of several bits (enum)
-    crtSelectableHint,  // hint available for user copying (e.g. current active JMP types)
-    crtHint             // the usual “decorative” hint
+    crtGeneralPurposeReg, // ordinary register
+    crtFloatingPointReg,  // arm only (S and D)
+    crtSegmentReg,        // intel only
+    crtValue,             // other regs MM/ST/R/XMM/YMM/V
+    crtExtra,             // special register EFlags, MSRCX etc...
+    crtBitValue,          // flag containing the bit value of the register
+    crtEnumValue,         // register part of several bits (enum)
+    crtSelectableHint,    // hint available for user copying (e.g. current active JMP types)
+    crtHint               // the usual “decorative” hint
     );
 
   // Types of supported register operations when changing or displaying a register
@@ -106,7 +121,9 @@ type
       2: (WordValue: Word);
       3: (IntValue: Integer);
       4: (DwordValue: Cardinal);
+      5: (SingleValue: Single);
       8: (QwordValue: Int64); // Yes, not UInt64, since all addr are Int64!
+      9: (DoubleValue: Double);
       10: (Ext10: array [0..9] of Byte);
       16: (Ext16: array [0..15] of Byte);
       32: (Ext32: array [0..31] of Byte);
@@ -119,8 +136,6 @@ type
   TRegQueryStringType = (rqstName, rqstDisplayName, rqstValue, rqstHint);
 
   TAbstractCPUContext = class;
-
-  { TRegAbstractSettings }
 
   { TContextAbstractSettings }
 
@@ -158,8 +173,10 @@ type
   private
     FAddressMode: TAddressMode;
     FChangeList: TList<TContextChangeEvent>;
+    FContextFeatures: TContextFeatures;
     FQueryHint: TContextQueryRegHintEvent;
     FQueryExternalHint: TContextQueryExternalRegHintEvent;
+    FQueryRegAtAddr: TDictionary<Int64, string>;
     FUpdateCount: Integer;
     FUtils: TCommonAbstractUtils;
   protected
@@ -168,6 +185,7 @@ type
     procedure DoQueryExternalRegHint(const AValue: TRegValue; ARegType: TExternalRegType; var AHint: string);
     function GetViewMode(RegID: TRegID): TRegViewMode; virtual; abstract;
     procedure SetViewMode(RegID: TRegID; const Value: TRegViewMode); virtual; abstract;
+    property QueryRegAtAddr: TDictionary<Int64, string> read FQueryRegAtAddr;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -179,7 +197,7 @@ type
     function InstructonPoint: Int64; virtual; abstract;
     function InstructonPointID: TRegID; virtual; abstract;
     function IsActiveJump(const Value: string): Boolean; virtual; abstract;
-    function PointerSize: Integer; virtual; abstract;
+    function PointerSize: Integer;
     function RegCount(ARowIndex: Integer): Integer; virtual; abstract;
     function RegDescriptor(ARegID: TRegID; out ADescriptor: TRegDescriptor): Boolean; overload;
     function RegDescriptor(const ARegName: string; out ADescriptor: TRegDescriptor): Boolean; overload; virtual; abstract;
@@ -189,7 +207,7 @@ type
     function RegParam(ARegID: TRegID; out AParam: TRegParam): Boolean; virtual; abstract;
     function RegQueryEnumString(ARegID: TRegID; AEnumIndex: Integer): string; virtual; abstract;
     function RegQueryEnumValuesCount(ARegID: TRegID): Integer; virtual; abstract;
-    function RegQueryNamesAtAddr(AAddrVA: Int64): string; virtual; abstract;
+    function RegQueryNamesAtAddr(AAddrVA: Int64): string;
     function RegQueryString(ARegID: TRegID; AType: TRegQueryStringType): string; virtual; abstract;
     function RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
     function RegQueryValue(const ARegName: string; out ARegValue: TRegValue): Boolean; overload; virtual; abstract;
@@ -198,6 +216,7 @@ type
     function Update(ANewInstructionPoint: Int64 = 0): Boolean; virtual; abstract;
   public
     property AddressMode: TAddressMode read FAddressMode write FAddressMode;
+    property ContextFeatures: TContextFeatures read FContextFeatures write FContextFeatures;
     property Utils: TCommonAbstractUtils read FUtils write FUtils;
     property ViewMode[RegID: TRegID]: TRegViewMode read GetViewMode write SetViewMode;
     property OnQueryExternalHint: TContextQueryExternalRegHintEvent read FQueryExternalHint write FQueryExternalHint;
@@ -242,6 +261,8 @@ type
     property RegID: Integer read FRegID write FRegID; // link to KnownRegs
   end;
 
+  { TCommonCpuContext }
+
   TCommonCpuContext = class(TAbstractCPUContext)
   strict private
     FLastReg: TCustomRegData;
@@ -271,7 +292,7 @@ type
     procedure FillRegData(RegID: TRegID); overload;
     procedure FillRegData(RowIndex, ColIndex: Integer); overload;
     procedure FillSeparator;
-    function RegHint(RegID: TRegID): string; virtual; abstract;
+    function RegHint(RegID: TRegID): string;
     function RegValue(Value: PByte; ValueLen: Integer;
       AValueFmt: TRegViewMode): string;
     function RegValueFmt(Value: PByte; ValueLen: Integer): string;
@@ -402,10 +423,12 @@ constructor TAbstractCPUContext.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FChangeList := TList<TContextChangeEvent>.Create;
+  FQueryRegAtAddr := TDictionary<Int64, string>.Create;
 end;
 
 destructor TAbstractCPUContext.Destroy;
 begin
+  FQueryRegAtAddr.Free;
   FreeAndNil(FChangeList);
   inherited Destroy;
 end;
@@ -420,6 +443,16 @@ begin
   Dec(FUpdateCount);
   if FUpdateCount = 0 then
     DoChange(cctDataChange);
+end;
+
+function TAbstractCPUContext.PointerSize: Integer;
+begin
+  case AddressMode of
+    am32bit: Result := 4;
+    am64bit: Result := 8;
+  else
+    Result := 0;
+  end;
 end;
 
 function TAbstractCPUContext.RegDescriptor(ARegID: TRegID;
@@ -441,6 +474,12 @@ procedure TAbstractCPUContext.RegisterChangeNotification(
   Value: TContextChangeEvent);
 begin
   FChangeList.Add(Value);
+end;
+
+function TAbstractCPUContext.RegQueryNamesAtAddr(AAddrVA: Int64): string;
+begin
+  if not FQueryRegAtAddr.TryGetValue(AAddrVA, Result) then
+    Result := '';
 end;
 
 procedure TAbstractCPUContext.UnRegisterChangeNotification(
@@ -556,6 +595,18 @@ end;
 procedure TCommonCpuContext.FillSeparator;
 begin
   FillReg('', '', 0, 0);
+end;
+
+function TCommonCpuContext.RegHint(RegID: TRegID): string;
+var
+  AValue: TRegValue;
+begin
+  AValue := Default(TRegValue);
+  AValue.IntValue := RegID;
+  Result := '';
+  DoQueryExternalRegHint(AValue, ertRegID, Result);
+  if Result <> '' then
+    Result := StringReplace(Result, '/n', sLineBreak, [rfReplaceAll]);
 end;
 
 function TCommonCpuContext.GetViewMode(RegID: Integer): TRegViewMode;

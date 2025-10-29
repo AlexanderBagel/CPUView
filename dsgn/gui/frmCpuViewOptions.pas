@@ -56,7 +56,6 @@ type
     cbForceFindSymbols: TCheckBox;
     cbExtendedHints: TCheckBox;
     cbDisplayStrings: TCheckBox;
-    cbUseSymbolCache: TCheckBox;
     FontDialog: TFontDialog;
     gbPerformance: TGroupBox;
     gbSessions: TGroupBox;
@@ -352,7 +351,6 @@ begin
   cbDisplayStrings.Checked := Settings.DisplayStrings;
   seMinStrLen.Value := Settings.MinimumStringLength;
   seFindSymbolsDepth.Value := Settings.ForceFindSymbolsDepth;
-  cbUseSymbolCache.Checked := Settings.UseCacheFoExternalSymbols;
   FillImageList;
   FillSettingsView;
   UpdateDebugSymbolsIndepended;
@@ -382,7 +380,6 @@ begin
   Settings.DisplayStrings := cbDisplayStrings.Checked;
   Settings.MinimumStringLength := seMinStrLen.Value;
   Settings.ForceFindSymbolsDepth := seFindSymbolsDepth.Value;
-  Settings.UseCacheFoExternalSymbols := cbUseSymbolCache.Checked;
   APointerValues := [];
   Enum := tvSettings.Nodes.GetEnumerator;
   while Enum.MoveNext do

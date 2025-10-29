@@ -2,7 +2,7 @@
 //
 //  ****************************************************************************
 //  * Project   : CPU-View
-//  * Unit Name : CpuView.IntelContext.Types.pas
+//  * Unit Name : CpuView.Context.Intel.Types.pas
 //  * Purpose   : Intel x86_64 processor utility methods and types.
 //  * Author    : Alexander (Rouse_) Bagel
 //  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
@@ -15,7 +15,7 @@
 //  ****************************************************************************
 //
 
-unit CpuView.IntelContext.Types;
+unit CpuView.Context.Intel.Types;
 
 interface
 
@@ -52,18 +52,33 @@ type
   TIntelThreadContext = packed record
     x86Context: Boolean;
     ContextLevel: Integer;
+    ChangedRegID: Integer; // for SetXXXContext
     Rax, Rbx, Rcx, Rdx, Rsp, Rbp, Rsi, Rdi, Rip: Int64;
     R: array [8..15] of Int64; // x64 specific
     EFlags: Cardinal;
     SegGs, SegFs, SegEs, SegDs, SegCs, SegSs: Cardinal;
     Dr0, Dr1, Dr2, Dr3, Dr6, Dr7: Int64;
+    DebugPresent: Boolean; // GDB does not support Debug regs, this must be specified.
     LastError, LastStatus: Cardinal;
     ControlWord, StatusWord, TagWord: Word;
     ErrorOffset, ErrorSelector, DataOffset, DataSelector, MxCsr: Cardinal;
     FloatRegisters: TFloatRegisters;
+    MMXPresent: Boolean;  // GDB does not support MMX, this must be specified.
     XmmCount: Integer;    // Zero - if the feature is unsupported by the processor
     YmmPresent: Boolean;  // False - if the feature is unsupported by the processor
     Ymm: array[0..15] of TYMMRegister; // 8..15 for x64 mode
+  end;
+
+  TGetIntelContext = function (ThreadID: DWORD): TIntelThreadContext;
+  TSetIntelContext = function (ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  TGetIntelWow64Context = function (ThreadID: DWORD): TIntelThreadContext;
+  TSetIntelWow64Context = function (ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+
+  TContextQueryParams = record
+    GetDefContext: TGetIntelContext;
+    SetDefContext: TSetIntelContext;
+    Get32Context: TGetIntelWow64Context;
+    Set32Context: TSetIntelWow64Context;
   end;
 
   function GetTagWordFromFXSave(AStatusWord: Word; ATagWord: Byte;

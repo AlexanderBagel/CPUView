@@ -17,12 +17,9 @@
 
 unit CpuView.Linux;
 
+{$I CpuViewCfg.inc}
+
 {$MODE Delphi}
-{$ASMMODE INTEL}
-{$UNDEF USE_CONSTREF}
-{$IF FPC_FULLVERSION <= 30202}
-  {$DEFINE USE_CONSTREF}
-{$ENDIF}
 
 interface
 
@@ -44,8 +41,14 @@ uses
   FpDebugDebugger,
   LazDebuggerIntfBaseTypes,
 
-  CpuView.Common,
-  CpuView.IntelContext.Types;
+  FWHexView.Common,
+  {$IFDEF USE_INTEL_CTX}
+  CpuView.Context.Intel.Types,
+  {$ENDIF}
+  {$IFDEF CPUAARCH64}
+  CpuView.Context.Aarch64.Types,
+  {$ENDIF}
+  CpuView.Common;
 
 type
   TMemoryBasicInformation = record
@@ -54,15 +57,17 @@ type
     MappedFile, Hint: string;
   end;
 
-  TMemoryBasicInformationList = class(TList<TMemoryBasicInformation>);
+  TMemoryBasicInformationList = class(TListEx<TMemoryBasicInformation>);
 
   { TCommonUtils }
 
   TCommonUtils = class(TCommonAbstractUtils)
   private
+    FMemory: TFileStream;
     FMemList: TMemoryBasicInformationList;
     function GetMemList: TMemoryBasicInformationList;
   protected
+    procedure SetProcessID(const Value: Integer); override;
     function VirtualQueryMBI(AQueryAddr: Int64; out
       MBI: TMemoryBasicInformation): Boolean;
   public
@@ -71,6 +76,7 @@ type
     function GetThreadExtendedData({%H-}AThreadID: Integer; {%H-}ThreadIs32: Boolean): TThreadExtendedData; override;
     function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
     function NeedUpdateReadData: Boolean; override;
+    function QueryLoadedImages({%H-}AProcess32: Boolean): TImageDataList; override;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
@@ -111,10 +117,12 @@ type
     property ThreadResult: Cardinal read FResult;
   end;
 
-  function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-  function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  {$IFDEF USE_INTEL_CTX}
+  function GetIntelContext(AThreadID: DWORD): TIntelThreadContext;
+  function SetIntelContext(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  function GetIntelWow64Context(AThreadID: DWORD): TIntelThreadContext;
+  function SetIntelWow64Context(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  {$ENDIF}
 
   function LoadVirtualMemoryInformation(AProcessID, AThreadID: Integer;
     AddFirstEmpty: Boolean = True): TMemoryBasicInformationList;
@@ -313,7 +321,10 @@ var
   Delimiter: Char;
 begin
   Result := TMemoryBasicInformationList.Create(TComparer<TMemoryBasicInformation>.Construct(@DefaultMBIComparer));
-  MapsPath := '/proc/' + IntToStr(AProcessID) + '/task/' + IntToStr(AThreadID) + '/maps';
+  if AThreadID = 0 then
+    MapsPath := '/proc/' + IntToStr(AProcessID) + '/task/' + IntToStr(AProcessID) + '/maps'
+  else
+    MapsPath := '/proc/' + IntToStr(AProcessID) + '/task/' + IntToStr(AThreadID) + '/maps';
   if not FileExists(MapsPath) then Exit;
 
   VMData := TStringList.Create;
@@ -411,6 +422,7 @@ begin
   end;
 end;
 
+{$IFDEF USE_INTEL_CTX}
 function IsAVXSupport: Boolean; assembler;
 asm
   {$IFDEF CPUX64}
@@ -464,15 +476,21 @@ asm
   pop ebx
   {$ENDIF}
 end;
+{$ELSE}
+function IsAVXSupport: Boolean; begin Result := False; end;
+function GetXSaveArea: Cardinal; begin Result := 0; end;
+function GetAVXOffset: Cardinal; begin Result := 0; end;
+{$ENDIF USE_INTEL_CTX}
 
-procedure LoadRegs32(ThreadID: DWORD; var AContext: TIntelThreadContext);
+{$IFDEF USE_INTEL_CTX}
+procedure LoadRegs32(AThreadID: DWORD; var AContext: TIntelThreadContext);
 var
   io: iovec;
   Regs: TUserRegs;
  begin
   io.iov_base := @(Regs.regs32[0]);
   io.iov_len := SizeOf(Regs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
 
   AContext.x86Context := True;
@@ -495,7 +513,7 @@ var
   AContext.SegSs := Regs.regs32[XSS];
 end;
 
-function SaveRegs32(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SaveRegs32(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 var
   io: iovec;
   Regs: TUserRegs;
@@ -504,7 +522,7 @@ begin
 
   io.iov_base := @Regs;
   io.iov_len := SizeOf(Regs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
 
   Regs.regs32[EAX] := AContext.Rax;
@@ -528,10 +546,10 @@ begin
 
   io.iov_base := @Regs;
   io.iov_len := SizeOf(Regs);
-  Result := Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) = 0;
+  Result := Do_fpPTrace(PTRACE_SETREGSET, AThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) = 0;
 end;
 
-procedure LoadMMX32(ThreadID: DWORD; var AContext: TIntelThreadContext);
+procedure LoadMMX32(AThreadID: DWORD; var AContext: TIntelThreadContext);
 var
   I: Integer;
   io: iovec;
@@ -539,17 +557,18 @@ var
 begin
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
     Exit;
 
   AContext.ControlWord := FpRegs.cwd;
   AContext.StatusWord := FpRegs.swd;
   AContext.TagWord := FpRegs.twd;
+  AContext.MMXPresent := True;
   for I := 0 to 7 do
     Move(FpRegs.st_space[I * 10], AContext.FloatRegisters[I], 10);
 end;
 
-function SaveMMX32(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SaveMMX32(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 var
   I: Integer;
   io: iovec;
@@ -559,7 +578,7 @@ begin
 
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
     Exit;
 
   FpRegs.cwd := AContext.ControlWord;
@@ -571,10 +590,10 @@ begin
 
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
-  Result := Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) = 0;
+  Result := Do_fpPTrace(PTRACE_SETREGSET, AThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) = 0;
 end;
 
-procedure LoadAVX32(ThreadID: DWORD; var AContext: TIntelThreadContext);
+procedure LoadAVX32(AThreadID: DWORD; var AContext: TIntelThreadContext);
 var
   I: Integer;
   io: iovec;
@@ -602,7 +621,7 @@ begin
 
   io.iov_base := simdRegs;
   io.iov_len := XSaveArea;
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
     Exit;
 
   AContext.MxCsr := simdRegs.mxcsr;
@@ -625,7 +644,7 @@ begin
       Move(XSaveAreaBuff[AVXOffset + I * SizeOf(TXMMRegister)], AContext.Ymm[I].High, SizeOf(TXMMRegister));
 end;
 
-function SaveAVX32(ThreadID: DWORD; {%H-}AContext: TIntelThreadContext;
+function SaveAVX32(AThreadID: DWORD; {%H-}AContext: TIntelThreadContext;
   UpdateAVXRegister: Boolean): Boolean;
 var
   I, XmmCount: Integer;
@@ -658,7 +677,7 @@ begin
 
   io.iov_base := simdRegs;
   io.iov_len := XSaveArea;
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
     Exit;
 
   if AVXOffset > 0 then
@@ -678,17 +697,17 @@ begin
 
   io.iov_base := simdRegs;
   io.iov_len := XSaveArea;
-  Result := Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) = 0;
+  Result := Do_fpPTrace(PTRACE_SETREGSET, AThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) = 0;
 end;
 
-procedure LoadRegs64(ThreadID: DWORD; var AContext: TIntelThreadContext);
+procedure LoadRegs64(AThreadID: DWORD; var AContext: TIntelThreadContext);
 var
   io: iovec;
   Regs: TUserRegs;
 begin
   io.iov_base := @Regs;
   io.iov_len := SizeOf(Regs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
 
   AContext.Rax := Regs.regs64[RAX];
@@ -718,7 +737,7 @@ begin
   AContext.SegSs := Regs.regs64[SS];
 end;
 
-function SaveRegs64(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SaveRegs64(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 var
   io: iovec;
   Regs: TUserRegs;
@@ -727,7 +746,7 @@ begin
 
   io.iov_base := @Regs;
   io.iov_len := SizeOf(Regs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) <> 0 then
     Exit;
 
   Regs.regs64[RAX] := AContext.Rax;
@@ -759,10 +778,10 @@ begin
 
   io.iov_base := @Regs;
   io.iov_len := SizeOf(Regs);
-  Result := Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) = 0;
+  Result := Do_fpPTrace(PTRACE_SETREGSET, AThreadID, Pointer(PtrUInt(NT_PRSTATUS)), @io) = 0;
 end;
 
-procedure LoadMMX64(ThreadID: DWORD; var AContext: TIntelThreadContext);
+procedure LoadMMX64(AThreadID: DWORD; var AContext: TIntelThreadContext);
 var
   I: Integer;
   io: iovec;
@@ -770,12 +789,13 @@ var
 begin
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
     Exit;
 
   AContext.ControlWord := FpRegs.cwd;
   AContext.StatusWord := FpRegs.swd;
   AContext.MxCsr := FpRegs.mxcsr;
+  AContext.MMXPresent := True;
 
   for I := 0 to 7 do
     Move(FpRegs.st_space[I * 4], AContext.FloatRegisters[I], 10);
@@ -783,7 +803,7 @@ begin
   AContext.TagWord := GetTagWordFromFXSave(FpRegs.swd, FpRegs.ftw, AContext.FloatRegisters);
 end;
 
-function SaveMMX64(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SaveMMX64(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 var
   I: Integer;
   io: iovec;
@@ -793,7 +813,7 @@ begin
 
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io) <> 0 then
     Exit;
 
   FpRegs.cwd := AContext.ControlWord;
@@ -806,10 +826,10 @@ begin
 
   io.iov_base := @FpRegs;
   io.iov_len := SizeOf(FpRegs);
-  Result := Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io)= 0;
+  Result := Do_fpPTrace(PTRACE_SETREGSET, AThreadID, Pointer(PtrUInt(NT_PRFPREG)), @io)= 0;
 end;
 
-procedure LoadAVX64(ThreadID: DWORD; var AContext: TIntelThreadContext);
+procedure LoadAVX64(AThreadID: DWORD; var AContext: TIntelThreadContext);
 var
   I: Integer;
   io: iovec;
@@ -839,7 +859,7 @@ begin
 
   io.iov_base := simdRegs;
   io.iov_len := XSaveArea;
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, {%H-}Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, {%H-}Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
     Exit;
 
   if AVXOffset > 0 then
@@ -860,7 +880,7 @@ begin
       Move(XSaveAreaBuff[AVXOffset + I * SizeOf(TXMMRegister)], AContext.Ymm[I].High, SizeOf(TXMMRegister));
 end;
 
-function SaveAVX64(ThreadID: DWORD; const {%H-}AContext: TIntelThreadContext;
+function SaveAVX64(AThreadID: DWORD; const {%H-}AContext: TIntelThreadContext;
   UpdateAVXRegister: Boolean): Boolean;
 var
   I, XMMCount: Integer;
@@ -894,7 +914,7 @@ begin
 
   io.iov_base := simdRegs;
   io.iov_len := XSaveArea;
-  if Do_fpPTrace(PTRACE_GETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
+  if Do_fpPTrace(PTRACE_GETREGSET, AThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) <> 0 then
     Exit;
 
   if AVXOffset > 0 then
@@ -913,88 +933,106 @@ begin
 
   io.iov_base := simdRegs;
   io.iov_len := XSaveArea;
-  Result := Do_fpPTrace(PTRACE_SETREGSET, ThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) = 0;
+  Result := Do_fpPTrace(PTRACE_SETREGSET, AThreadID, Pointer(PtrUInt(NT_X86_XSTATE)), @io) = 0;
 end;
 
-function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
+function GetIntelContext(AThreadID: DWORD): TIntelThreadContext;
 begin
   Result := Default(TIntelThreadContext);
 
   {$IFDEF CPUX86}
-  LoadRegs32(ThreadID, Result);
-  LoadMMX32(ThreadID, Result);
-  LoadAVX32(ThreadID, Result);
+  LoadRegs32(AThreadID, Result);
+  LoadMMX32(AThreadID, Result);
+  LoadAVX32(AThreadID, Result);
   {$ENDIF}
 
   {$IFDEF CPUX64}
-  LoadRegs64(ThreadID, Result);
-  LoadMMX64(ThreadID, Result);
-  LoadAVX64(ThreadID, Result);
+  LoadRegs64(AThreadID, Result);
+  LoadMMX64(AThreadID, Result);
+  LoadAVX64(AThreadID, Result);
   {$ENDIF}
 end;
 
-function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SetIntelContext(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 begin
   Result := False;
   case AContext.ContextLevel of
     0:
     begin
       {$IFDEF CPUX86}
-      Result := SaveRegs32(ThreadID, AContext);
+      Result := SaveRegs32(AThreadID, AContext);
       {$ENDIF}
 
       {$IFDEF CPUX64}
-      Result := SaveRegs64(ThreadID, AContext);
+      Result := SaveRegs64(AThreadID, AContext);
       {$ENDIF}
     end;
     1:
     begin
       {$IFDEF CPUX86}
-      Result := SaveMMX32(ThreadID, AContext);
+      Result := SaveMMX32(AThreadID, AContext);
       {$ENDIF}
 
       {$IFDEF CPUX64}
-      Result := SaveMMX64(ThreadID, AContext);
+      Result := SaveMMX64(AThreadID, AContext);
       {$ENDIF}
     end;
     2, 3:
     begin
       {$IFDEF CPUX86}
-      Result := SaveAVX32(ThreadID, AContext, AContext.ContextLevel = 3);
+      Result := SaveAVX32(AThreadID, AContext, AContext.ContextLevel = 3);
       {$ENDIF}
 
       {$IFDEF CPUX64}
-      Result := SaveAVX64(ThreadID, AContext, AContext.ContextLevel = 3);
+      Result := SaveAVX64(AThreadID, AContext, AContext.ContextLevel = 3);
       {$ENDIF}
     end;
   end;
 end;
 
-function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
+function GetIntelWow64Context(AThreadID: DWORD): TIntelThreadContext;
 begin
   Result := Default(TIntelThreadContext);
-  LoadRegs32(ThreadID, Result);
-  LoadMMX32(ThreadID, Result);
-  LoadAVX32(ThreadID, Result);
+  LoadRegs32(AThreadID, Result);
+  LoadMMX32(AThreadID, Result);
+  LoadAVX32(AThreadID, Result);
 end;
 
-function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SetIntelWow64Context(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 begin
   Result := False;
   case AContext.ContextLevel of
-    0: Result := SaveRegs32(ThreadID, AContext);
-    1: Result := SaveMMX32(ThreadID, AContext);
-    2, 3: Result := SaveAVX32(ThreadID, AContext, AContext.ContextLevel = 3);
+    0: Result := SaveRegs32(AThreadID, AContext);
+    1: Result := SaveMMX32(AThreadID, AContext);
+    2, 3: Result := SaveAVX32(AThreadID, AContext, AContext.ContextLevel = 3);
   end;
 end;
+{$ENDIF USE_INTEL_CTX}
 
 { TCommonUtils }
 
 function TCommonUtils.GetMemList: TMemoryBasicInformationList;
 begin
   if FMemList = nil then
-    FMemList := LoadVirtualMemoryInformation(ProcessID, ThreadID);
+  begin
+    if ProcessID <> 0 then
+      FMemList := LoadVirtualMemoryInformation(ProcessID, ThreadID);
+  end;
   Result := FMemList;
+end;
+
+procedure TCommonUtils.SetProcessID(const Value: Integer);
+var
+  MemPath: string;
+begin
+  inherited;
+  FreeAndNil(FMemory);
+  if (LinuxDebugger = nil) and (Value <> 0) then
+  begin
+    MemPath := '/proc/' + IntToStr(Value) + '/mem';
+    if FileExists(MemPath) then
+      FMemory := TFileStream.Create(MemPath, fmOpenRead or fmShareDenyWrite);
+  end;
 end;
 
 function TCommonUtils.VirtualQueryMBI(AQueryAddr: Int64; out
@@ -1004,6 +1042,7 @@ var
   Index: SizeInt;
 begin
   List := GetMemList;
+  if List = nil then Exit(False);
   if List.Count = 0 then Exit(False);
   MBI.BaseAddress := AQueryAddr;
   Result := List.BinarySearch(MBI, Index);
@@ -1033,6 +1072,7 @@ end;
 destructor TCommonUtils.Destroy;
 begin
   FMemList.Free;
+  FMemory.Free;
   inherited Destroy;
 end;
 
@@ -1081,6 +1121,35 @@ begin
   Result := False;
 end;
 
+function TCommonUtils.QueryLoadedImages(AProcess32: Boolean): TImageDataList;
+var
+  I: Integer;
+  ImageData: TImageData;
+  List: TMemoryBasicInformationList;
+  LastImagePath: string;
+  MBI: TMemoryBasicInformation;
+begin
+  Result := TImageDataList.Create;
+  List := GetMemList;
+  if List = nil then Exit;
+  LastImagePath := '';
+  for I := 0 to List.Count - 1 do
+  begin
+    MBI := List[I];
+    if not FileExists(MBI.MappedFile) then Continue;
+    if LastImagePath = MBI.MappedFile then
+      Inc(Result.List[Result.Count - 1].Size, MBI.RegionSize)
+    else
+    begin
+      LastImagePath := MBI.MappedFile;
+      ImageData.Size := MBI.RegionSize;
+      ImageData.ImageBase := MBI.AllocationBase;
+      ImageData.ImagePath := MBI.MappedFile;
+      Result.Add(ImageData);
+    end;
+  end;
+end;
+
 function TCommonUtils.QueryModuleName(AddrVA: Int64; out AModuleName: string
   ): Boolean;
 var
@@ -1089,7 +1158,10 @@ begin
   AModuleName := '';
   Result := VirtualQueryMBI(AddrVA, MBI);
   if Result then
+  begin
     AModuleName := MBI.MappedFile;
+    Result := FileExists(AModuleName);
+  end;
 end;
 
 function TCommonUtils.QueryRegion(AddrVA: Int64; out RegionData: TRegionData
@@ -1126,6 +1198,16 @@ begin
   // If it cannot be read, return an empty buffer
   if (LinuxDebugger = nil) or (LinuxDebugger.State <> dsPause) then
   begin
+    if Assigned(FMemory) then
+    begin
+      try
+        FMemory.Position := QWord(AddrVA);
+        Result := FMemory.Read(Buff, ASize);
+        Exit;
+      except
+        FillChar(Buff, ASize, 0);
+      end;
+    end;
     FillChar(Buff, ASize, 0);
     Exit;
   end;
@@ -1165,7 +1247,6 @@ procedure TCommonUtils.Update;
 begin
   FreeAndNil(FMemList);
   if ProcessID = 0 then Exit;
-  if ThreadID = 0 then Exit;
   FMemList := LoadVirtualMemoryInformation(ProcessID, ThreadID);
 end;
 

@@ -25,12 +25,11 @@ unit CpuView.Core;
 
 interface
 
-{ TODO:
-  The x87/SIMD registers are not editable
-  Run to user code (detect IsRetAddr via previos Call)
-}
+{$I CpuViewCfg.inc}
 
-{$message 'Need ASLR Breakpoints'}
+{ TODO:
+  Need ASLR Breakpoints
+}
 
 uses
   {$IFDEF FPC}
@@ -61,17 +60,10 @@ uses
   CpuView.DebugerGate,
   CpuView.CPUContext,
   CpuView.DBase,
-  CpuView.ExtendedHint;
+  CpuView.ExtendedHint,
+  CpuView.TraceLog;
 
 type
-  TAsmLine = record
-    AddrVA: Int64;
-    DecodedStr, HintStr: string;
-    Len: Integer;
-    JmpTo: Int64;
-    LinkIndex: Integer;
-  end;
-
   TDumpViewRec = record
     View: TDumpView;
     Stream: TBufferedROStream;
@@ -118,17 +110,21 @@ type
     property OnUpdated: TOnCacheUpdated read FOnUpdated write SetOnUpdated;
   end;
 
+  TCoreState = (csWaitDebugger, csDebuggerInit, csRun, csDisassembling);
+
   { TCpuViewCore }
 
-  TCpuViewCore = class
+  TCpuViewCore = class(TComponent)
   private
     FAddrIndex: TDictionary<Int64, Integer>;
     FAsmJmpStack: TJumpStack;
     FAsmView: TAsmView;
     FAsmSelStart, FAsmSelEnd: Int64;
     FAsmStream: TBufferedROStream;
-    FCacheList: TListEx<TAsmLine>;
+    FCacheList: TListEx<TInstruction>;
     FCacheListIndex: Integer;
+    FCoreState: TCoreState;
+    FCtx: TCommonCpuContext;
     FDBase: TCpuViewDBase;
     FDebugger: TAbstractDebugger;
     FDisassemblyStream: TBufferedROStream;
@@ -159,11 +155,12 @@ type
     FOldAsmSelect: TNotifyEvent;
     FUtils: TCommonUtils;
     FReset: TNotifyEvent;
+    FStateChange: TNotifyEvent;
     procedure BuildTraceLine(ACurrentAddrVA: Int64);
     function CanWork: Boolean;
     function DisasmBuffSize: Integer;
     procedure DoReset;
-    function FormatInstructionToAsmLine(const AIns: TInstruction): TAsmLine;
+    procedure DoStateChange(Value: TCoreState);
     function GetAddrMode: TAddressMode;
     procedure OnAsmCacheEnd(Sender: TObject);
     procedure OnAsmJmpTo(Sender: TObject; const AJmpAddr: Int64;
@@ -174,7 +171,6 @@ type
     procedure OnAsmSelectionChange(Sender: TObject);
     procedure OnBreakPointsChange(Sender: TObject);
     procedure OnContextChange(Sender: TObject);
-    procedure OnDebugerChage(Sender: TObject);
     procedure OnDebugerStateChange(Sender: TObject);
     procedure OnGetHint(Sender: TObject; const Param: THintParam;
       var Hint: string);
@@ -190,6 +186,8 @@ type
     function QueryPointerValueAtAddr(AddrVA: Int64; out AItem: TAddrCacheItem): Boolean;
     function QueryStringAtAddr(AddrVA: Int64; var AItem: TAddrCacheItem; out AsPtrValue: Int64): Boolean;
     procedure SetAsmView(const Value: TAsmView);
+    procedure SetCtx(AValue: TCommonCpuContext);
+    procedure SetDebugger(AValue: TAbstractDebugger);
     procedure SetRegView(const Value: TRegView);
     procedure SetStackView(const Value: TStackView);
     function SynhronizeViewersWithContext: Boolean;
@@ -199,6 +197,7 @@ type
     function CacheVisibleRows: Integer;
     function GenerateCache(AAddress: Int64): Integer;
     procedure LoadFromCache(AIndex: Integer);
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure OnQueryAddressType(Sender: TObject; AddrVA: Int64; var AddrType: TAddrType);
     procedure RefreshBreakPoints;
     procedure RefreshView(Forced: Boolean = False);
@@ -213,7 +212,7 @@ type
       AColumn: TColumnType; var AComment: string);
     procedure UpdateStreamsProcessID;
   public
-    constructor Create(ADebuggerClass: TAbstractDebuggerClass);
+    constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     function AddrInAsm(AddrVA: Int64): Boolean;
     function AddrInDump(AddrVA: Int64): Boolean;
@@ -233,8 +232,10 @@ type
     function UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue): Boolean;
   public
     property AsmView: TAsmView read FAsmView write SetAsmView;
+    property Context: TCommonCpuContext read FCtx write SetCtx;
+    property CoreState: TCoreState read FCoreState;
     property DBase: TCpuViewDBase read FDBase;
-    property Debugger: TAbstractDebugger read FDebugger;
+    property Debugger: TAbstractDebugger read FDebugger write SetDebugger;
     property DisplayStrings: Boolean read FDisplayStrings write FDisplayStrings;
     property DumpViewList: TDumpViewList read FDumpViewList;
     property ExtendedHints: Boolean read FExtendedHints write FExtendedHints;
@@ -252,38 +253,12 @@ type
     property ShowCallFuncName: Boolean read FShowCallFuncName write FShowCallFuncName;
     property ForceFindSymbols: Boolean read FForceFindSymbols write FForceFindSymbols;
     property ForceFindSymbolsDepth: Integer read FFindSymbolsDepth write FFindSymbolsDepth;
+    property Utils: TCommonUtils read FUtils;
     property OnReset: TNotifyEvent read FReset write FReset;
+    property OnStateChange: TNotifyEvent read FStateChange write FStateChange;
   end;
-
-  { TTraceLog }
-
-  TTraceLog = class
-  private
-    FData: TStringList;
-    FChange: TNotifyEvent;
-    procedure DoChange;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure Clear;
-    procedure Log(const Value: string; AddTime: Boolean = True);
-    property Data: TStringList read FData;
-    property OnChange: TNotifyEvent read FChange write FChange;
-  end;
-
-  function TraceLog: TTraceLog;
 
 implementation
-
-var
-  _TraceLog: TTraceLog;
-
-function TraceLog: TTraceLog;
-begin
-  if _TraceLog = nil then
-    _TraceLog := TTraceLog.Create;
-  Result := _TraceLog;
-end;
 
 { TDumpViewList }
 
@@ -693,11 +668,11 @@ begin
     Result := 0;
 end;
 
-constructor TCpuViewCore.Create(ADebuggerClass: TAbstractDebuggerClass);
+constructor TCpuViewCore.Create(AOwner: TComponent);
 var
   RemoteStream: TRemoteStream;
 begin
-  FCacheList := TListEx<TAsmLine>.Create;
+  FCacheList := TListEx<TInstruction>.Create;
   FAddrIndex := TDictionary<Int64, Integer>.Create;
   FUtils := TCommonUtils.Create;
   FDumpViewList := TDumpViewList.Create(Self, FUtils);
@@ -709,23 +684,12 @@ begin
   FDisassemblyStream.BufferSize := DisasmBuffSize;
   RemoteStream := TRemoteStream.Create(FUtils);
   FStackStream := TBufferedROStream.Create(RemoteStream, soOwned);
-  FDebugger := ADebuggerClass.Create(nil, FUtils);
-  FDebugger.OnBreakPointsChange := OnBreakPointsChange;
-  FDebugger.OnChange := OnDebugerChage;
-  FDebugger.OnContextChange := OnContextChange;
-  FDebugger.OnStateChange := OnDebugerStateChange;
-  FDebugger.OnThreadChange := OnThreadChange;
-  FAsmStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
-  FDisassemblyStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
-  FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
-  FStackStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   FSessionCache := TDictionary<Int64, TAddrCacheItem>.Create;
   FShowCallFuncName := True;
   FAsmJmpStack := TJumpStack.Create;
   FDBase := TCpuViewDBase.Create;
   RemoteStream := TRemoteStream.Create(FUtils);
   FStringStream := TBufferedROStream.Create(RemoteStream, soOwned);
-  FStringStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
   FStringStream.BufferSize := 1024;
   MinimumStringLength := 4;
   DisplayStrings := True;
@@ -774,24 +738,23 @@ end;
 
 function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
 
-  function BuildCacheFromBuff(FromAddr: Int64; FromBuff: PByte;
+  function BuildCacheFromBuff(FromAddr, LastKnownAddrVA: Int64; FromBuff: PByte;
     BufSize: Integer): Integer;
   var
     List: TList<TInstruction>;
     Inst: TInstruction;
-    AsmLine: TAsmLine;
   begin
-    List := Debugger.Disassembly(FromAddr, FromBuff, BufSize, Debugger.ShowSourceLines);
+    List := Debugger.Disassembly(FromAddr, LastKnownAddrVA, FromBuff, BufSize,
+      Debugger.ShowSourceLines, ShowCallFuncName);
     try
       for Inst in List do
       begin
         if Inst.Len > BufSize then
           Break;
-        AsmLine := FormatInstructionToAsmLine(Inst);
         FAddrIndex.TryAdd(FromAddr, FCacheList.Count);
-        FCacheList.Add(AsmLine);
-        Inc(FromAddr, AsmLine.Len);
-        Dec(BufSize, AsmLine.Len);
+        FCacheList.Add(Inst);
+        Inc(FromAddr, Inst.Len);
+        Dec(BufSize, Inst.Len);
       end;
     finally
       List.Free;
@@ -805,12 +768,12 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
 
     if (BufSize > 0) and FForceGotoAddress then
     begin
-      AsmLine.AddrVA := FromAddr;
-      AsmLine.DecodedStr := '???';
-      AsmLine.Len := BufSize;
-      AsmLine.JmpTo := 0;
+      Inst.AddrVA := FromAddr;
+      Inst.Mnemonic := InvalidAsmLine;
+      Inst.Len := BufSize;
+      Inst.JmpTo := 0;
       FAddrIndex.TryAdd(FromAddr, FCacheList.Count);
-      FCacheList.Add(AsmLine);
+      FCacheList.Add(Inst);
       BufSize := 0;
     end;
 
@@ -820,61 +783,75 @@ function TCpuViewCore.GenerateCache(AAddress: Int64): Integer;
 const
   LastInstructionReserve = 15;
   TopCacheMinLimit = 128;
-  TopCacheMaxLimit = 1024;
 var
-  WindowAddr: Int64;
-  Count, TopCacheSize, Missed: Integer;
+  WindowAddr, LastKnownAddrVA: Int64;
+  Count, TopCacheMaxLimit, TopCacheSize, Missed: Integer;
   Buff: array of Byte;
   RegData: TRegionData;
 begin
   Result := -1;
   if FDisassemblyStream = nil then Exit;
-  ResetCache;
-  if QueryRegion(AAddress, RegData) then
-  begin
-    WindowAddr := Max(AAddress - TopCacheMinLimit, RegData.AllocationBase);
-    WindowAddr := FDebugger.QuerySymbolAtAddr(WindowAddr, qsAddrVA).AddrVA;
-  end
-  else
-    WindowAddr := AAddress;
-  TopCacheSize := AAddress - WindowAddr;
-  if TopCacheSize > TopCacheMaxLimit then
-  begin
-    TopCacheSize := TopCacheMaxLimit;
-    WindowAddr := AAddress - TopCacheMaxLimit;
-  end;
-  Missed := 0;
 
-  SetLength(Buff{%H-}, TopCacheSize + DisasmBuffSize);
-  FDisassemblyStream.SetAddrWindow(WindowAddr, Length(Buff));
-  Count := FDisassemblyStream.Read(Buff[0], Length(Buff));
-  if Count > 0 then
-  begin
-    if TopCacheSize > 0 then
-      Missed := BuildCacheFromBuff(WindowAddr, @Buff[0], TopCacheSize);
-    Result := FCacheList.Count;
-    Dec(TopCacheSize, Missed);
-    Dec(AAddress, Missed);
+  DoStateChange(csDisassembling);
+  try
 
-    // LastInstructionReserve в конце резервирует гарантированные 16 байт
-    // в конце стрима для последней инструкции.
-    // Необходимо для движка дизассемблера, так как в нем не контролируется
-    // размер переданного на дизассемблирование буфера.
+    ResetCache;
+    if QueryRegion(AAddress, RegData) then
+    begin
+      WindowAddr := Max(AAddress - TopCacheMinLimit, RegData.AllocationBase);
+      WindowAddr := FDebugger.QuerySymbolAtAddr(WindowAddr, qsAddrVA).AddrVA;
+    end
+    else
+      WindowAddr := AAddress - TopCacheMinLimit;
+    TopCacheSize := AAddress - WindowAddr;
+    TopCacheMaxLimit := Debugger.PreferededDasmBufSize;
+    if TopCacheSize > TopCacheMaxLimit then
+    begin
+      TopCacheSize := TopCacheMaxLimit;
+      WindowAddr := AAddress - TopCacheMaxLimit;
+    end;
+    Missed := 0;
 
-    // LastInstructionReserve at the end reserves a guaranteed 16 bytes
-    // at the end of the stream for the last instruction.
-    // It is necessary for the disassembler engine because it does not control
-    // the size of the buffer passed to the disassembly.
+    SetLength(Buff{%H-}, TopCacheSize + DisasmBuffSize);
+    FDisassemblyStream.SetAddrWindow(WindowAddr, Length(Buff));
+    Count := FDisassemblyStream.Read(Buff[0], Length(Buff));
+    if Count > 0 then
+    begin
+      if TopCacheSize > 0 then
+        Missed := BuildCacheFromBuff(WindowAddr, 0, @Buff[0], TopCacheSize);
+      if FCacheList.Count > 0 then
+      begin
+        Result := FCacheList.Count;
+        LastKnownAddrVA := FCacheList.Last.AddrVA;
+      end
+      else
+        LastKnownAddrVA := 0;
+      Dec(TopCacheSize, Missed);
+      Dec(AAddress, Missed);
 
-    BuildCacheFromBuff(AAddress, @Buff[TopCacheSize],
-      Count - TopCacheSize - LastInstructionReserve);
+      // LastInstructionReserve в конце резервирует гарантированные 16 байт
+      // в конце стрима для последней инструкции.
+      // Необходимо для движка дизассемблера, так как в нем не контролируется
+      // размер переданного на дизассемблирование буфера.
+
+      // LastInstructionReserve at the end reserves a guaranteed 16 bytes
+      // at the end of the stream for the last instruction.
+      // It is necessary for the disassembler engine because it does not control
+      // the size of the buffer passed to the disassembly.
+
+      BuildCacheFromBuff(AAddress, LastKnownAddrVA, @Buff[TopCacheSize],
+        Count - TopCacheSize - LastInstructionReserve);
+    end;
+
+  finally
+    DoStateChange(csRun);
   end;
 end;
 
 procedure TCpuViewCore.LoadFromCache(AIndex: Integer);
 var
   I: Integer;
-  Line: TAsmLine;
+  Line: TInstruction;
 begin
   FAsmView.BeginUpdate;
   try
@@ -883,28 +860,36 @@ begin
     if AIndex < 0 then Exit;
     Line := FCacheList.List[AIndex];
     if Line.Len = 0 then
-      FAsmView.DataMap.AddComment(Line.AddrVA, Line.DecodedStr)
+      FAsmView.DataMap.AddComment(Line.AddrVA, Line.Mnemonic)
     else
-      if Line.LinkIndex > 0 then
-        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, Line.HintStr,
-          Line.JmpTo, Line.LinkIndex, Length(Line.DecodedStr) - Line.LinkIndex)
+      if Line.JmpToPosStart > 0 then
+        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.Mnemonic, Line.Hint,
+          Line.JmpTo, Line.JmpToPosStart, Line.JmpToPosLength)
       else
-        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
+        FAsmView.DataMap.AddAsm(Line.AddrVA, Line.Len, Line.Mnemonic, Line.Hint, Line.JmpTo, 0, 0);
     for I := 1 to Min(CacheVisibleRows, FCacheList.Count - AIndex - 1) do
     begin
       Line := FCacheList.List[I + AIndex];
       if Line.Len = 0 then
-        FAsmView.DataMap.AddComment(Line.DecodedStr)
+        FAsmView.DataMap.AddComment(Line.Mnemonic)
       else
-        if Line.LinkIndex > 0 then
-          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo,
-            Line.LinkIndex, Length(Line.DecodedStr) - Line.LinkIndex)
+        if Line.JmpToPosStart > 0 then
+          FAsmView.DataMap.AddAsm(Line.Len, Line.Mnemonic, Line.Hint, Line.JmpTo,
+            Line.JmpToPosStart, Line.JmpToPosLength)
         else
-          FAsmView.DataMap.AddAsm(Line.Len, Line.DecodedStr, Line.HintStr, Line.JmpTo, 0, 0);
+          FAsmView.DataMap.AddAsm(Line.Len, Line.Mnemonic, Line.Hint, Line.JmpTo, 0, 0);
     end;
   finally
     FAsmView.EndUpdate;
   end;
+end;
+
+procedure TCpuViewCore.Notification(AComponent: TComponent;
+  Operation: TOperation);
+begin
+  inherited;
+  if (Operation = opRemove) and (AComponent = Context) then
+    Context := nil;
 end;
 
 procedure TCpuViewCore.RefreshBreakPoints;
@@ -925,34 +910,35 @@ end;
 
 procedure TCpuViewCore.BuildTraceLine(ACurrentAddrVA: Int64);
 var
-  AItem: TAddrCacheItem;
+  ARowIndex: Int64;
+  ARowData: TRowColumnData;
 begin
   if (FLastAddrVA = ACurrentAddrVA) then Exit;
-  try
-    if (ACurrentAddrVA = 0) and (FDebugger.DebugState = adsFinished) then
-    begin
-      TraceLog.Log('debug stop');
-      Exit;
-    end;
 
-    if FDebugger.DebugState <> adsPaused then Exit;
-
-    if FLastAddrVA = 0 then
-      TraceLog.Log('debug start');
-
-    if not QueryDisasmAtAddr(ACurrentAddrVA, AItem) then Exit;
-
-    TraceLog.Log(Format('%s | %.16x | %s (%s)',
-      [
-      FormatDateTime('hh:mm:ss.zzz', Now),
-      ACurrentAddrVA,
-      AItem.FirstAsmLine,
-      QuerySymbolAtAddr(ACurrentAddrVA, False)
-      ]), False);
-
-  finally
-    FLastAddrVA := ACurrentAddrVA;
+  if (ACurrentAddrVA = 0) and (FDebugger.DebugState = adsFinished) then
+  begin
+    TraceLog.Log('debug stop');
+    FLastAddrVA := 0;
+    Exit;
   end;
+
+  if FDebugger.DebugState <> adsPaused then Exit;
+
+  if FLastAddrVA = 0 then
+    TraceLog.Log('debug start');
+
+  ARowIndex := FAsmView.AddressToRowIndex(ACurrentAddrVA);
+  ARowData := FAsmView.RowColumnData(ARowIndex);
+
+  FLastAddrVA := ACurrentAddrVA;
+
+  TraceLog.Log(Format('%s | %.16x | %s (%s)',
+    [
+    FormatDateTime('hh:mm:ss.zzz', Now),
+    ACurrentAddrVA,
+    ARowData.Columns[ctDescription],
+    QuerySymbolAtAddr(ACurrentAddrVA, False)
+    ]), False);
 end;
 
 function TCpuViewCore.CanWork: Boolean;
@@ -971,35 +957,11 @@ begin
     FReset(Self);
 end;
 
-function TCpuViewCore.FormatInstructionToAsmLine(const AIns: TInstruction
-  ): TAsmLine;
-var
-  SpaceIndex, SquareBracketPos: Integer;
+procedure TCpuViewCore.DoStateChange(Value: TCoreState);
 begin
-  Result.AddrVA := AIns.AddrVA;
-  Result.DecodedStr := AIns.AsString;
-  Result.HintStr := AIns.Hint;
-  Result.Len := AIns.Len;
-  Result.JmpTo := AIns.JmpTo;
-  Result.LinkIndex := 0;
-  if Result.JmpTo <> 0 then
-  begin
-    Result.LinkIndex := Pos(' ', Result.DecodedStr);
-    SpaceIndex := Pos(' ', Result.HintStr);
-    if SpaceIndex = 0 then
-      SpaceIndex := Length(Result.HintStr) + 1;
-    if ShowCallFuncName and Result.DecodedStr.StartsWith('CALL') then
-    begin
-      SquareBracketPos := Pos('[', Result.DecodedStr);
-      if SquareBracketPos = 0 then
-      begin
-        Result.DecodedStr := 'CALL ' + Copy(Result.HintStr, 1, SpaceIndex - 1);
-        Result.HintStr := '';
-      end
-      else
-        Result.LinkIndex := SquareBracketPos - 1;
-    end;
-  end;
+  FCoreState := Value;
+  if Assigned(FStateChange) then
+    FStateChange(Self);
 end;
 
 function TCpuViewCore.GetAddrMode: TAddressMode;
@@ -1086,12 +1048,6 @@ begin
   SynhronizeViewersWithContext;
 end;
 
-procedure TCpuViewCore.OnDebugerChage(Sender: TObject);
-begin
-  FUtils.Update;
-  RefreshView;
-end;
-
 procedure TCpuViewCore.OnDebugerStateChange(Sender: TObject);
 var
   CurrentIP: Int64;
@@ -1105,12 +1061,12 @@ begin
     adsPaused:
     begin
       CurrentIP := FDebugger.CurrentInstructionPoint;
-      BuildTraceLine(CurrentIP);
       if Assigned(FDebugger) and (FThreadChange or (CurrentIP <> FAsmView.InstructionPoint)) then
       begin
         FThreadChange := False;
         FUtils.Update;
         RefreshView;
+        BuildTraceLine(CurrentIP);
       end;
     end;
     adsRunning:
@@ -1276,8 +1232,6 @@ begin
     ertLastStatus: AComment := DBase.GetLastStatusStr(AValue.DwordValue);
     ertRegID: AComment := DBase.GetRegHintStr(AValue.IntValue);
   end;
-  if AComment <> '' then
-    AComment := '(' + AComment + ')';
 end;
 
 procedure TCpuViewCore.OnThreadChange(Sender: TObject);
@@ -1293,6 +1247,14 @@ var
 begin
   AItem := Default(TAddrCacheItem);
   Result := FSessionCache.TryGetValue(AddrVA, AItem);
+
+  // If the process memory is read through a remote console debugger, then you also need to check for locking.
+  // This is not required at this time, and memory reading is implemented independently.
+  {$IFNDEF USE_MANUAL_READMEMORY}
+  if not Result and Debugger.IsDebuggerLocked then
+    Exit;
+  {$ENDIF}
+
   if not Result then
   try
     AItem.AddrVA := AddrVA;
@@ -1350,7 +1312,7 @@ const
 var
   Buff: array of Byte;
   List: TList<TInstruction>;
-  AsmLine: TAsmLine;
+  AsmLine: TInstruction;
   I: Integer;
 begin
   AItem := Default(TAddrCacheItem);
@@ -1361,18 +1323,19 @@ begin
     SetLength(Buff{%H-}, BuffSize);
     if Debugger.ReadMemory(AddrVA, Buff[0], BuffSize) then
     begin
-      List := Debugger.Disassembly(AddrVA, @Buff[0], BuffSize, False);
+      List := Debugger.Disassembly(AddrVA, 0, @Buff[0], BuffSize, False, ShowCallFuncName);
       try
+        if List.Count = 0 then Exit(False);
         for I := 0 to Min(9, List.Count - 1) do
         begin
-          AsmLine := FormatInstructionToAsmLine(List[I]);
+          AsmLine := List[I];
           if I = 0 then
-            AItem.FirstAsmLine := AsmLine.DecodedStr
+            AItem.FirstAsmLine := AsmLine.Mnemonic
           else
-            AItem.AsmLines := AItem.AsmLines + AsmLine.DecodedStr + sLineBreak;
-          AItem.HintLines := AItem.HintLines + AsmLine.HintStr + sLineBreak;
+            AItem.AsmLines := AItem.AsmLines + AsmLine.Mnemonic + sLineBreak;
+          AItem.HintLines := AItem.HintLines + AsmLine.Hint + sLineBreak;
           AItem.Linked[I] := AsmLine.JmpTo <> 0;
-          if Trim(AsmLine.DecodedStr) = 'RET' then Break;
+          if Trim(AsmLine.Mnemonic) = Debugger.EndOnProcToken then Break;
         end;
       finally
         List.Free;
@@ -1398,6 +1361,7 @@ begin
     FStackStream.SetAddrWindow(FLastStackLimit.Limit,
       FLastStackLimit.Base - FLastStackLimit.Limit);
     FStackView.AddressMode := GetAddrMode;
+    FStackView.FitColumnsToBestSize;
     FStackView.SetDataStream(FStackStream, FLastStackLimit.Limit);
     FStackView.FramesUpdated;
     FStackView.FocusOnAddress(FLastCtx.StackPoint, ccmSelectRow);
@@ -1409,6 +1373,17 @@ begin
   end;
   FDumpViewList.AddressMode := GetAddrMode;
   FDumpViewList.Restore(FDebugger.CurrentInstructionPoint);
+
+  // Data for validated addresses is displayed when it is rendered and is taken from the cache.
+  // However, since ProcessMessage is called while waiting for the pipe handle,
+  // the rendering event will occur when the debugger is blocked.
+  // Therefore, the cache must be updated immediately by forcing a call.
+  {$IFNDEF USE_MANUAL_READMEMORY}
+  FRegView.Repaint;
+  FStackView.Repaint;
+  {$ENDIF}
+
+  DoStateChange(FCoreState);
 end;
 
 procedure TCpuViewCore.RefreshAsmView(Forced: Boolean);
@@ -1435,6 +1410,8 @@ end;
 procedure TCpuViewCore.StackViewQueryComment(Sender: TObject; AddrVA: Int64;
   AColumn: TColumnType; var AComment: string);
 var
+  ARowIndex: Int64;
+  ARawData: TBytes;
   AStackValue: Int64;
 begin
   case AColumn of
@@ -1443,9 +1420,13 @@ begin
     begin
       AStackValue := 0;
       if not CanWork then Exit;
-      FStackStream.Stream.Position := AddrVA;
-      FStackStream.Stream.ReadBuffer(AStackValue, Debugger.PointerSize);
-      AComment := QuerySymbolAtAddr(AStackValue);
+      ARowIndex := FStackView.AddressToRowIndex(AddrVA);
+      if FStackView.ReadRowData(ARowIndex, ARawData) then
+      begin
+        AStackValue := 0;
+        Move(ARawData[0], AStackValue, Length(ARawData));
+        AComment := QuerySymbolAtAddr(AStackValue);
+      end;
     end;
   end;
 end;
@@ -1473,6 +1454,51 @@ begin
   end;
 end;
 
+procedure TCpuViewCore.SetCtx(AValue: TCommonCpuContext);
+begin
+  if FCtx = AValue then Exit;
+  if Assigned(FCtx) then
+    FCtx.RemoveFreeNotification(Self);
+  FCtx := AValue;
+  if Assigned(FCtx) then
+    FCtx.FreeNotification(Self);
+  if Assigned(FDebugger) then
+    FDebugger.Context := Context;
+end;
+
+procedure TCpuViewCore.SetDebugger(AValue: TAbstractDebugger);
+begin
+  if FDebugger = AValue then Exit;
+  if FDebugger <> nil then
+    FreeAndNil(FDebugger);
+  FDebugger := AValue;
+  if FDebugger <> nil then
+  begin
+    FDebugger.Context := Context;
+    FDebugger.OnBreakPointsChange := OnBreakPointsChange;
+    FDebugger.OnContextChange := OnContextChange;
+    FDebugger.OnStateChange := OnDebugerStateChange;
+    FDebugger.OnThreadChange := OnThreadChange;
+    FAsmStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+    FDisassemblyStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+    FDumpViewList.OnUpdated := FDebugger.UpdateRemoteStream;
+    FStackStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+    FStringStream.Stream.OnUpdated := FDebugger.UpdateRemoteStream;
+    DoStateChange(csDebuggerInit);
+    RefreshBreakPoints;
+    DoStateChange(csRun);
+  end
+  else
+  begin
+    DoStateChange(csWaitDebugger);
+    FAsmStream.Stream.OnUpdated := nil;
+    FDisassemblyStream.Stream.OnUpdated := nil;
+    FDumpViewList.OnUpdated := nil;
+    FStackStream.Stream.OnUpdated := nil;
+    FStringStream.Stream.OnUpdated := nil;
+  end;
+end;
+
 procedure TCpuViewCore.SetRegView(const Value: TRegView);
 begin
   if RegView <> Value then
@@ -1493,7 +1519,6 @@ begin
   begin
     FStackView := Value;
     if Value = nil then Exit;
-    Value.FitColumnsToBestSize;
     FStackView.OnHint := OnGetHint;
     FStackView.OnQueryComment := StackViewQueryComment;
     FStackView.OnQueryAddressType := OnQueryAddressType;
@@ -1511,6 +1536,7 @@ begin
   if Assigned(FAsmView) then
   begin
     FAsmView.AddressMode := GetAddrMode;
+    FAsmView.Tokenizer.TokenizerMode := FDebugger.GetTokenizerMode;
     FAsmView.InstructionPoint := CurrentInstructionPoint;
     FAsmView.CurrentIPIsActiveJmp := FDebugger.IsActiveJmp;
     FAsmView.Invalidate;
@@ -1646,7 +1672,13 @@ function TCpuViewCore.UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue
 begin
   Result := False;
   if CanWork then
+  begin
     Result := FDebugger.UpdateRegValue(RegID, ANewRegValue);
+    if Result then
+      TraceLog.Log(Format('Set %s = %s', [
+        Context.RegQueryString(RegID, rqstDisplayName),
+        Trim(Context.RegQueryString(RegID, rqstValue))]));
+  end;
 end;
 
 procedure TCpuViewCore.UpdateStreamsProcessID;
@@ -1659,50 +1691,5 @@ begin
     ResetCache;
   end;
 end;
-
-{ TTraceLog }
-
-procedure TTraceLog.DoChange;
-begin
-  if Assigned(FChange) then
-    FChange(Self);
-end;
-
-constructor TTraceLog.Create;
-begin
-  FData := TStringList.Create;
-end;
-
-destructor TTraceLog.Destroy;
-begin
-  FData.Free;
-  inherited Destroy;
-end;
-
-procedure TTraceLog.Clear;
-begin
-  FData.Clear;
-  DoChange;
-end;
-
-procedure TTraceLog.Log(const Value: string; AddTime: Boolean);
-begin
-  if AddTime then
-    FData.Add(FormatDateTime('hh:mm:ss.zzz', Now) + ': ' + Value)
-  else
-    FData.Add(Value);
-  if FData.Count > 500 then
-    while FData.Count > 250 do
-      FData.Delete(0);
-  DoChange;
-end;
-
-initialization
-
-  _TraceLog := TTraceLog.Create;
-
-finalization
-
-  FreeAndNil(_TraceLog);
 
 end.

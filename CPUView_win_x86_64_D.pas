@@ -9,17 +9,17 @@ interface
 
 uses
   CpuView.Actions, CpuView.Common, CpuView.CPUContext, CpuView.Viewers, 
-  CpuView.XML, CpuView.Core, CpuView.DBase, CpuView.DebugerGate, 
-  CpuView.ExtendedHint, CpuView.FpDebug, CpuView.Settings, 
-  CpuView.ScriptExecutor, CpuView.Stream, CpuView.Reg, CpuView.Design.Common, 
-  CpuView.Design.CrashDump, CpuView.Design.DbgLog, dlgCpuView, 
-  frmCpuViewBaseOptions, frmCpuViewColors, frmCpuViewOptions, 
-  frmCpuViewShortCuts, CpuView.Windows, dlgCpuViewImplementation, 
-  CpuView.IntelContext, CpuView.IntelContext.Types, 
-  CpuView.ScriptExecutor.Intel, dlgCpuView.TemporaryLocker, dlgInputBox, 
-  dlgTraceLog, dlgSimd87Editor, dlgProcExports, dlgMemoryMap, 
-  CpuView.Windows.MMap, dlgPageAccess, CpuView.Design.DpiFix, 
-  LazarusPackageIntf;
+  CpuView.XML, CpuView.CommonDebug, CpuView.Context.Intel, 
+  CpuView.Context.Intel.Types, CpuView.Context.Params, CpuView.Core, 
+  CpuView.DBase, CpuView.DebugerGate, CpuView.ExtendedHint, CpuView.FpDebug, 
+  CpuView.GdbDebug, CpuView.GdbDebug.Intel, CpuView.ScriptExecutor, 
+  CpuView.ScriptExecutor.Intel, CpuView.Settings, CpuView.Stream, 
+  CpuView.TraceLog, CpuView.Windows, CpuView.Windows.MMap, CpuView.Reg, 
+  CpuView.Design.Common, CpuView.Design.CrashDump, CpuView.Design.DbgLog, 
+  dlgCpuView, frmCpuViewBaseOptions, frmCpuViewColors, frmCpuViewOptions, 
+  frmCpuViewShortCuts, dlgCpuViewImplementation, dlgCpuView.TemporaryLocker, 
+  dlgInputBox, dlgTraceLog, dlgSimd87Editor, dlgProcExports, dlgMemoryMap, 
+  dlgPageAccess, CpuView.Design.DpiFix, LazarusPackageIntf;
 
 implementation
 

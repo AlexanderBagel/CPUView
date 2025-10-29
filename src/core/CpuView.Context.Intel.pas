@@ -2,7 +2,7 @@
 //
 //  ****************************************************************************
 //  * Project   : CPU-View
-//  * Unit Name : CpuView.IntelContext.pas
+//  * Unit Name : CpuView.Context.Intel.pas
 //  * Purpose   : Intel x86_64 processor context implementation.
 //  * Author    : Alexander (Rouse_) Bagel
 //  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
@@ -15,7 +15,7 @@
 //  ****************************************************************************
 //
 
-unit CpuView.IntelContext;
+unit CpuView.Context.Intel;
 
 {$IFDEF FPC}
   {$MODE Delphi}
@@ -37,13 +37,8 @@ uses
   CpuView.Common,
   CpuView.XML,
   CpuView.CPUContext,
-{$IFDEF MSWINDOWS}
-  CpuView.Windows,
-{$ENDIF}
-{$IFDEF LINUX}
-  CpuView.Linux,
-{$ENDIF}
-  CpuView.IntelContext.Types;
+  CpuView.Context.Params,
+  CpuView.Context.Intel.Types;
 
 type
 
@@ -92,7 +87,6 @@ type
     FContext: TIntelThreadContext;
     FMapMode: TIntelCpuMapMode;
     FFPUMode: TFPUMode;
-    FQueryRegAtAddr: TDictionary<Int64, string>;
     FShowDebug: Boolean;
     FShowFPU: Boolean;
     FShowXMM: Boolean;
@@ -113,7 +107,6 @@ type
     procedure BuildMap; override;
     procedure DoChangeViewMode(ARegID: TRegID; const Value: TRegViewMode); override;
     procedure InitKnownRegs; override;
-    function RegHint(RegID: TRegID): string; override;
     procedure UpdateLastRegData(ARegID: TRegID; SetModifyed: Boolean); override;
   protected
     function StToR(Index: Integer): Integer;
@@ -137,16 +130,13 @@ type
     procedure SetMxCsrRoundingValue(AValue: Byte);
   public
     constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
     procedure InitDefault; override;
     function InstructonPoint: Int64; override;
     function InstructonPointID: TRegID; override;
     function IsActiveJump(const Value: string): Boolean; override;
-    function PointerSize: Integer; override;
     function RegDescriptor(const ARegName: string; out ADescriptor: TRegDescriptor): Boolean; overload; override;
     function RegQueryEnumString(ARegID: TRegID; AEnumIndex: Integer): string; override;
     function RegQueryEnumValuesCount(ARegID: TRegID): Integer; override;
-    function RegQueryNamesAtAddr(AAddrVA: Int64): string; override;
     function RegQueryValue(ARegID: TRegID; out ARegValue: TRegValue): Boolean; overload; override;
     function RegQueryValue(const ARegName: string; out ARegValue: TRegValue): Boolean; overload; override;
     function RegSetValue(ARegID: TRegID; const ANewRegValue: TRegValue): Boolean; override;
@@ -607,7 +597,7 @@ begin
 
   // DR0..DR7
   {$IFNDEF LINUX}
-  if ShowDebug then
+  if ShowDebug and Context.DebugPresent then
   begin
     AddSeparator;
     for I := 24 to 27 do
@@ -632,13 +622,6 @@ begin
   FShowFPU := True;
   for I := 0 to 3 do
     FSavedDetailed[I] := I <> 2;
-  FQueryRegAtAddr := TDictionary<Int64, string>.Create;
-end;
-
-destructor TIntelCpuContext.Destroy;
-begin
-  FQueryRegAtAddr.Free;
-  inherited;
 end;
 
 procedure TIntelCpuContext.DoChangeViewMode(ARegID: TRegID;
@@ -828,48 +811,48 @@ begin
   else
     vmDefRegMod := vmReg64;
 
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 000 - RAX
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 001 - RBX
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 002 - RCX
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 003 - RDX
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 004 - RBP
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 005 - RSP
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 006 - RSI
-  Add(crtValue, vmDefRegMod, [rfIncrement..rfValidation]);    // 007 - RDI
-  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 008 - RIP
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 000 - RAX
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 001 - RBX
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 002 - RCX
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 003 - RDX
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 004 - RBP
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 005 - RSP
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 006 - RSI
+  Add(crtGeneralPurposeReg, vmDefRegMod, [rfIncrement..rfValidation]);    // 007 - RDI
+  Add(crtGeneralPurposeReg, vmDefOnly, [rfChangeValue]);                  // 008 - RIP
 
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 009 - R8
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 010 - R9
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 011 - R10
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 012 - R11
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 013 - R12
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 014 - R13
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 015 - R14
-  Add(crtValue, vmReg64, [rfIncrement..rfValidation]);        // 016 - R15
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 009 - R8
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 010 - R9
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 011 - R10
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 012 - R11
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 013 - R12
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 014 - R13
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 015 - R14
+  Add(crtGeneralPurposeReg, vmReg64, [rfIncrement..rfValidation]);        // 016 - R15
 
   Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);          // 017 - EFlags
 
   if Context.x86Context then
   begin
-    Add(crtValue, vmDefOnly, [rfChangeValue]);                // 018 - SegGs
-    Add(crtValue, vmDefOnly, [rfHint, rfChangeValue]);        // 019 - SegFs
+    Add(crtSegmentReg, vmDefOnly, [rfChangeValue]);                // 018 - SegGs
+    Add(crtSegmentReg, vmDefOnly, [rfHint, rfChangeValue]);        // 019 - SegFs
   end
   else
   begin
-    Add(crtValue, vmDefOnly, [rfHint, rfChangeValue]);        // 018 - SegGs
-    Add(crtValue, vmDefOnly, [rfChangeValue]);                // 019 - SegFs
+    Add(crtSegmentReg, vmDefOnly, [rfHint, rfChangeValue]);        // 018 - SegGs
+    Add(crtSegmentReg, vmDefOnly, [rfChangeValue]);                // 019 - SegFs
   end;
-  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 020 - SegEs
-  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 021 - SegDs
-  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 022 - SegCs
-  Add(crtValue, vmDefOnly, [rfChangeValue]);                  // 023 - SegSs
+  Add(crtSegmentReg, vmDefOnly, [rfChangeValue]);                  // 020 - SegEs
+  Add(crtSegmentReg, vmDefOnly, [rfChangeValue]);                  // 021 - SegDs
+  Add(crtSegmentReg, vmDefOnly, [rfChangeValue]);                  // 022 - SegCs
+  Add(crtSegmentReg, vmDefOnly, [rfChangeValue]);                  // 023 - SegSs
 
-  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 024 - DR0
-  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 025 - DR1
-  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 026 - DR2
-  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 027 - DR3
-  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 028 - DR6
-  Add(crtValue, vmDefOnly, [rfZero..rfValidation]);     // 029 - DR7
+  Add(crtGeneralPurposeReg, vmDefOnly, [rfZero..rfValidation]);     // 024 - DR0
+  Add(crtGeneralPurposeReg, vmDefOnly, [rfZero..rfValidation]);     // 025 - DR1
+  Add(crtGeneralPurposeReg, vmDefOnly, [rfZero..rfValidation]);     // 026 - DR2
+  Add(crtGeneralPurposeReg, vmDefOnly, [rfZero..rfValidation]);     // 027 - DR3
+  Add(crtGeneralPurposeReg, vmDefOnly, [rfZero..rfValidation]);     // 028 - DR6
+  Add(crtGeneralPurposeReg, vmDefOnly, [rfZero..rfValidation]);     // 029 - DR7
 
   Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 030 - ControlWord
   Add(crtExtra, vmDefOnly, [rfChangeValue, rfHint]);     // 031 - StatusWord
@@ -1106,8 +1089,10 @@ var
 begin
   Result := False;
 
-  if Value.StartsWith('CALL ') or Value.StartsWith('JMP ') then
+  if Value.StartsWith('CALL ') or Value.StartsWith('JMP ') or Value.StartsWith('JMPF ') then
     Exit(True);
+
+  if Value.StartsWith('JRCXZ ') then Exit(FContext.Rcx = 0);
 
   EFlags := FContext.EFlags;
   CF := EFlags and (1 shl 0) <> 0;
@@ -1174,16 +1159,6 @@ begin
   end;
 end;
 
-function TIntelCpuContext.PointerSize: Integer;
-begin
-  case AddressMode of
-    am32bit: Result := 4;
-    am64bit: Result := 8;
-  else
-    Result := 0;
-  end;
-end;
-
 function TIntelCpuContext.RegDescriptor(const ARegName: string;
   out ADescriptor: TRegDescriptor): Boolean;
 var
@@ -1197,18 +1172,6 @@ begin
   end
   else
     Result := RegDescriptor(ExtendedRegIndex[Idx], ADescriptor);
-end;
-
-function TIntelCpuContext.RegHint(RegID: TRegID): string;
-var
-  AValue: TRegValue;
-begin
-  AValue := Default(TRegValue);
-  AValue.IntValue := RegID;
-  Result := '';
-  DoQueryExternalRegHint(AValue, ertRegID, Result);
-  if Result <> '' then
-    Result := StringReplace(Result, '/n', sLineBreak, [rfReplaceAll]);
 end;
 
 function TIntelCpuContext.RegQueryEnumString(ARegID: TRegID;
@@ -1272,12 +1235,6 @@ begin
   else
     Result := 0;
   end;
-end;
-
-function TIntelCpuContext.RegQueryNamesAtAddr(AAddrVA: Int64): string;
-begin
-  if not FQueryRegAtAddr.TryGetValue(AAddrVA, Result) then
-    Result := '';
 end;
 
 function TIntelCpuContext.RegQueryValue(const ARegName: string;
@@ -1373,11 +1330,12 @@ begin
   OriginalRIP := FContext.Rip;
   {$IFDEF CPUX64}
   if AddressMode = am32bit then
-    FContext := GetIntelWow64Context(ThreadID)
+    FContext := ContextQueryParams.Get32Context(ThreadID)
   else
   {$ENDIF}
-    FContext := GetIntelContext(ThreadID);
+    FContext := ContextQueryParams.GetDefContext(ThreadID);
   FContext.Rip := OriginalRIP;
+  FContext.ChangedRegID := ARegID;
   case ARegID of
     0: FContext.Rax := ANewRegValue.QwordValue;
     1: FContext.Rbx := ANewRegValue.QwordValue;
@@ -1408,7 +1366,11 @@ begin
     33..40:
       FContext.FloatRegisters[ARegID - 33].MM.Value := ANewRegValue.QwordValue;
     41..48:
-      Move(ANewRegValue.Ext10[0], FContext.FloatRegisters[ARegID - 41], 10);
+    begin
+      // convert to STxx index
+      FContext.ChangedRegID := RToSt(ARegID - 41) + 49;
+      Move(ANewRegValue.Ext10[0], FContext.FloatRegisters[RToSt(ARegID - 41)], 10);
+    end;
     49..56:
       Move(ANewRegValue.Ext10[0], FContext.FloatRegisters[ARegID - 49], 10);
     57: FContext.MxCsr := ANewRegValue.DwordValue;
@@ -1478,10 +1440,10 @@ begin
 
   {$IFDEF CPUX64}
   if AddressMode = am32bit then
-    Result := SetIntelWow64Context(ThreadID, FContext)
+    Result := ContextQueryParams.Set32Context(ThreadID, FContext)
   else
   {$ENDIF}
-    Result := SetIntelContext(ThreadID, FContext);
+    Result := ContextQueryParams.SetDefContext(ThreadID, FContext);
 
   if Result then
   begin
@@ -1496,7 +1458,7 @@ begin
     // Speсial case for x64 - Reload TagWord
     if ReloadTagWord then
     begin
-      TagWordCtx := GetIntelContext(ThreadID);
+      TagWordCtx := ContextQueryParams.GetDefContext(ThreadID);
       FContext.TagWord := TagWordCtx.TagWord;
     end;
     // Update LastReg cache...
@@ -1560,7 +1522,7 @@ begin
     33..40:
       ARegValue.QwordValue := Context.FloatRegisters[ARegID - 33].MM.Value;
     41..48:
-      Move(Context.FloatRegisters[ARegID - 41], ARegValue.Ext10[0], 10);
+      Move(Context.FloatRegisters[RToSt(ARegID - 41)], ARegValue.Ext10[0], 10);
     49..56:
       Move(Context.FloatRegisters[ARegID - 49], ARegValue.Ext10[0], 10);
     57: ARegValue.DwordValue := Context.MxCsr;
@@ -1632,15 +1594,15 @@ end;
 
 procedure TIntelCpuContext.SetContext(const Value: TIntelThreadContext);
 var
-  CtxBittessChanged: Boolean;
+  CtxBitnessChanged: Boolean;
 begin
   if not CompareMem(@FContext, @Value, SizeOf(TIntelThreadContext)) then
     UpdateModifyed(Value);
-  CtxBittessChanged := (FContext.Rip = 0) or
+  CtxBitnessChanged := (FContext.Rip = 0) or
     (Value.x86Context <> FContext.x86Context);
   FContext := Value;
   UpdateQueryRegs;
-  if CtxBittessChanged then
+  if CtxBitnessChanged then
     UpdateMap(True)
   else
     DoChange(cctContextUpdated);
@@ -1806,6 +1768,7 @@ function TIntelCpuContext.Update(ANewInstructionPoint: Int64): Boolean;
 var
   ACtx: TIntelThreadContext;
   ExtendedData: TThreadExtendedData;
+  ANewContextFeatures: TContextFeatures;
 begin
   if ThreadID = 0 then
     Exit(False)
@@ -1816,10 +1779,10 @@ begin
   if AddressMode = am32bit then
   begin
     if ANewInstructionPoint = 0 then
-      ACtx := GetIntelWow64Context(ThreadID)
+      ACtx := ContextQueryParams.Get32Context(ThreadID)
     else
     begin
-      ACtx := GetIntelWow64Context(ThreadID);
+      ACtx := ContextQueryParams.Get32Context(ThreadID);
       ACtx.Rip := ANewInstructionPoint;
     end;
   end
@@ -1827,10 +1790,10 @@ begin
   {$ENDIF}
   begin
     if ANewInstructionPoint = 0 then
-      ACtx := GetIntelContext(ThreadID)
+      ACtx := ContextQueryParams.GetDefContext(ThreadID)
     else
     begin
-      ACtx := GetIntelContext(ThreadID);
+      ACtx := ContextQueryParams.GetDefContext(ThreadID);
       ACtx.Rip := ANewInstructionPoint;
     end;
   end;
@@ -1841,6 +1804,24 @@ begin
     ACtx.LastError := ExtendedData.LastError;
     ACtx.LastStatus := ExtendedData.LastStatus;
   end;
+
+  ANewContextFeatures := [cfFloat];
+  if ACtx.DebugPresent then Include(ANewContextFeatures, cfDebug);
+  if ACtx.XmmCount > 0 then Include(ANewContextFeatures, cfSse);
+  if ACtx.YmmPresent then Include(ANewContextFeatures, cfAvx);
+  if ACtx.MMXPresent then
+    Include(ANewContextFeatures, cfMmx)
+  else
+    if FFPUMode = fpuMMX then
+      FFPUMode := fpuST;
+  if MapMode = icmSimple then
+  begin
+    if ShowDebug and not ACtx.DebugPresent then MapMode := icmDetailed;
+    if ShowXMM and (ACtx.XmmCount = 0) then MapMode := icmDetailed;
+    if ShowYMM and not ACtx.YmmPresent then MapMode := icmDetailed;
+  end;
+  ContextFeatures := ANewContextFeatures;
+
   Context := ACtx;
 end;
 
@@ -2091,7 +2072,7 @@ procedure TIntelCpuContext.UpdateModifyed(const Value: TIntelThreadContext);
       A and (1 shl Index) <> B and (1 shl Index);
   end;
 
-    procedure CheckDoubleSet(A, B: DWORD; Index: Integer; RegID: Integer);
+  procedure CheckDoubleSet(A, B: DWORD; Index: Integer; RegID: Integer);
   begin
     KnownRegs.List[RegID].Modifyed :=
       (A shr Index) and 3 <> (B shr Index) and 3;
@@ -2161,7 +2142,7 @@ begin
       @Value.FloatRegisters[I], 8, 33 + I);
     // Rx
     CheckMem(@FContext.FloatRegisters[I],
-      @Value.FloatRegisters[I], 10, 41 + I);
+      @Value.FloatRegisters[I], 10, 41 + StToR(I));
     // STx
     CheckMem(@FContext.FloatRegisters[I],
       @Value.FloatRegisters[I], 10, 49 + I);
@@ -2241,18 +2222,18 @@ procedure TIntelCpuContext.UpdateQueryRegs;
   var
     Param: string;
   begin
-    if FQueryRegAtAddr.TryGetValue(AddrVA, Param) then
+    if QueryRegAtAddr.TryGetValue(AddrVA, Param) then
       Param := Param + ' ' + RegName
     else
       Param := RegName;
-    FQueryRegAtAddr.AddOrSetValue(AddrVA, Param);
+    QueryRegAtAddr.AddOrSetValue(AddrVA, Param);
   end;
 
 var
   I: Integer;
   RegValue: TRegValue;
 begin
-  FQueryRegAtAddr.Clear;
+  QueryRegAtAddr.Clear;
   // RAX..R15, DR0..DR3
   for I in [0..16, 24..27] do
   begin

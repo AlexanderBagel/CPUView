@@ -48,6 +48,22 @@
         <Type Value="Include"/>
       </Item>
       <Item>
+        <Filename Value="src\core\CpuView.CommonDebug.pas"/>
+        <UnitName Value="CpuView.CommonDebug"/>
+      </Item> 	  
+      <Item>
+        <Filename Value="src\core\CpuView.Context.Intel.pas"/>
+        <UnitName Value="CpuView.Context.Intel"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.Context.Intel.Types.pas"/>
+        <UnitName Value="CpuView.Context.Intel.Types"/>
+      </Item>  	
+      <Item>
+        <Filename Value="src\core\CpuView.Context.Params.pas"/>
+        <UnitName Value="CpuView.Context.Params"/>
+      </Item>         
+      <Item>
         <Filename Value="src\core\CpuView.Core.pas"/>
         <UnitName Value="CpuView.Core"/>
       </Item>
@@ -68,17 +84,41 @@
         <UnitName Value="CpuView.FpDebug"/>
       </Item>
       <Item>
-        <Filename Value="src\core\CpuView.Settings.pas"/>
-        <UnitName Value="CpuView.Settings"/>
+        <Filename Value="src\core\CpuView.GdbDebug.pas"/>
+        <UnitName Value="CpuView.GdbDebug"/>
       </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.GdbDebug.Intel.pas"/>
+        <UnitName Value="CpuView.GdbDebug.Intel"/>
+      </Item>		  
       <Item>
         <Filename Value="src\core\CpuView.ScriptExecutor.pas"/>
         <UnitName Value="CpuView.ScriptExecutor"/>
       </Item>
       <Item>
+        <Filename Value="src\core\CpuView.ScriptExecutor.Intel.pas"/>
+        <UnitName Value="CpuView.ScriptExecutor.Intel"/>
+      </Item> 
+      <Item>
+        <Filename Value="src\core\CpuView.Settings.pas"/>
+        <UnitName Value="CpuView.Settings"/>
+      </Item>	  
+      <Item>
         <Filename Value="src\core\CpuView.Stream.pas"/>
         <UnitName Value="CpuView.Stream"/>
       </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.TraceLog.pas"/>
+        <UnitName Value="CpuView.TraceLog"/>
+      </Item>	  
+      <Item>
+        <Filename Value="src\core\CpuView.Windows.pas"/>
+        <UnitName Value="CpuView.Windows"/>
+      </Item>	 
+      <Item>
+        <Filename Value="src\core\CpuView.Windows.MMap.pas"/>
+        <UnitName Value="CpuView.Windows.MMap"/>
+      </Item>	  
       <Item>
         <Filename Value="dsgn\CpuView.Reg.pas"/>
         <HasRegisterProc Value="True"/>
@@ -137,24 +177,8 @@
         <UnitName Value="frmCpuViewShortCuts"/>
       </Item>
       <Item>
-        <Filename Value="src\core\CpuView.Windows.pas"/>
-        <UnitName Value="CpuView.Windows"/>
-      </Item>
-      <Item>
         <Filename Value="dsgn\gui\processors\intel\dlgCpuViewImplementation.pas"/>
         <UnitName Value="dlgCpuViewImplementation"/>
-      </Item>
-      <Item>
-        <Filename Value="src\core\CpuView.IntelContext.pas"/>
-        <UnitName Value="CpuView.IntelContext"/>
-      </Item>
-      <Item>
-        <Filename Value="src\core\CpuView.IntelContext.Types.pas"/>
-        <UnitName Value="CpuView.IntelContext.Types"/>
-      </Item>
-      <Item>
-        <Filename Value="src\core\CpuView.ScriptExecutor.Intel.pas"/>
-        <UnitName Value="CpuView.ScriptExecutor.Intel"/>
       </Item>
       <Item>
         <Filename Value="dsgn\gui\dlgCpuView.TemporaryLocker.pas"/>
@@ -179,10 +203,6 @@
       <Item>
         <Filename Value="dsgn\gui\dlgMemoryMap.pas"/>
         <UnitName Value="dlgMemoryMap"/>
-      </Item>
-      <Item>
-        <Filename Value="src\core\CpuView.Windows.MMap.pas"/>
-        <UnitName Value="CpuView.Windows.MMap"/>
       </Item>
       <Item>
         <Filename Value="dsgn\gui\dlgPageAccess.pas"/>

@@ -31,8 +31,9 @@ uses
   LCLIntf,
   {$ENDIF}
   Windows,
+  SysUtils,
   CpuView.Common,
-  CpuView.IntelContext.Types;
+  CpuView.Context.Intel.Types;
 
 const
   ntdll = 'ntdll.dll';
@@ -485,6 +486,7 @@ type
     function GetPageSize: Integer; override;
     function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; override;
     function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; override;
+    function QueryLoadedImages(AProcess32: Boolean): TImageDataList; override;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; override;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; override;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; override;
@@ -493,10 +495,10 @@ type
     procedure Update; override;
   end;
 
-  function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
-  function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
-  function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  function GetIntelContext(AThreadID: DWORD): TIntelThreadContext;
+  function SetIntelContext(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+  function GetIntelWow64Context(AThreadID: DWORD): TIntelThreadContext;
+  function SetIntelWow64Context(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 
   function GetMappedFileName(hProcess: THandle; AddrVA: Pointer; out AModuleName: string): Boolean;
 
@@ -666,7 +668,7 @@ const
   ExecuteFlags = PAGE_EXECUTE or PAGE_EXECUTE_READ or RWE_Flags;
 
   function OpenThread(dwDesiredAccess: DWORD; bInheritHandle: BOOL;
-    dwThreadId: DWORD): THandle; stdcall; external kernel32;
+    dwAThreadID: DWORD): THandle; stdcall; external kernel32;
   function GetThreadContext(hThread: THandle; Context: PContext): BOOL;
     stdcall; external kernel32;
   function GetEnabledXStateFeatures: Int64; stdcall; external kernel32;
@@ -802,7 +804,7 @@ begin
   Result := SetThreadContext(hThread, Windows.PContext(Ctx)^);
 end;
 
-function GetIntelContext(ThreadID: DWORD): TIntelThreadContext;
+function GetIntelContext(AThreadID: DWORD): TIntelThreadContext;
 var
   hThread: THandle;
   Ctx: PContext;
@@ -810,9 +812,9 @@ var
   ContextFlags: DWORD;
 begin
   Result := Default(TIntelThreadContext);
-  if ThreadID = 0 then Exit;
+  if AThreadID = 0 then Exit;
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     {$IFDEF CPUX86}
@@ -896,6 +898,9 @@ begin
     Result.Dr6 := Ctx.Dr6;
     Result.Dr7 := Ctx.Dr7;
 
+    Result.DebugPresent := True;
+    Result.MMXPresent := True;
+
     LoadAVX(hThread, Result, False);
 
   finally
@@ -903,7 +908,7 @@ begin
   end;
 end;
 
-function SetIntelContext(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SetIntelContext(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 var
   hThread: THandle;
   Ctx: PContext;
@@ -912,7 +917,7 @@ var
 begin
   Result := False;
   hThread := OpenThread(THREAD_GET_CONTEXT or THREAD_SET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     {$IFDEF CPUX86}
@@ -1000,7 +1005,7 @@ begin
   end;
 end;
 
-function GetIntelWow64Context(ThreadID: DWORD): TIntelThreadContext;
+function GetIntelWow64Context(AThreadID: DWORD): TIntelThreadContext;
 var
   hThread: THandle;
   Wow64Ctx: PWow64Context;
@@ -1009,9 +1014,9 @@ var
   I: Integer;
 begin
   Result := Default(TIntelThreadContext);
-  if ThreadID = 0 then Exit;
+  if AThreadID = 0 then Exit;
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     SetLength(ContextBuff{%H-}, SizeOf(TContext) + $10);
@@ -1070,6 +1075,9 @@ begin
       Inc(SimdReg);
     end;
 
+    Result.DebugPresent := True;
+    Result.MMXPresent := True;
+
     LoadAVX(hThread, Result, True);
 
   finally
@@ -1077,7 +1085,7 @@ begin
   end;
 end;
 
-function SetIntelWow64Context(ThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
+function SetIntelWow64Context(AThreadID: DWORD; const AContext: TIntelThreadContext): Boolean;
 var
   hThread: THandle;
   Ctx: PWow64Context;
@@ -1086,7 +1094,7 @@ var
 begin
   Result := False;
   hThread := OpenThread(THREAD_GET_CONTEXT or THREAD_SET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     case AContext.ContextLevel of
@@ -1147,6 +1155,93 @@ begin
   end;
 end;
 
+function NormalizePath(const Value: string): string;
+const
+  OBJ_CASE_INSENSITIVE         = $00000040;
+  STATUS_SUCCESS               = 0;
+  FILE_SYNCHRONOUS_IO_NONALERT = $00000020;
+  FILE_READ_DATA = 1;
+  ObjectNameInformation = 1;
+  DriveNameSize = 4;
+  VolumeCount = 26;
+  DriveTotalSize = DriveNameSize * VolumeCount;
+  DosDeviceName = '\Device\HarddiskVolume';
+var
+  US: UNICODE_STRING;
+  OA: OBJECT_ATTRIBUTES;
+  IO: IO_STATUS_BLOCK;
+  hFile: THandle;
+  NTSTAT, dwReturn: DWORD;
+  ObjectNameInfo: TOBJECT_NAME_INFORMATION;
+  Buff, Volume: string;
+  I, Count, dwQueryLength: Integer;
+  lpQuery: array [0..MAX_PATH - 1] of Char;
+  AnsiResult: AnsiString;
+begin
+  Result := Value;
+
+  if not Value.StartsWith(DosDeviceName, True) then
+  begin
+    RtlInitUnicodeString(@US, StringToOleStr(Value));
+    FillChar(OA, SizeOf(OBJECT_ATTRIBUTES), #0);
+    OA.Length := SizeOf(OBJECT_ATTRIBUTES);
+    OA.ObjectName := @US;
+    OA.Attributes := OBJ_CASE_INSENSITIVE;
+    // The ZwOpenFile function safely opens files whose path is represented
+    // using character references, for example:
+    // \SystemRoot\System32\ntdll.dll
+    // \??\C:\Windows\System32\ntdll.dll
+    // \Device\HarddiskVolume1\WINDOWS\system32\ntdll.dll
+    // So we will use it to get the handle
+    NTSTAT := ZwOpenFile(@hFile, FILE_READ_DATA or SYNCHRONIZE, @OA, @IO,
+      FILE_SHARE_READ or FILE_SHARE_WRITE or FILE_SHARE_DELETE,
+      FILE_SYNCHRONOUS_IO_NONALERT);
+    if NTSTAT = STATUS_SUCCESS then
+    try
+      // The file is opened, now let's see its formalized path
+      NTSTAT := NtQueryObject(hFile, ObjectNameInformation,
+        @ObjectNameInfo, MAX_PATH * 2, @dwReturn);
+      if NTSTAT = STATUS_SUCCESS then
+      begin
+        SetLength(AnsiResult, MAX_PATH);
+        WideCharToMultiByte(CP_ACP, 0,
+          @ObjectNameInfo.Name.Buffer[ObjectNameInfo.Name.MaximumLength -
+          ObjectNameInfo.Name.Length {$IFDEF WIN64} + 4{$ENDIF}],
+          ObjectNameInfo.Name.Length, @AnsiResult[1],
+          MAX_PATH, nil, nil);
+        Result := string(PAnsiChar(AnsiResult));
+      end;
+    finally
+      ZwClose(hFile);
+    end;
+  end;
+
+  // The path to the file opened via ZwOpenFile
+  // is returned as \Device\HarddiskVolumeX\blah-blah-blah
+  // It remains only to match it with the real disk.
+  SetLength(Buff, DriveTotalSize);
+  Count := GetLogicalDriveStrings(DriveTotalSize, @Buff[1]) div DriveNameSize;
+  for I := 0 to Count - 1 do
+  begin
+    Volume := PChar(@Buff[(I * DriveNameSize) + 1]);
+    Volume[3] := #0;
+    // Convert each disk name to a symbolic reference
+    // and compare to the formalized path
+    QueryDosDevice(PChar(Volume), @lpQuery[0], MAX_PATH);
+    dwQueryLength := Length(string(lpQuery));
+    if Copy(Result, 1, dwQueryLength) = string(lpQuery) then
+    begin
+      Volume[3] := '\';
+      if lpQuery[dwQueryLength - 1] <> '\' then
+        Inc(dwQueryLength);
+      Delete(Result, 1, dwQueryLength);
+      Result := Volume + Result;
+      Break;
+    end;
+  end;
+
+end;
+
 function GetMappedFileName(hProcess: THandle; AddrVA: Pointer;
   out AModuleName: string): Boolean;
 var
@@ -1157,10 +1252,10 @@ begin
   ALength := GetMappedFileNameW(hProcess, {%H-}AddrVA, @ModulePath[1], MAX_PATH);
   Result := ALength > 0;
   SetLength(ModulePath, ALength);
-  AModuleName := string(ModulePath);
+  AModuleName := NormalizePath(string(ModulePath));
 end;
 
-function GetThreadNativeStackLimit(ProcessHandle: THandle; ThreadID: DWORD): TStackLimit;
+function GetThreadNativeStackLimit(ProcessHandle: THandle; AThreadID: DWORD): TStackLimit;
 var
   hThread: THandle;
   TBI: TThreadBasicInformation;
@@ -1169,7 +1264,7 @@ var
 begin
   Result := Default(TStackLimit);
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
@@ -1186,7 +1281,7 @@ begin
   end;
 end;
 
-function GetThreadWow64StackLimit(ProcessHandle: THandle; ThreadID: DWORD): TStackLimit;
+function GetThreadWow64StackLimit(ProcessHandle: THandle; AThreadID: DWORD): TStackLimit;
 const
   ThreadBasicInformation = 0;
 var
@@ -1198,7 +1293,7 @@ var
 begin
   Result := Default(TStackLimit);
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
@@ -1218,7 +1313,7 @@ begin
   end;
 end;
 
-function GetThreadNativeExtendedData(ProcessHandle: THandle; ThreadID: DWORD): TThreadExtendedData;
+function GetThreadNativeExtendedData(ProcessHandle: THandle; AThreadID: DWORD): TThreadExtendedData;
 var
   hThread: THandle;
   TBI: TThreadBasicInformation;
@@ -1226,7 +1321,7 @@ var
 begin
   Result := Default(TThreadExtendedData);
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
@@ -1244,7 +1339,7 @@ begin
   end;
 end;
 
-function GetThreadWow64ExtendedData(ProcessHandle: THandle; ThreadID: DWORD): TThreadExtendedData;
+function GetThreadWow64ExtendedData(ProcessHandle: THandle; AThreadID: DWORD): TThreadExtendedData;
 var
   hThread: THandle;
   TBI: TThreadBasicInformation;
@@ -1253,7 +1348,7 @@ var
 begin
   Result := Default(TThreadExtendedData);
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
@@ -1274,7 +1369,7 @@ begin
   end;
 end;
 
-function SetThreadNativeExtendedData(ProcessHandle: THandle; ThreadID: Integer;
+function SetThreadNativeExtendedData(ProcessHandle: THandle; AThreadID: Integer;
   const AData: TThreadExtendedData): Boolean;
 var
   hThread: THandle;
@@ -1283,7 +1378,7 @@ var
 begin
   Result := False;
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
@@ -1302,7 +1397,7 @@ begin
   end;
 end;
 
-function SetThreadWow64ExtendedData(ProcessHandle: THandle; ThreadID: Integer;
+function SetThreadWow64ExtendedData(ProcessHandle: THandle; AThreadID: Integer;
   const AData: TThreadExtendedData): Boolean;
 var
   hThread: THandle;
@@ -1312,7 +1407,7 @@ var
 begin
   Result := False;
   hThread := OpenThread(THREAD_GET_CONTEXT or
-    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, ThreadID);
+    THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, False, AThreadID);
   if hThread = 0 then Exit;
   try
     if NtQueryInformationThread(hThread, ThreadBasicInformation, @TBI,
@@ -1380,6 +1475,37 @@ begin
   {$ENDIF}
 end;
 
+function TCommonUtils.QueryLoadedImages(AProcess32: Boolean): TImageDataList;
+const
+  MM_HIGHEST_USER_ADDRESS32 = $7FFEFFFF;
+  MM_HIGHEST_USER_ADDRESS64 = $7FFFFFFF0000;
+var
+  ImageData: TImageData;
+  AddrVA, MaxAddr: Int64;
+  MBI: TMemoryBasicInformation;
+  dwLength: Cardinal;
+begin
+  Result := TImageDataList.Create;
+  if FProcessHandle = 0 then Exit;
+  AddrVA := 0;
+  if AProcess32 then
+    MaxAddr := MM_HIGHEST_USER_ADDRESS32
+  else
+    MaxAddr := MM_HIGHEST_USER_ADDRESS64;
+  dwLength := SizeOf(TMemoryBasicInformation);
+  while AddrVA < MaxAddr do
+  begin
+    if VirtualQueryEx(FProcessHandle, {%H-}Pointer(AddrVA),
+      MBI{%H-}, dwLength) <> dwLength then Break;
+    Inc(AddrVA, MBI.RegionSize);
+    if not QueryModuleName({%H-}Int64(MBI.AllocationBase), ImageData.ImagePath) then
+      Continue;
+    ImageData.ImageBase := {%H-}Int64(MBI.AllocationBase);
+    ImageData.Size := MBI.RegionSize;
+    Result.Add(ImageData);
+  end;
+end;
+
 function TCommonUtils.QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean;
 begin
   Result := GetMappedFileName(FProcessHandle, {%H-}Pointer(AddrVA), AModuleName);
@@ -1437,6 +1563,13 @@ var
 begin
   Result := 0;
   if FProcessHandle = 0 then Exit;
+
+  if Assigned(ReadDataEx) then
+  begin
+    Result := ReadDataEx(AddrVA, Buff, ASize);
+    Exit;
+  end;
+
   dwLength := SizeOf(TMemoryBasicInformation);
   MBI := Default(TMemoryBasicInformation);
   if VirtualQueryEx(FProcessHandle,

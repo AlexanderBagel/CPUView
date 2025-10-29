@@ -41,10 +41,13 @@ type
     procedure edAddressChange(Sender: TObject);
   protected
     FCallback: TQueryAddrCallback;
+    FFloatMode: Boolean;
   end;
 
   function QueryAddress(const ACaption, APromt: string; var AAddrVA: Int64;
     ACallback: TQueryAddrCallback): Boolean;
+  function QuerySingle(const ACaption, APromt: string; var AFloatValue: Single): Boolean;
+  function QueryDouble(const ACaption, APromt: string; var AFloatValue: Double): Boolean;
   function QuerySetList(const ACaption, APromt: string;
     AList: array of string; var ItemIndex: Integer): Boolean;
 
@@ -105,13 +108,53 @@ begin
   end;
 end;
 
+function QuerySingle(const ACaption, APromt: string; var AFloatValue: Single): Boolean;
+var
+  frmInputBox: TfrmInputBox;
+  ANewFloatValue: Single;
+begin
+  frmInputBox := TfrmInputBox.Create(Application);
+  try
+    frmInputBox.Caption := ACaption;
+    frmInputBox.lblPromt.Caption := APromt;
+    frmInputBox.FFloatMode := True;
+    frmInputBox.edAddress.Text := FloatToStr(AFloatValue);
+    Result := (frmInputBox.ShowModal = mrOK) and
+      TryStrToFloat(frmInputBox.edAddress.Text, ANewFloatValue);
+    if Result then
+      AFloatValue := ANewFloatValue;
+  finally
+    frmInputBox.Free;
+  end;
+end;
+
+function QueryDouble(const ACaption, APromt: string; var AFloatValue: Double): Boolean;
+var
+  frmInputBox: TfrmInputBox;
+  ANewFloatValue: Double;
+begin
+  frmInputBox := TfrmInputBox.Create(Application);
+  try
+    frmInputBox.Caption := ACaption;
+    frmInputBox.lblPromt.Caption := APromt;
+    frmInputBox.FFloatMode := True;
+    frmInputBox.edAddress.Text := FloatToStr(AFloatValue);
+    Result := (frmInputBox.ShowModal = mrOK) and
+      TryStrToFloat(frmInputBox.edAddress.Text, ANewFloatValue);
+    if Result then
+      AFloatValue := ANewFloatValue;
+  finally
+    frmInputBox.Free;
+  end;
+end;
+
 { TfrmInputBox }
 
 procedure TfrmInputBox.edAddressChange(Sender: TObject);
 var
   ANewAddrVA: Int64;
 begin
-  if edAddress.Visible then
+  if edAddress.Visible and not FFloatMode then
   begin
     if not TryGetAddr(edAddress, ANewAddrVA) then
       btnOk.Enabled := False

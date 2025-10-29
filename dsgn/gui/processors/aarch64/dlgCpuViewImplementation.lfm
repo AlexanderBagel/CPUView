@@ -1,0 +1,216 @@
+inherited frmCpuViewImpl: TfrmCpuViewImpl
+  Left = 190
+  Top = 156
+  Width = 1415
+  ClientWidth = 1415
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  inherited pnDebug: TPanel
+    Height = 62
+    Top = 807
+    Width = 1415
+    ClientHeight = 62
+    ClientWidth = 1415
+    inherited edCommands: TEdit
+      Left = 4
+      Height = 36
+      Top = 4
+      Width = 1407
+      TabOrder = 1
+      OnKeyPress = edCommandsKeyPress
+    end
+    inherited StatusBar: TStatusBar
+      Height = 18
+      Top = 43
+      Width = 1413
+    end
+  end
+  inherited pnAsmReg: TPanel
+    Height = 448
+    Top = 26
+    Width = 1415
+    ClientHeight = 448
+    ClientWidth = 1415
+    inherited AsmView: TAsmView
+      Height = 446
+      Width = 1198
+      OnSelectionChange = AsmViewSelectionChange
+    end
+    inherited RegView: TRegView
+      Left = 1204
+      Height = 446
+      PopupMenu = pmAarch64Reg
+    end
+    inherited splitAsmReg: TSplitter
+      Left = 1199
+      Height = 446
+    end
+  end
+  inherited ToolBar: TToolBar
+    Width = 1415
+    inherited tbStepIn: TToolButton
+      Top = 2
+    end
+    inherited tbStepOut: TToolButton
+      Top = 2
+    end
+    inherited tbSep1: TToolButton
+      Left = 47
+      Height = 22
+      Top = 2
+    end
+    inherited tbBreakPoint: TToolButton
+      Left = 55
+      Top = 2
+    end
+    inherited tbSep2: TToolButton
+      Left = 78
+      Height = 22
+      Top = 2
+    end
+    inherited tbRunTillRet: TToolButton
+      Left = 109
+      Top = 2
+    end
+    inherited tbRunTo: TToolButton
+      Left = 86
+      Top = 2
+    end
+    inherited tbRunToUserCode: TToolButton
+      Left = 132
+      Top = 2
+    end
+    inherited tbSep3: TToolButton
+      Left = 155
+      Height = 22
+      Top = 2
+    end
+    inherited tbTraceLog: TToolButton
+      Left = 163
+      Top = 2
+    end
+    inherited tbExports: TToolButton
+      Left = 186
+      Top = 2
+    end
+    inherited tbMemoosyMap: TToolButton
+      Left = 209
+      Top = 2
+    end
+  end
+  inherited pnDumps: TPanel
+    Top = 479
+    Width = 1415
+    ClientHeight = 328
+    ClientWidth = 1415
+    inherited memHints: TMemo
+      Width = 1413
+    end
+    inherited pnDumpStack: TPanel
+      Height = 284
+      Top = 43
+      Width = 1413
+      ClientHeight = 284
+      ClientWidth = 1413
+      inherited pcDumps: TPageControl
+        Height = 282
+        Width = 777
+        inherited tabDump0: TTabSheet
+          ClientHeight = 245
+          ClientWidth = 771
+          inherited DumpView: TDumpView
+            Height = 245
+            Width = 771
+          end
+        end
+      end
+      inherited StackView: TStackView
+        Left = 783
+        Height = 282
+      end
+      inherited splitDumpStack: TSplitter
+        Left = 778
+        Height = 282
+      end
+    end
+  end
+  inherited splitAsmDumps: TSplitter
+    Top = 474
+    Width = 1415
+  end
+  inherited pmRegSelected: TPopupMenu
+    Left = 1240
+    Top = 264
+  end
+  inherited ActionList: TActionList
+    inherited acDMHex8: THexViewByteViewModeAction[26]
+    end
+    inherited acStackFollowRSP: TAction[27]
+    end
+    inherited acDbgStepOut: TAction[51]
+    end
+    inherited acDbgStepOver: TAction[52]
+    end
+    inherited acSBCopyPanelText: TAction[70]
+    end
+    inherited acSBCopyScriptorValue: TAction[71]
+    end
+    inherited acSaveRawDump: TAction[72]
+    end
+    inherited acUtilTraceLog: TAction[73]
+    end
+    inherited acSBShowInDump: TAction[74]
+    end
+    inherited acSBShowInAsm: TAction[75]
+    end
+    object acRegSingle: TAction[79]
+      Category = 'RegView Settings'
+      Caption = 'Show Single'
+      OnExecute = acRegSingleExecute
+      OnUpdate = acRegSingleUpdate
+    end
+    object acRegDouble: TAction[80]
+      Category = 'RegView Settings'
+      Caption = 'Show Double'
+      OnExecute = acRegDoubleExecute
+      OnUpdate = acRegDoubleUpdate
+    end
+    object acRegNeon: TAction[81]
+      Category = 'RegView Settings'
+      Caption = 'Show Neon'
+      OnExecute = acRegNeonExecute
+      OnUpdate = acRegNeonUpdate
+    end
+  end
+  inherited pmDump: TPopupMenu
+    Left = 176
+  end
+  inherited pmHint: TPopupMenu
+    OnPopup = pmHintPopup
+  end
+  object pmAarch64Reg: TPopupMenu[17]
+    Left = 1232
+    Top = 152
+    object miRegAarchSingle: TMenuItem
+      Action = acRegSingle
+    end
+    object miRegAarchDouble: TMenuItem
+      Action = acRegDouble
+    end
+    object miRegAarchNeon: TMenuItem
+      Action = acRegNeon
+    end
+    object miRegAarchSep2: TMenuItem
+      Caption = '-'
+    end
+    object miRegAarchCopy: TMenuItem
+      Action = acCopy
+    end
+    object miRegAarchSep3: TMenuItem
+      Caption = '-'
+    end
+    object miRegAarchFit: TMenuItem
+      Action = acViewFitColumnToBestSize
+    end
+  end
+end

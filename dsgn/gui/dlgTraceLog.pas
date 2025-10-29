@@ -26,7 +26,7 @@ uses
   LCLType, LCLIntf, Messages, Classes, SysUtils, Forms, Controls, Graphics,
   Dialogs, StdCtrls, Menus,
 
-  CpuView.Core;
+  CpuView.TraceLog;
 
 type
 
@@ -50,7 +50,6 @@ type
     procedure miSelectAllClick(Sender: TObject);
     procedure mnuCopyClick(Sender: TObject);
   private
-    FTraceLog: TTraceLog;
     procedure TraceLogChanged(Sender: TObject);
   public
     procedure UpdateTraceLog(Value: TTraceLog);
@@ -72,32 +71,30 @@ end;
 
 procedure TfrmTraceLog.TraceLogChanged(Sender: TObject);
 begin
-  memLog.Lines.Assign(FTraceLog.Data);
+  memLog.Lines.Assign(TraceLog.Data);
   SendMessage(frmTraceLog.memLog.Handle, WM_VSCROLL, SB_BOTTOM, 0);
 end;
 
 procedure TfrmTraceLog.UpdateTraceLog(Value: TTraceLog);
 begin
-  FTraceLog := Value;
-  FTraceLog.OnChange := TraceLogChanged;
+  TraceLog.OnChange := TraceLogChanged;
   TraceLogChanged(Value);
 end;
 
 procedure TfrmTraceLog.miClearClick(Sender: TObject);
 begin
-  FTraceLog.Clear;
+  TraceLog.Clear;
 end;
 
 procedure TfrmTraceLog.FormClose(Sender: TObject; var CloseAction: TCloseAction
   );
 begin
-  if Assigned(FTraceLog) then
-    FTraceLog.OnChange := nil;
   CloseAction := caFree;
 end;
 
 procedure TfrmTraceLog.FormDestroy(Sender: TObject);
 begin
+  TraceLog.OnChange := nil;
   frmTraceLog := nil;
 end;
 

@@ -117,6 +117,9 @@ const
   {$IFDEF USE_INTEL_CTX}
   RegHint = 'IntelRegHint.db';
   {$ENDIF}
+  {$IFDEF CPUAARCH64}
+  RegHint = 'ArmRegHint.db';
+  {$ENDIF}
 var
   APath, ALine: string;
   AError, Idx: Integer;

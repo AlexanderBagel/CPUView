@@ -2,7 +2,7 @@
 <CONFIG>
   <Package Version="5">
     <PathDelim Value="\"/>
-    <Name Value="CPUView_lin_x86_64_D"/>
+    <Name Value="CPUView_lin_aarch64_D"/>
     <Type Value="RunAndDesignTime"/>
     <Author Value="Alexander (Rouse_) Bagel"/>
     <CompilerOptions>
@@ -10,7 +10,7 @@
       <PathDelim Value="\"/>
       <SearchPaths>
         <IncludeFiles Value="src;dsgn\gui"/>
-        <OtherUnitFiles Value="src;src\core;dsgn;dsgn\gui;dsgn\gui\processors\intel"/>
+        <OtherUnitFiles Value="src;src\core;dsgn;dsgn\gui;dsgn\gui\processors\aarch64"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
       <Other>
@@ -50,19 +50,19 @@
       <Item>
         <Filename Value="src\core\CpuView.CommonDebug.pas"/>
         <UnitName Value="CpuView.CommonDebug"/>
-      </Item>          
-      <Item>
-        <Filename Value="src\core\CpuView.Context.Intel.pas"/>
-        <UnitName Value="CpuView.Context.Intel"/>
       </Item>
       <Item>
-        <Filename Value="src\core\CpuView.Context.Intel.Types.pas"/>
-        <UnitName Value="CpuView.Context.Intel.Types"/>
-      </Item> 
+        <Filename Value="src\core\CpuView.Context.Aarch64.Types.pas"/>
+        <UnitName Value="CpuView.Context.Aarch64.Types"/>
+      </Item>
+      <Item>
+        <Filename Value="src\core\CpuView.Context.Aarch64.pas"/>
+        <UnitName Value="CpuView.Context.Aarch64"/>
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Context.Params.pas"/>
         <UnitName Value="CpuView.Context.Params"/>
-      </Item>         
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Core.pas"/>
         <UnitName Value="CpuView.Core"/>
@@ -80,37 +80,33 @@
         <UnitName Value="CpuView.ExtendedHint"/>
       </Item>
       <Item>
-        <Filename Value="src\core\CpuView.FpDebug.pas"/>
-        <UnitName Value="CpuView.FpDebug"/>
-      </Item>
-      <Item>
         <Filename Value="src\core\CpuView.GdbDebug.pas"/>
         <UnitName Value="CpuView.GdbDebug"/>
       </Item>
       <Item>
-        <Filename Value="src\core\CpuView.GdbDebug.Intel.pas"/>
-        <UnitName Value="CpuView.GdbDebug.Intel"/>
-      </Item>	  
+        <Filename Value="src\core\CpuView.GdbDebug.Aarch64.pas"/>
+        <UnitName Value="CpuView.GdbDebug.Aarch64"/>
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Linux.pas"/>
         <UnitName Value="CpuView.Linux"/>
-      </Item>   
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Linux.MMap.pas"/>
         <UnitName Value="CpuView.Linux.MMap"/>
-      </Item>        
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.ScriptExecutor.pas"/>
         <UnitName Value="CpuView.ScriptExecutor"/>
       </Item>
       <Item>
-        <Filename Value="src\core\CpuView.ScriptExecutor.Intel.pas"/>
-        <UnitName Value="CpuView.ScriptExecutor.Intel"/>
-      </Item>      
+        <Filename Value="src\core\CpuView.ScriptExecutor.Aarch64.pas"/>
+        <UnitName Value="CpuView.ScriptExecutor.Aarch64"/>
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Settings.pas"/>
         <UnitName Value="CpuView.Settings"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Stream.pas"/>
         <UnitName Value="CpuView.Stream"/>
@@ -118,7 +114,7 @@
       <Item>
         <Filename Value="src\core\CpuView.TraceLog.pas"/>
         <UnitName Value="CpuView.TraceLog"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="dsgn\CpuView.Reg.pas"/>
         <HasRegisterProc Value="True"/>
@@ -137,49 +133,29 @@
         <UnitName Value="CpuView.Design.DbgLog"/>
       </Item>
       <Item>
-        <Filename Value="dsgn\gui\dlgCpuView.lfm"/>
-        <Type Value="LFM"/>
-      </Item>
-      <Item>
         <Filename Value="dsgn\gui\dlgCpuView.pas"/>
         <UnitName Value="dlgCpuView"/>
-      </Item>
-      <Item>
-        <Filename Value="dsgn\gui\frmCpuViewBaseOptions.lfm"/>
-        <Type Value="LFM"/>
       </Item>
       <Item>
         <Filename Value="dsgn\gui\frmCpuViewBaseOptions.pas"/>
         <UnitName Value="frmCpuViewBaseOptions"/>
       </Item>
       <Item>
-        <Filename Value="dsgn\gui\frmCpuViewColors.lfm"/>
-        <Type Value="LFM"/>
-      </Item>
-      <Item>
         <Filename Value="dsgn\gui\frmCpuViewColors.pas"/>
         <UnitName Value="frmCpuViewColors"/>
-      </Item>
-      <Item>
-        <Filename Value="dsgn\gui\frmCpuViewOptions.lfm"/>
-        <Type Value="LFM"/>
       </Item>
       <Item>
         <Filename Value="dsgn\gui\frmCpuViewOptions.pas"/>
         <UnitName Value="frmCpuViewOptions"/>
       </Item>
       <Item>
-        <Filename Value="dsgn\gui\frmCpuViewShortCuts.lfm"/>
-        <Type Value="LFM"/>
-      </Item>
-      <Item>
         <Filename Value="dsgn\gui\frmCpuViewShortCuts.pas"/>
         <UnitName Value="frmCpuViewShortCuts"/>
       </Item>
       <Item>
-        <Filename Value="dsgn\gui\processors\intel\dlgCpuViewImplementation.pas"/>
+        <Filename Value="dsgn\gui\processors\aarch64\dlgCpuViewImplementation.pas"/>
         <UnitName Value="dlgCpuViewImplementation"/>
-      </Item>    
+      </Item>
       <Item>
         <Filename Value="dsgn\gui\dlgCpuView.TemporaryLocker.pas"/>
         <UnitName Value="dlgCpuView.TemporaryLocker"/>

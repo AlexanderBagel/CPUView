@@ -11,14 +11,13 @@ each of which will require a long development time and will not be
 posted so as not to break the current CPU-View behavior.  
 
 1. SIMD register editor. (DONE)
-2. Window displaying function call parameters.
-3. Carbon/Cocoa widget support under macOS.
-4. Support for ARM architecture.
+2. Support for ARM architecture via GDB. (DONE)
+3. Carbon/Cocoa widget support under macOS + LLDB.
 ```
 
 ### Setup and use: 
 1. Download FWHexView https://github.com/AlexanderBagel/FWHexView and compile FWHexView.LCL.lpk
-2. Open CPUView_win_x86_64_D.lpk (or CPUView_lin_x86_64_D.lpk for Linux) and install it in the IDE (menu: Package->Install/Uninstall Packages) 
+2. Open CPUView_win_x86_64_D.lpk (or CPUView_lin_x86_64_D.lpk for Linux with Intel, or CPUView_lin_aarch64_D.lpk for Linux with ARM) and install it in the IDE (menu: Package->Install/Uninstall Packages) 
 3. Rebuild IDE
 4. In debug mode select menu "View->Debug Windows->CPU-View" or press Ctrl+Shift+C
 5. Enjoy  
@@ -44,7 +43,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 
 ### Common features:
 * OS: Windows and Linux support via Gtk2 or Qt5
-* Proc: Intel x86_64 (ARM not yet implemented)
+* Proc: Intel x86_64, ARM (AArch64)
 * Thread context (Basic, x87 and SIMD register) full support on Windows and Linux
 * Light and dark display themes
 * Crosscompiling support
@@ -107,7 +106,8 @@ Started development of a set of built-in utilities.
 ### Commands:
 
 "?" - calculates the result of the expression  
-For example: "? [RIP+EAX*2+123]" output [RIP+EAX*2+123] = [100003982] -> 35DC5E8D98948C3
+For example (Intel): "? [RIP+EAX*2+123]" output [RIP+EAX*2+123] = [100003982] -> 35DC5E8D98948C3
+For example (AArch64): "? [X0, #16]" output [X0, #16] = [0x7FF63580D0 (RW.)] -> 0x7FF7FB4450 (RW.)
 
 "gmh", "getmodulehandle" - returns the ImageBase of the library in the process being debugged  
 For example: "gmh user32" output "user32.dll" instance 7FFEFDDF0000. Path: C:\WINDOWS\System32\user32.dll
@@ -135,6 +135,12 @@ Light theme:
 
 Dark theme:
 ![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/dark.png)
+
+At&T syntax:
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/att.png)
+
+AArch64:
+![](https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/aarch64.png)
 
 Active jump, breakpoints, smart hints for selected instructions and their menus, Register hightlight.
 

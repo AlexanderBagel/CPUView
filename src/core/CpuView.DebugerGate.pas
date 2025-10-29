@@ -29,6 +29,7 @@ uses
   Forms,
   Generics.Collections,
   FWHexView.Common,
+  FWHexView.AsmTokenizer,
   CpuView.Common,
   CpuView.CPUContext,
   CpuView.Stream;
@@ -56,9 +57,11 @@ type
 
   TInstruction = record
     AddrVA: Int64;
-    AsString, Hint: string;
+    Mnemonic, Hint: string;
     Len: Integer;
     JmpTo: Int64;
+    JmpToPosStart: Integer;
+    JmpToPosLength: Integer;
   end;
 
   TBasicBreakPoint = record
@@ -88,30 +91,36 @@ type
     FBreakPointList: TListEx<TBasicBreakPoint>;
     FCtx: TCommonCpuContext;
     FUtils: TCommonAbstractUtils;
-    FChange: TNotifyEvent;
     FErrorMessage: string;
-    FShowFullAddress, FShowSourceLines, FUseDebugInfo, FUseCacheFoExternalSymbols: Boolean;
+    FShowFullAddress, FShowSourceLines, FUseDebugInfo: Boolean;
     FBreakPointsChange, FCtxChange, FStateChange, FThreadChange: TNotifyEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
     procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
     procedure DoBreakPointsChange;
-    procedure DoChange;
     procedure DoError(const AMessage: string);
     procedure DoStateChange;
     procedure DoThreadChange;
+    procedure InitContext(AValue: TCommonCpuContext); virtual; abstract;
+    function GetEndOnProcToken: string; virtual; abstract;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure UpdateContext; virtual;
+    function GetThreadID: Cardinal; virtual; abstract; // internal thread TID (for GDB/MI, LLDB)
+    function GetThreadTargetID: Cardinal; virtual;     // real TID
+    function UpdateContext: Boolean; virtual;
   public
     constructor Create(AOwner: TComponent; AUtils: TCommonAbstractUtils); reintroduce; virtual;
     destructor Destroy; override;
     function CommandAvailable(ACommand: TInterfaceDebugCommand): Boolean; virtual; abstract;
     function CurrentInstructionPoint: Int64; virtual; abstract;
+    function CurrentThreadID: Cardinal; virtual;
     function DebugState: TAbstractDebugState; virtual; abstract;
-    function Disassembly(AddrVA: Int64; pBuff: PByte; nSize: Integer;
-      AShowSourceLines: Boolean): TList<TInstruction>; virtual; abstract;
+    function Disassembly(AddrVA, LastKnownAddrVA: Int64; pBuff: PByte; nSize: Integer;
+      AShowSourceLines, AShowCallFuncName: Boolean): TListEx<TInstruction>; virtual; abstract;
     function IsActive: Boolean; virtual; abstract;
     function IsActiveJmp: Boolean; virtual; abstract;
+    function IsBreakPointActive(AddrVA: Int64): Boolean;
+    function IsDebuggerLocked: Boolean; virtual;
+    function IsExtendedSyntax: Boolean; virtual;
     function IsUserCode(AAddrVA: Int64): Boolean; virtual; abstract;
     procedure FillThreadStackFrames(ALimit: TStackLimit;
       AddrStack, AddrFrame: Int64; AStream: TRemoteStream;
@@ -119,20 +128,21 @@ type
     function GetRemoteModuleHandle(const ALibraryName: string): TRemoteModule; virtual; abstract;
     function GetRemoteModules: TList<TRemoteModule>; virtual; abstract;
     function GetRemoteProcList(const AModule: TRemoteModule): TList<TRemoteProc>; virtual; abstract;
-    function GetRemoteProcAddress(ALibHandle: TLibHandle; const AProcName: string): Int64; virtual; abstract;
+    function GetRemoteProcAddress(const AModule: TRemoteModule; const AProcName: string): Int64; virtual; abstract;
     function GetReturnAddrVA: Int64; virtual; abstract;
     function GetSourceLine(AddrVA: Int64; out ASourcePath: string;
       out ASourceLine: Integer): Boolean; virtual; abstract;
+    function GetTokenizerMode: TTokenizerMode; virtual; abstract;
     function GetUserCodeAddrVA: Int64; virtual; abstract;
     procedure Pause; virtual; abstract;
     function PointerSize: Integer; virtual; abstract;
+    function PreferededDasmBufSize: Integer; virtual;
     function ProcessID: Cardinal; virtual; abstract;
     function QuerySymbolAtAddr(AddrVA: Int64; AParam: TQuerySymbol): TQuerySymbolValue; virtual; abstract;
     function ReadMemory(AddrVA: Int64; var Buff; Size: Integer): Boolean; virtual; abstract;
     procedure Run; virtual; abstract;
     procedure Stop; virtual; abstract;
     procedure SetNewIP(AddrVA: Int64); virtual; abstract;
-    function ThreadID: Cardinal; virtual; abstract;
     function ThreadStackLimit: TStackLimit; virtual; abstract;
     procedure ToggleBreakPoint(AddrVA: Int64); virtual; abstract;
     procedure TraceIn; virtual; abstract;
@@ -141,16 +151,16 @@ type
     procedure TraceTo(AddrVA: Int64); virtual; abstract;
     procedure TraceToList(AddrVA: array of Int64); virtual; abstract;
     function UpdateRegValue(RegID: Integer; ANewRegValue: TRegValue): Boolean; virtual; abstract;
+    procedure UpdateRemoteModulesData; virtual; abstract;
     procedure UpdateRemoteStream(pBuff: PByte; AAddrVA: Int64; ASize: Int64); virtual; abstract;
     property BreakPointList: TListEx<TBasicBreakPoint> read FBreakPointList;
     property Context: TCommonCpuContext read FCtx write SetCtx;
+    property EndOnProcToken: string read GetEndOnProcToken;
     property ErrorMessage: string read FErrorMessage;
     property ShowFullAddress: Boolean read FShowFullAddress write FShowFullAddress;
     property ShowSourceLines: Boolean read FShowSourceLines write FShowSourceLines;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
-    property UseCacheFoExternalSymbols: Boolean read FUseCacheFoExternalSymbols write FUseCacheFoExternalSymbols;
     property Utils: TCommonAbstractUtils read FUtils;
-    property OnChange: TNotifyEvent read FChange write FChange;
     property OnContextChange: TNotifyEvent read FCtxChange write FCtxChange;
     property OnStateChange: TNotifyEvent read FStateChange write FStateChange;
     property OnThreadChange: TNotifyEvent read FThreadChange write FThreadChange;
@@ -176,6 +186,7 @@ begin
   begin
     FCtx.RegisterChangeNotification(ContextUpdate);
     FCtx.FreeNotification(Self);
+    InitContext(FCtx);
   end;
   UpdateContext;
 end;
@@ -187,8 +198,37 @@ begin
     FCtxChange(Self);
 end;
 
+function TAbstractDebugger.CurrentThreadID: Cardinal;
+begin
+  Result := GetThreadTargetID;
+end;
+
+function TAbstractDebugger.IsBreakPointActive(AddrVA: Int64): Boolean;
+var
+  I: Integer;
+begin
+  for I := 0 to BreakPointList.Count - 1 do
+    if (BreakPointList.List[I].AddrVA = AddrVA) and BreakPointList.List[I].Active then
+    begin
+      Result := True;
+      Exit;
+    end;
+  Result := False;
+end;
+
+function TAbstractDebugger.IsDebuggerLocked: Boolean;
+begin
+  Result := DebugState <> adsPaused;
+end;
+
+function TAbstractDebugger.IsExtendedSyntax: Boolean;
+begin
+  Result := False;
+end;
+
 destructor TAbstractDebugger.Destroy;
 begin
+  Context := nil;
   FBreakPointList.Free;
   inherited;
 end;
@@ -197,12 +237,6 @@ procedure TAbstractDebugger.DoBreakPointsChange;
 begin
   if Assigned(FBreakPointsChange) then
     FBreakPointsChange(Self);
-end;
-
-procedure TAbstractDebugger.DoChange;
-begin
-  if Assigned(FChange) then
-    FChange(Self);
 end;
 
 procedure TAbstractDebugger.DoError(const AMessage: string);
@@ -239,21 +273,22 @@ begin
   Dec(ALimit.Base, PointerSize);
   AFrame.AddrStack := AddrStack;
   AFrame.AddrFrame := AddrFrame;
-  {$IFDEF USE_INTEL_CTX}
   repeat
     AFrame.AddrPC := AFrame.AddrFrame + Int64(PointerSize);
     AFrames.Add(AFrame);
     AFrame.AddrStack := AFrame.AddrPC + Int64(PointerSize);
     AStream.Position := AFrame.AddrFrame;
-    AStream.ReadBuffer(NewAddrFrame{%H-}, PointerSize);
+    if AStream.Read(NewAddrFrame{%H-}, PointerSize) <> PointerSize then
+      Break;
     if AFrame.AddrFrame >= NewAddrFrame then
       Break;
     AFrame.AddrFrame := NewAddrFrame;
   until not InStack(AFrame.AddrFrame);
-  {$ELSE}
-    {$message 'not implemented'}
-    AFrames.Add(AFrame);
-  {$ENDIF}
+end;
+
+function TAbstractDebugger.PreferededDasmBufSize: Integer;
+begin
+  Result := 1024;
 end;
 
 procedure TAbstractDebugger.Notification(AComponent: TComponent;
@@ -264,12 +299,18 @@ begin
     Context := nil;
 end;
 
-procedure TAbstractDebugger.UpdateContext;
+function TAbstractDebugger.GetThreadTargetID: Cardinal;
 begin
+  Result := GetThreadID;
+end;
+
+function TAbstractDebugger.UpdateContext: Boolean;
+begin
+  Result := False;
   if Assigned(Context) then
   begin
-    Context.ThreadID := ThreadID;
-    Utils.ThreadID := ThreadID;
+    Context.ThreadID := CurrentThreadID;
+    Utils.ThreadID := Context.ThreadID;
     Context.Utils := Utils;
     case PointerSize of
       4: Context.AddressMode := am32bit;
@@ -277,7 +318,7 @@ begin
     else
       Exit;
     end;
-    Context.Update(CurrentInstructionPoint);
+    Result := Context.Update(CurrentInstructionPoint);
   end;
 end;
 

@@ -7,21 +7,30 @@ interface
 uses
   LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics, Dialogs,
   ComCtrls, StdCtrls, ExtCtrls, Menus, Clipbrd, laz.VirtualTrees,
-  Generics.Collections, Math,
+  Generics.Collections,
 
   CpuView.Common,
   CpuView.Core,
   CpuView.Design.DpiFix,
+  CpuView.TraceLog,
 
   {$IFDEF LINUX}
+  Math,
   CpuView.Linux,
   CpuView.Linux.MMap,
   {$ENDIF}
 
   {$IFDEF MSWINDOWS}
   Windows,
-  CpuView.Windows,
   CpuView.Windows.MMap,
+  {$ENDIF}
+
+  {$IFDEF USE_INTEL_CTX}
+  CpuView.Context.Intel,
+  {$ENDIF}
+
+  {$IFDEF CPUAARCH64}
+  CpuView.Context.Aarch64,
   {$ENDIF}
 
   dlgInputBox,
@@ -62,7 +71,7 @@ type
     procedure lvMemoryMapBeforeItemErase(Sender: TBaseVirtualTree;
       {%H-}TargetCanvas: TCanvas; Node: PVirtualNode; const {%H-}ItemRect: TRect;
       var ItemColor: TColor; var {%H-}EraseAction: TItemEraseAction);
-    procedure lvMemoryMapDblClick(Sender: TObject);
+    procedure lvMemoryMapDblClick({%H-}Sender: TObject);
     procedure lvMemoryMapGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; {%H-}TextType: TVSTTextType; var CellText: String);
     procedure lvMemoryMapHeaderDrawQueryElements(Sender: TVTHeader;
@@ -250,10 +259,10 @@ begin
     F := TFileStream.Create(SaveDialog.FileName, fmCreate);
     try
       BuffSize := Min(FCore.Debugger.Utils.GetPageSize, PageSize);
-      SetLength(Buff, BuffSize);
+      SetLength(Buff{%H-}, BuffSize);
       while PageSize > 0 do
       begin
-        FCore.Debugger.Utils.ReadData(Pointer(AddrVA), Buff[0], BuffSize);
+        FCore.Debugger.Utils.ReadData({%H-}Pointer(AddrVA), Buff[0], BuffSize);
         F.Write(Buff[0], BuffSize);
         Inc(AddrVA, BuffSize);
         Dec(PageSize, BuffSize);

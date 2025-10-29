@@ -22,15 +22,22 @@ unit dlgCpuView;
 
 interface
 
+{$I CpuViewCfg.inc}
+
 uses
-  LCLIntf, LCLType, Classes, SysUtils, Forms, Controls, Graphics,
+  LCLIntf, LCLType, Messages, Classes, SysUtils, Forms, Controls, Graphics,
   Dialogs, ExtCtrls, StdCtrls, Menus, ComCtrls, ActnList, Clipbrd,
   ImgList, GraphType, Types, Generics.Collections,
 
   IDEImagesIntf,
+  DbgIntfDebuggerBase,
+  LazDebuggerIntfBaseTypes,
   BaseDebugManager,
+  FpDebugDebugger,
+  GDBMIDebugger,
 
   FWHexView,
+  FWHexView.Common,
   FWHexView.Actions,
 
   CpuView.Common,
@@ -38,13 +45,21 @@ uses
   CpuView.CPUContext,
   CpuView.Viewers,
   CpuView.DebugerGate,
+  {$IFDEF CPUAARCH64}
+  CpuView.GdbDebug.Aarch64,
+  {$ENDIF}
+  {$IFDEF USE_INTEL_CTX}
   CpuView.FpDebug,
+  CpuView.GdbDebug.Intel,
+  {$ENDIF}
   CpuView.Actions,
   CpuView.Settings,
   CpuView.Design.Common,
   CpuView.Design.CrashDump,
   CpuView.Design.DbgLog,
   CpuView.Design.DpiFix,
+  CpuView.ScriptExecutor,
+  CpuView.TraceLog,
 
   dlgCpuView.TemporaryLocker,
   dlgInputBox,
@@ -155,6 +170,7 @@ type
     acDMText: THexViewByteViewModeAction;
     ilToolBarChars: TImageList;
     memHints: TMemo;
+    miDebugDumpProcessSymbols: TMenuItem;
     miStackShowInMM: TMenuItem;
     miRegShowInMM: TMenuItem;
     miAsmShowInMM: TMenuItem;
@@ -356,6 +372,7 @@ type
     procedure acShowInDumpExecute(Sender: TObject);
     procedure acShowInDumpUpdate(Sender: TObject);
     procedure acShowInMemoryMapExecute(Sender: TObject);
+    procedure acShowInMemoryMapUpdate(Sender: TObject);
     procedure acShowInNewDumpExecute(Sender: TObject);
     procedure acShowInStackExecute(Sender: TObject);
     procedure acShowInStackUpdate(Sender: TObject);
@@ -373,14 +390,17 @@ type
     procedure acViewGotoExecute(Sender: TObject);
     procedure AsmViewSelectionChange(Sender: TObject);
     procedure DumpViewSelectionChange(Sender: TObject);
+    procedure edCommandsKeyPress(Sender: TObject; var Key: char);
     procedure FormChangeBounds(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyPress(Sender: TObject; var Key: char);
+    procedure miDebugDumpProcessSymbolsClick(Sender: TObject);
     procedure miDebugGenExceptionClick(Sender: TObject);
     procedure pcDumpsChange(Sender: TObject);
+    procedure pmHintPopup(Sender: TObject);
     procedure pmStatusBarPopup(Sender: TObject);
     procedure RegViewDblClick(Sender: TObject);
     procedure RegViewSelectedContextPopup(Sender: TObject; MousePos: TPoint;
@@ -389,10 +409,21 @@ type
     procedure StackViewSelectionChange(Sender: TObject);
     procedure tmpZOrderLockTimer(Sender: TObject);
     procedure DefaultActionUpdate(Sender: TObject);
+  private type
+    THintMenuType = (hmtAddrVA, hmtSeparator, hmtCopy, hmtSelectAll, hmtSimdSingle, hmtSimdDouble);
+    THintMenuParam = record
+      Caption: string;
+      AddrVA: Int64;
+      MemSize: Integer;
+      MenuType: THintMenuType;
+    end;
+  private const
+    MNU_GOTOASM = -1;
+    MNU_GOTODMP = -2;
+    MNU_GOTOSTK = -3;
   private
     FCore: TCpuViewCore;
-    FContext: TCommonCpuContext;
-    FDbgGate: TCpuViewDebugGate;
+    FCurrendDebuggerClass: TAbstractDebuggerClass;
     FSBPanelText: string;
     FSBPanelValue: string;
     FSBPanelValueAddrVA: Int64;
@@ -406,14 +437,20 @@ type
     FContextRegister: TRegister;
     FContextRegisterParam: TRegParam;
     FQweryAddrViewerIndex: Integer;
+    FRegisterInDebugBoss: Boolean;
     FSourceLine: Integer;
     FLastBounds: TRect;
     FCrashDump: TExceptionLogger;
     FExit1ShortCut, FExit2ShortCut: TShortCut;
+    FShowSimdHintAsSingle: Boolean;
+    FHintMenuData: TList<THintMenuParam>;
+    FScriptExecutorValue, FScryptExecutorMemValue: Int64;
     function ActiveViewerSelectedValue: Int64;
     function CheckAddressCallback(ANewAddrVA: Int64): Boolean;
     function CheckRegCallback({%H-}ANewAddrVA: Int64): Boolean;
     procedure InternalShowInDump(AddrVA: Int64);
+    procedure OnCoreStateChange(Sender: TObject);
+    procedure OnState(ADebugger: TDebuggerIntf; {%H-}AOldState: TDBGState);
   protected
     { IGuiImplementation }
     procedure OpenInDisassembler(AAddrVA: Int64);
@@ -422,29 +459,33 @@ type
     function ActiveDumpView: TDumpView;
     function ActiveView: TFWCustomHexView;
     function ActiveViewIndex: Integer;
-    procedure AfterDbgGateCreate; virtual; abstract;
-    procedure BeforeDbgGateDestroy; virtual; abstract;
     function GetContext: TCommonCpuContext; virtual; abstract;
     procedure GenerateToolBarImages;
-    procedure InitStatusBarValues(APanelIndex: Integer); virtual;
+    procedure InitStatusBarValues(APanelIndex: Integer);
     procedure OpenMM(AddrVA: Int64);
+    function ScriptExecutor: TAbstractScriptExecutor; virtual; abstract;
     function ToDpi(Value: Integer): Integer;
     function ToDefaultDpi(Value: Integer): Integer;
     procedure LockZOrder;
     function MeasureCanvas: TBitmap;
     procedure UnlockZOrder;
     function UpdateContextRegData: Boolean;
+    procedure UpdateDebugGateSettings;
+    procedure UpdateDebugger(ADebugger: TDebuggerIntf);
     procedure UpdateStatusBar;
     procedure UpdateTraceLog;
     property SBPanelText: string read FSBPanelText write FSBPanelText;
     property SBPanelValue: string read FSBPanelValue write FSBPanelValue;
+  protected
+    procedure OnHintMenuClick(Sender: TObject);
+    procedure OnReset(Sender: TObject);
   public
     procedure AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy; const AFromPPI,
       AToPPI, AOldFormWidth, ANewFormWidth: Integer); override;
+    function DbgGate: TAbstractDebugger;
     procedure LoadSettings;
     procedure SaveSettings;
     property Core: TCpuViewCore read FCore;
-    property DbgGate: TCpuViewDebugGate read FDbgGate;
     property Settings: TCpuViewSettins read FSettings;
   end;
 
@@ -476,11 +517,13 @@ procedure TfrmCpuView.FormCreate(Sender: TObject);
 begin
   FCrashDump := TExceptionLogger.Create;
   FSettings := TCpuViewSettins.Create;
-  FCore := TCpuViewCore.Create(TCpuViewDebugGate);
-  FContext := GetContext;
-  FDbgGate := FCore.Debugger as TCpuViewDebugGate;
-  FDbgGate.Context := FContext;
-  AfterDbgGateCreate;
+  FCore := TCpuViewCore.Create(Self);
+  FCore.OnStateChange := OnCoreStateChange;
+  FCore.Context := GetContext;
+  FCore.OnReset := OnReset;
+  FHintMenuData := TList<THintMenuParam>.Create;
+  ScriptExecutor.Context := GetContext;
+  ScriptExecutor.Debugger := DbgGate;
   FCore.AsmView := AsmView;
   FCore.RegView := RegView;
   FCore.DumpViewList.Add(DumpView);
@@ -504,6 +547,12 @@ begin
   pmStack.Images := IDEImages.Images_16;
   SetHooks;
   GenerateToolBarImages;
+  if Assigned(DebugBoss) then
+  begin
+    DebugBoss.RegisterStateChangeHandler(OnState);
+    FRegisterInDebugBoss := True;
+    UpdateDebugger(DebugBoss.Snapshots.Debugger);
+  end;
   CpuViewDebugLog.Reset;
   CpuViewDebugLog.Log('TfrmCpuView: start', True, False);
 end;
@@ -519,16 +568,17 @@ end;
 
 procedure TfrmCpuView.FormDestroy(Sender: TObject);
 begin
+  if FRegisterInDebugBoss and Assigned(DebugBoss) then
+    DebugBoss.UnregisterStateChangeHandler(OnState);
   FreeAndNil(frmMemoryMap);
   FreeAndNil(frmProcExports);
+  FreeAndNil(frmTraceLog);
   ResetHooks;
   SaveSettings;
-  BeforeDbgGateDestroy;
-  FDbgGate.Context := nil;
-  FContext.Free;
   FCore.Free;
   FSettings.Free;
   FCrashDump.Free;
+  FHintMenuData.Free;
   CpuViewDebugLog.Log('TfrmCpuView: end', False);
   CpuViewDebugLog.Enabled := False;
 end;
@@ -539,6 +589,25 @@ begin
     Close;
 end;
 
+procedure TfrmCpuView.miDebugDumpProcessSymbolsClick(Sender: TObject);
+var
+  A: Int64;
+  S: TStringList;
+begin
+  A := $100000000;
+  S := TStringList.Create;
+  try
+    while A < $1003A7000 do
+    begin
+      S.Add(IntToHex(A) + ': ' + FCore.Debugger.QuerySymbolAtAddr(A, qsName).Description);
+      Inc(A, 8);
+    end;
+    S.SaveToFile(DebugFolder + IntToStr(FCore.Debugger.ProcessID) + '.txt');
+  finally
+    S.Free;
+  end;
+end;
+
 procedure TfrmCpuView.miDebugGenExceptionClick(Sender: TObject);
 begin
   raise Exception.Create('Test exception');
@@ -547,6 +616,48 @@ end;
 procedure TfrmCpuView.pcDumpsChange(Sender: TObject);
 begin
   Core.DumpViewList.ItemIndex := pcDumps.PageIndex;
+end;
+
+procedure TfrmCpuView.pmHintPopup(Sender: TObject);
+
+  function AddMenuItem(AParent: TMenuItem; const ACaption: string;
+    ATag: Integer): TMenuItem;
+  begin
+    Result := TMenuItem.Create(pmHint);
+    Result.Caption := ACaption;
+    Result.Tag := ATag;
+    Result.OnClick := OnHintMenuClick;
+    AParent.Add(Result);
+  end;
+
+var
+  AItem: TMenuItem;
+  AParam: THintMenuParam;
+  I: Integer;
+begin
+  pmHint.Items.Clear;
+  for I := 0 to FHintMenuData.Count - 1 do
+  begin
+    AParam := FHintMenuData[I];
+    case AParam.MenuType of
+      hmtSeparator: AddMenuItem(pmHint.Items, '-', I);
+      hmtCopy: AddMenuItem(pmHint.Items, 'Copy', I);
+      hmtSelectAll: AddMenuItem(pmHint.Items, 'Select All', I);
+      hmtSimdSingle: AddMenuItem(pmHint.Items, 'Show SIMD value as Single Array', I).Checked := FShowSimdHintAsSingle;
+      hmtSimdDouble: AddMenuItem(pmHint.Items, 'Show SIMD value as Double Array', I).Checked := not FShowSimdHintAsSingle;
+      hmtAddrVA:
+      begin
+        AItem := AddMenuItem(pmHint.Items, AParam.Caption +
+          ' = ' + IntToHex(AParam.AddrVA, 1), I);
+        if Core.AddrInAsm(AParam.AddrVA) then
+          AddMenuItem(AItem, 'Follow in Asm', MNU_GOTOASM);
+        if Core.AddrInDump(AParam.AddrVA) then
+          AddMenuItem(AItem, 'Follow in Dump', MNU_GOTODMP);
+        if Core.AddrInStack(AParam.AddrVA) then
+          AddMenuItem(AItem, 'Follow in Stack', MNU_GOTOSTK);
+      end;
+    end;
+  end;
 end;
 
 procedure TfrmCpuView.pmStatusBarPopup(Sender: TObject);
@@ -566,7 +677,7 @@ procedure TfrmCpuView.RegViewDblClick(Sender: TObject);
 var
   Handled: Boolean;
 begin
-  if FDbgGate.DebugState <> adsPaused then Exit;
+  if (DbgGate = nil) or (DbgGate.DebugState <> adsPaused) then Exit;
   Handled := UpdateContextRegData;
   if not Handled then Exit;
   if rfToggle in FContextRegisterParam.Flags then
@@ -600,8 +711,9 @@ end;
 
 procedure TfrmCpuView.StackViewSelectionChange(Sender: TObject);
 begin
+  if DbgGate = nil then Exit;
   FStackSelectedValue := 0;
-  StackView.ReadDataAtSelStart(FStackSelectedValue, FDbgGate.PointerSize);
+  StackView.ReadDataAtSelStart(FStackSelectedValue, DbgGate.PointerSize);
   UpdateStatusBar;
 end;
 
@@ -612,17 +724,20 @@ end;
 
 procedure TfrmCpuView.DefaultActionUpdate(Sender: TObject);
 begin
-  TAction(Sender).Enabled := DbgGate.DebugState = adsPaused;
+  TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
+    (DbgGate.DebugState = adsPaused);
 end;
 
 function TfrmCpuView.ActiveViewerSelectedValue: Int64;
 begin
+  if DbgGate = nil then Exit(0);
   Result := FAsmViewSelectedAddr;
   if AsmView.Focused then
     Exit;
   if ActiveDumpView.Focused then
     Exit(FDumpSelectedValue);
-  if RegView.Focused and (FContextRegValue.ValueSize = FDbgGate.PointerSize) then
+  if RegView.Focused and (FContextRegValue.ValueSize = DbgGate.PointerSize) then
     Exit(FContextRegValue.QwordValue);
   if StackView.Focused then
     Result := FStackSelectedValue;
@@ -651,6 +766,45 @@ begin
   else
     Core.ShowDumpAtAddr(AddrVA);
   ActiveControl := ActiveDumpView;
+end;
+
+procedure TfrmCpuView.OnCoreStateChange(Sender: TObject);
+begin
+  if Core.CoreState = csDebuggerInit then
+    UpdateDebugGateSettings;
+  UpdateStatusBar;
+end;
+
+procedure TfrmCpuView.OnState(ADebugger: TDebuggerIntf; AOldState: TDBGState);
+begin
+  if ADebugger.State = dsInit then
+    UpdateDebugger(ADebugger);
+end;
+
+procedure TfrmCpuView.UpdateDebugger(ADebugger: TDebuggerIntf);
+var
+  NewDebuggerClass: TAbstractDebuggerClass;
+begin
+  NewDebuggerClass := nil;
+  {$IFDEF USE_INTEL_CTX}
+  if ADebugger is TFpDebugDebugger then
+    NewDebuggerClass := TFpDebugGate;
+  if ADebugger is TGDBMIDebugger then
+    NewDebuggerClass := TGdbIntelDebugGate;
+  {$ENDIF}
+  {$IFDEF CPUAARCH64}
+  if ADebugger is TGDBMIDebugger then
+    NewDebuggerClass := TGdbAarch64DebugGate;
+  {$ENDIF}
+  if FCurrendDebuggerClass <> NewDebuggerClass then
+  begin
+    FCurrendDebuggerClass := NewDebuggerClass;
+    if FCurrendDebuggerClass = nil then
+      Core.Debugger := nil
+    else
+      Core.Debugger := FCurrendDebuggerClass.Create(nil, Core.Utils);
+  end;
+  ScriptExecutor.Debugger := DbgGate;
 end;
 
 procedure TfrmCpuView.OpenInDisassembler(AAddrVA: Int64);
@@ -689,17 +843,38 @@ const
   );
 var
   AddrVA: Int64;
-  AccessStr, Symbol: string;
+  AccessStr, Symbol, State, DumpAddr: string;
   AMeasureCanvas: TBitmap;
+  AState: TAbstractDebugState;
+  APid, ATid: Integer;
 begin
-  StatusBar.Panels[0].Text := Format('Pid: %d, Tid: %d, State: %s',
-    [DbgGate.ProcessID, DbgGate.ThreadID, DbgStates[DbgGate.DebugState]]);
+  if DbgGate = nil then
+  begin
+    AState := adsStoped;
+    APid := 0;
+    ATid := 0;
+  end
+  else
+  begin
+    AState := DbgGate.DebugState;
+    APid := DbgGate.ProcessID;
+    ATid := DbgGate.CurrentThreadID;
+  end;
+  if Core.CoreState = csDisassembling then
+    State := 'Disassembling...'
+  else
+    State := DbgStates[AState];
+  StatusBar.Panels[0].Text := Format('Pid: %d, Tid: %d, State: %s', [APid, ATid, State]);
   StatusBar.Panels[1].Text := Format('Module: "%s"',
     [ExtractFileName(FCore.QueryModuleName(AsmView.SelectedInstructionAddr))]);
   AddrVA := ActiveViewerSelectedValue;
   AccessStr := FCore.QueryAccessStr(AddrVA);
   Symbol := FCore.QuerySymbolAtAddr(AddrVA);
-  StatusBar.Panels[2].Text := Format('Addr:  0x%x (%s) %s', [AddrVA, AccessStr, Symbol]);
+  if ActiveDumpView.Focused then
+    DumpAddr := Format('[0x%x] ->', [ActiveDumpView.SelectedAddr])
+  else
+    DumpAddr := '';
+  StatusBar.Panels[2].Text := Format('Addr: %s 0x%x (%s) %s', [DumpAddr, AddrVA, AccessStr, Symbol]);
   AMeasureCanvas := MeasureCanvas;
   try
     StatusBar.Panels[0].Width :=
@@ -720,12 +895,73 @@ begin
     frmTraceLog.UpdateTraceLog(TraceLog);
 end;
 
+procedure TfrmCpuView.OnHintMenuClick(Sender: TObject);
+
+  function GetMnuParam: THintMenuParam;
+  begin
+    Result := FHintMenuData[TMenuItem(Sender).Parent.Tag];
+  end;
+
+var
+  AParam: THintMenuParam;
+begin
+  case TMenuItem(Sender).Tag of
+    MNU_GOTOSTK:
+    begin
+      AParam := GetMnuParam;
+      Core.ShowStackAtAddr(AParam.AddrVA);
+      ActiveControl := StackView;
+    end;
+    MNU_GOTODMP:
+    begin
+      AParam := GetMnuParam;
+      Core.ShowDumpAtAddr(AParam.AddrVA, AParam.MemSize);
+      ActiveControl := ActiveDumpView;
+    end;
+    MNU_GOTOASM:
+    begin
+      AParam := GetMnuParam;
+      Core.ShowDisasmAtAddr(AParam.AddrVA);
+      ActiveControl := AsmView;
+    end;
+  else
+    case FHintMenuData[TMenuItem(Sender).Tag].MenuType of
+      hmtCopy: memHints.CopyToClipboard;
+      hmtSelectAll:
+      begin
+        memHints.SelectAll;
+        ActiveControl := memHints;
+      end;
+      hmtSimdDouble, hmtSimdSingle:
+      begin
+        FShowSimdHintAsSingle := FHintMenuData[TMenuItem(Sender).Tag].MenuType = hmtSimdSingle;
+        AsmViewSelectionChange(nil);
+      end;
+    end;
+  end;
+end;
+
+procedure TfrmCpuView.OnReset(Sender: TObject);
+begin
+  FHintMenuData.Clear;
+  edCommands.Text := '';
+  memHints.Text := '';
+  FreeAndNil(frmProcExports);
+  FreeAndNil(frmMemoryMap);
+  UpdateStatusBar;
+end;
+
 procedure TfrmCpuView.AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy;
   const AFromPPI, AToPPI, AOldFormWidth, ANewFormWidth: Integer);
 begin
   inherited AutoAdjustLayout(AMode, AFromPPI, AToPPI, AOldFormWidth,
     ANewFormWidth);
   GenerateToolBarImages;
+end;
+
+function TfrmCpuView.DbgGate: TAbstractDebugger;
+begin
+  Result := FCore.Debugger;
 end;
 
 procedure TfrmCpuView.LoadSettings;
@@ -762,8 +998,8 @@ begin
   for I := 1 to pcDumps.PageCount - 1 do
     Settings.SetSettingsToDumpView(pcDumps.Pages[I].Controls[0] as TDumpView);
   Settings.SetSettingsToRegView(RegView);
-  Settings.SetSettingsToContext(DbgGate.Context);
   Settings.SetSettingsToStackView(StackView);
+  UpdateDebugGateSettings;
   R := Settings.CpuViewDlgSettings.BoundsRect;
   if R.IsEmpty then
     Position := poScreenCenter
@@ -788,21 +1024,13 @@ begin
     (Core.ForceFindSymbols <> Settings.ForceFindSymbols) or
     (Core.ForceFindSymbolsDepth <> Settings.ForceFindSymbolsDepth) or
     (Core.DisplayStrings <> Settings.DisplayStrings) or
-    (Core.MinimumStringLength <> Settings.MinimumStringLength) or
-    (DbgGate.ShowFullAddress <> Settings.ShowFullAddress) or
-    (DbgGate.ShowSourceLines <> Settings.ShowSourceLines) or
-    (DbgGate.UseCacheFoExternalSymbols <> Settings.UseCacheFoExternalSymbols) or
-    (DbgGate.UseDebugInfo <> Settings.UseDebugInfo) then
+    (Core.MinimumStringLength <> Settings.MinimumStringLength) then
   begin
     Core.DisplayStrings := Settings.DisplayStrings;
     Core.MinimumStringLength := Settings.MinimumStringLength;
     Core.ShowCallFuncName := Settings.ShowCallFuncName;
     Core.ForceFindSymbols := Settings.ForceFindSymbols;
     Core.ForceFindSymbolsDepth := Settings.ForceFindSymbolsDepth;
-    DbgGate.ShowFullAddress := Settings.ShowFullAddress;
-    DbgGate.ShowSourceLines := Settings.ShowSourceLines;
-    DbgGate.UseDebugInfo := Settings.UseDebugInfo;
-    DbgGate.UseCacheFoExternalSymbols := Settings.UseCacheFoExternalSymbols;
     Core.UpdateAfterSettingsChange;
   end;
 
@@ -846,7 +1074,8 @@ begin
     Settings.GetSessionFromAsmView(AsmView);
     Settings.GetSessionFromDumpView(DumpView);
     Settings.GetSessionFromRegView(RegView);
-    Settings.GetSessionFromContext(DbgGate.Context);
+    if Assigned(DbgGate) then
+      Settings.GetSessionFromContext(DbgGate.Context);
     Settings.GetSessionFromStackView(StackView);
   end;
   if Settings.SaveFormSession then
@@ -941,6 +1170,8 @@ begin
     SBPanelText := StatusBar.Panels[APanelIndex].Text;
   if (APanelIndex = 2) and (ActiveViewerSelectedValue <> 0) then
     SBPanelValue := IntToHex(ActiveViewerSelectedValue, 1);
+  if (APanelIndex = 3) and (FScriptExecutorValue <> 0) then
+    SBPanelValue := IntToHex(FScriptExecutorValue, 1);
   acSBCopyScriptorValue.Enabled := SBPanelValue <> '';
 end;
 
@@ -948,9 +1179,9 @@ procedure TfrmCpuView.OpenMM(AddrVA: Int64);
 begin
   if frmMemoryMap = nil then
   begin
-    frmMemoryMap := TfrmMemoryMap.Create(Self);
-    frmMemoryMap.Init(FCore, Self, FDbgGate.ProcessID,
-      FDbgGate.PointerSize = 8, AddrVA);
+    frmMemoryMap := TfrmMemoryMap.Create(Application);
+    frmMemoryMap.Init(FCore, Self, DbgGate.ProcessID,
+      DbgGate.PointerSize = 8, AddrVA);
   end
   else
   begin
@@ -985,8 +1216,11 @@ end;
 
 procedure TfrmCpuView.UnlockZOrder;
 begin
-  tmpZOrderLock.Enabled := False;
-  InterceptorActive := False;
+  if not Core.Debugger.IsDebuggerLocked then
+  begin
+    tmpZOrderLock.Enabled := False;
+    InterceptorActive := False;
+  end;
 end;
 
 function TfrmCpuView.UpdateContextRegData: Boolean;
@@ -999,10 +1233,20 @@ begin
     (FContextRegValue.ValueSize > 0);
 end;
 
+procedure TfrmCpuView.UpdateDebugGateSettings;
+begin
+  if DbgGate = nil then Exit;
+  Settings.SetSettingsToContext(DbgGate.Context);
+  DbgGate.ShowFullAddress := Settings.ShowFullAddress;
+  DbgGate.ShowSourceLines := Settings.ShowSourceLines;
+  DbgGate.UseDebugInfo := Settings.UseDebugInfo;
+end;
+
 procedure TfrmCpuView.ActionRegModifyUpdate(Sender: TObject);
 begin
   TAction(Sender).Visible :=
-    (FDbgGate.DebugState = adsPaused) and
+    (DbgGate <> nil) and
+    (DbgGate.DebugState = adsPaused) and
     (FContextRegister.RegID >= 0) and
     (TRegisterFlag(TAction(Sender).Tag) in FContextRegisterParam.Flags);
 end;
@@ -1020,12 +1264,13 @@ begin
   begin
     frmProcExports := TfrmProcExports.Create(Application);
     ExportList := TRemoteExports.Create;
-    RemoteModules := FDbgGate.GetRemoteModules;
+    DbgGate.UpdateRemoteModulesData;
+    RemoteModules := DbgGate.GetRemoteModules;
     try
       for Module in RemoteModules do
       begin
         ExportItem.LibraryName := ExtractFileName(Module.LibraryPath);
-        ProcList := FDbgGate.GetRemoteProcList(Module);
+        ProcList := DbgGate.GetRemoteProcList(Module);
         try
           for RemoteProc in ProcList do
           begin
@@ -1100,7 +1345,45 @@ end;
 procedure TfrmCpuView.DumpViewSelectionChange(Sender: TObject);
 begin
   FDumpSelectedValue := 0;
-  ActiveDumpView.ReadDataAtSelStart(FDumpSelectedValue, FDbgGate.PointerSize);
+  if DbgGate = nil then Exit;
+  ActiveDumpView.ReadDataAtSelStart(FDumpSelectedValue, DbgGate.PointerSize);
+  UpdateStatusBar;
+end;
+
+procedure TfrmCpuView.edCommandsKeyPress(Sender: TObject; var Key: char);
+var
+  ExecuteResult, ValueAccess, Symbol, MemValueAccess, MemSymbol: string;
+  Expression: TExpression;
+begin
+  if Key <> #13 then Exit;
+  if Trim(edCommands.Text) = '' then Exit;
+  ScriptExecutor.CurrentRIPOffset :=
+    AsmView.SelectedInstructionAddr + AsmView.SelectedRawLength;
+  if ScriptExecutor.Execute(edCommands.Text, ExecuteResult) and
+    (ScriptExecutor.CalculatedList.Count > 0) then
+  begin
+    Expression := ScriptExecutor.CalculatedList[0];
+    ValueAccess := Core.QueryAccessStr(Expression.Value);
+    Symbol := Core.QuerySymbolAtAddr(Expression.Value, Expression.MemSize = 0);
+    if Symbol <> '' then
+      Symbol := ' ' + Symbol;
+    if Expression.MemSize > 0 then
+    begin
+      MemValueAccess := Core.QueryAccessStr(Expression.Value);
+      MemSymbol := Core.QuerySymbolAtAddr(Expression.Value, True);
+      if MemSymbol <> '' then
+        MemSymbol := ' ' + Symbol;
+      ExecuteResult := Format('%s = [0x%x (%s)%s] -> 0x%x (%s)%s',
+        [Expression.Data, Expression.Value, ValueAccess, Symbol,
+        Expression.MemValue, MemValueAccess, MemSymbol]);
+      FScryptExecutorMemValue := Expression.MemValue;
+    end
+    else
+      ExecuteResult := Format('%s = 0x%x (%s)%s',
+        [Expression.Data, Expression.Value, ValueAccess, Symbol]);
+  end;
+  FScriptExecutorValue := ScriptExecutor.CalculatedValue;
+  StatusBar.Panels[3].Text := ExecuteResult;
   UpdateStatusBar;
 end;
 
@@ -1112,24 +1395,26 @@ end;
 
 procedure TfrmCpuView.acShowInDumpUpdate(Sender: TObject);
 begin
-  if RegView.Focused then
-  begin
-    if not ((FContextRegister.RegID >= 0) and
-      (rfChangeValue in FContextRegisterParam.Flags) and
-      (FContextRegisterParam.RegType = crtValue)) then
-    begin
-      TAction(Sender).Enabled := False;
-      Exit;
-    end;
-  end;
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInDump(ActiveViewerSelectedValue);
+  TAction(Sender).Visible :=
+    (FContextRegisterParam.RegType = crtGeneralPurposeReg) or not RegView.Focused;
 end;
 
 procedure TfrmCpuView.acShowInMemoryMapExecute(Sender: TObject);
 begin
   OpenMM(ActiveViewerSelectedValue);
+end;
+
+procedure TfrmCpuView.acShowInMemoryMapUpdate(Sender: TObject);
+begin
+  TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
+    (DbgGate.DebugState = adsPaused);
+  TAction(Sender).Visible :=
+    (FContextRegisterParam.RegType = crtGeneralPurposeReg) or not RegView.Focused;
 end;
 
 procedure TfrmCpuView.acShowInNewDumpExecute(Sender: TObject);
@@ -1146,8 +1431,11 @@ end;
 procedure TfrmCpuView.acShowInStackUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInStack(ActiveViewerSelectedValue);
+  TAction(Sender).Visible :=
+    (FContextRegisterParam.RegType = crtGeneralPurposeReg) or not RegView.Focused;
 end;
 
 procedure TfrmCpuView.acStackFollowRBPExecute(Sender: TObject);
@@ -1159,6 +1447,7 @@ end;
 procedure TfrmCpuView.acStackFollowRBPUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInStack(DbgGate.Context.StackBase);
 end;
@@ -1172,6 +1461,7 @@ end;
 procedure TfrmCpuView.acStackFollowRSPUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInStack(DbgGate.Context.StackPoint);
 end;
@@ -1189,8 +1479,114 @@ begin
 end;
 
 procedure TfrmCpuView.AsmViewSelectionChange(Sender: TObject);
+const
+  SimdX87FormatMode: TFormatMode = (Align: False; AlignChar: #0; Inverted: True; Divide: True; DivideChar: #9);
+var
+  ExecuteResult, ValueAccess, MemValueAccess, Symbol, MemSymbol: string;
+  I, Idx: Integer;
+  Expression: TExpression;
+  HintParam: THintMenuParam;
+  ShowSimdMenu: Boolean;
 begin
   FAsmViewSelectedAddr := AsmView.SelectedInstructionAddr;
+  memHints.Lines.BeginUpdate;
+  try
+    memHints.Lines.Clear;
+    ShowSimdMenu := False;
+    FHintMenuData.Clear;
+    ScriptExecutor.CurrentRIPOffset := AsmView.SelectedInstructionAddr + AsmView.SelectedRawLength;
+    ScriptExecutor.ExtendedSyntax := Core.Debugger.IsExtendedSyntax;
+    if ScriptExecutor.Execute(
+      AsmView.SelectedColumnAsString(ctDescription), ExecuteResult) then
+    begin
+      for I := 0 to ScriptExecutor.CalculatedList.Count - 1 do
+      begin
+        Expression := ScriptExecutor.CalculatedList[I];
+        if not Expression.Calculated then Continue;
+        Symbol := '';
+        HintParam.MenuType := hmtAddrVA;
+        HintParam.MemSize := Expression.MemSize;
+        if Expression.MemSize > 0 then
+        begin
+          Idx := Pos('[', Expression.Data);
+          HintParam.Caption := Copy(Expression.Data, Idx + 1, Length(Expression.Data));
+          HintParam.Caption := StringReplace(HintParam.Caption, ']', '', [rfReplaceAll]);
+        end
+        else
+        begin
+          HintParam.Caption := Expression.Data;
+          HintParam.MemSize := DbgGate.PointerSize;
+        end;
+        HintParam.AddrVA := Expression.Value;
+        ValueAccess := Core.QueryAccessStr(HintParam.AddrVA);
+        Symbol := Core.QuerySymbolAtAddr(HintParam.AddrVA, Expression.MemSize = 0);
+        if Symbol <> '' then
+          Symbol := ' ' + Symbol;
+        if Core.AddrInDump(HintParam.AddrVA) then
+          FHintMenuData.Add(HintParam);
+        if Expression.MemSize > 0 then
+        begin
+          if etSimdX87 in Expression.Types then
+          begin
+            MemSymbol := '';
+            case Expression.MemSize of
+              4: MemSymbol := 'single: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat32), bvmFloat32, SimdX87FormatMode);
+              8: MemSymbol := 'double: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat64), bvmFloat64, SimdX87FormatMode);
+              10: MemSymbol := 'extended: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat80), bvmFloat80, SimdX87FormatMode);
+            else
+              ShowSimdMenu := True;
+              if FShowSimdHintAsSingle then
+                MemSymbol := 'single array: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat32), bvmFloat32, SimdX87FormatMode)
+              else
+                MemSymbol := 'double array: ' + RawBufToViewMode(@Expression.SimdX87[0], Expression.MemSize, DefValueMetric(bvmFloat64), bvmFloat64, SimdX87FormatMode);
+            end;
+            if etMem in Expression.Types then
+              ExecuteResult := Format('%s = [%x (%s)%s] -> %s',
+                [Expression.Data, Expression.Value, ValueAccess, Symbol, MemSymbol])
+            else
+              ExecuteResult := Format('%s = %s', [Expression.Data, MemSymbol]);
+          end
+          else
+          begin
+            MemSymbol := Core.QuerySymbolAtAddr(Expression.MemValue);
+            MemValueAccess := Core.QueryAccessStr(Expression.MemValue);
+            ExecuteResult := Format('%s = [%x (%s)%s] -> %x (%s) %s',
+              [Expression.Data, Expression.Value, ValueAccess, Symbol,
+              Expression.MemValue, MemValueAccess, MemSymbol]);
+            HintParam.AddrVA := Expression.MemValue;
+            HintParam.Caption := Expression.Data;
+            HintParam.MemSize := DbgGate.PointerSize;
+            if Core.AddrInDump(HintParam.AddrVA) then
+              FHintMenuData.Add(HintParam);
+          end;
+        end
+        else
+          ExecuteResult := Format('%s = %x (%s)%s',
+            [Expression.Data, Expression.Value, ValueAccess, Symbol]);
+        memHints.Lines.Add(ExecuteResult);
+      end;
+      HintParam.MenuType := hmtSeparator;
+      FHintMenuData.Add(HintParam);
+      HintParam.MenuType := hmtSelectAll;
+      FHintMenuData.Add(HintParam);
+      HintParam.MenuType := hmtCopy;
+      FHintMenuData.Add(HintParam);
+      if ShowSimdMenu then
+      begin
+        HintParam.MenuType := hmtSeparator;
+        FHintMenuData.Add(HintParam);
+        HintParam.MenuType := hmtSimdSingle;
+        FHintMenuData.Add(HintParam);
+        HintParam.MenuType := hmtSimdDouble;
+        FHintMenuData.Add(HintParam);
+      end;
+    end;
+
+  finally
+    memHints.Lines.EndUpdate;
+  end;
+  SendMessage(memHints.Handle, WM_VSCROLL, SB_TOP, 0);
+
   UpdateStatusBar;
 end;
 
@@ -1202,8 +1598,11 @@ end;
 procedure TfrmCpuView.acShowInAsmUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInAsm(ActiveViewerSelectedValue);
+  TAction(Sender).Visible :=
+    (FContextRegisterParam.RegType = crtGeneralPurposeReg) or not RegView.Focused;
 end;
 
 procedure TfrmCpuView.acShowInAsmExecute(Sender: TObject);
@@ -1214,7 +1613,9 @@ end;
 procedure TfrmCpuView.acHighlightRegUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
-    (DbgGate.DebugState = adsPaused) and (FContextRegName <> '');
+    (DbgGate <> nil) and
+    (DbgGate.DebugState = adsPaused) and
+    (FContextRegName <> '');
 end;
 
 procedure TfrmCpuView.acRegModifyDecExecute(Sender: TObject);
@@ -1230,38 +1631,64 @@ begin
 end;
 
 procedure TfrmCpuView.acRegModifyNewValueExecute(Sender: TObject);
+const
+  strEdit = 'Edit ';
+  strNewValue = 'New value:';
 var
   ACount, I: Integer;
   SetValues: array of string;
 begin
   {%H-}case FContextRegister.ValueType of
-    crtValue, crtExtra:
+    crtGeneralPurposeReg..crtExtra:
     begin
       I := -1;
       // map to TEditViewMode
-      case FContextRegValue.ValueSize of
-        8: if FContextRegisterParam.ContextLevel = 1 then I := 0;
-        10: I := 1;
-        16: I := 2;
-        32: I := 3;
-      end;
-      if I >= 0 then
+      if FContextRegister.ValueType = crtValue then
       begin
-        if QuerySimd87RegValue('Edit ' + FContextRegName, TEditViewMode(I), FContextRegValue) then
-          FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
-        Exit;
+        case FContextRegValue.ValueSize of
+          8: I := 0;
+          10: I := 1;
+          16: I := 2;
+          32: I := 3;
+        end;
+        if I >= 0 then
+        begin
+          if QuerySimd87RegValue(strEdit + FContextRegName,
+            TEditViewMode(I), FContextRegValue) then
+            FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
+          Exit;
+        end;
       end;
-      if QueryAddress('Edit ' + FContextRegName, 'New value:', FContextRegValue.QwordValue, CheckRegCallback) then
+      if FContextRegister.ValueType = crtFloatingPointReg then
+      begin
+        if FContextRegisterParam.ViewMode in [rvmFloat32, rvmFloat64] then
+        begin
+          if FContextRegisterParam.ViewMode = rvmFloat32 then
+          begin
+            if not QuerySingle(strEdit + FContextRegName,
+              strNewValue, FContextRegValue.SingleValue) then Exit;
+          end
+          else
+          begin
+            if not QueryDouble(strEdit + FContextRegName,
+              strNewValue, FContextRegValue.DoubleValue) then Exit;
+          end;
+          FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
+          Exit;
+        end;
+      end;
+      if QueryAddress(strEdit + FContextRegName, strNewValue,
+        FContextRegValue.QwordValue, CheckRegCallback) then
         FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
     end;
     crtEnumValue:
     begin
-      ACount := FDbgGate.Context.RegQueryEnumValuesCount(FContextRegister.RegID);
+      ACount := DbgGate.Context.RegQueryEnumValuesCount(FContextRegister.RegID);
       if ACount = 0 then Exit;
       SetLength(SetValues{%H-}, ACount);
       for I := 0 to ACount - 1 do
-        SetValues[I] := FDbgGate.Context.RegQueryEnumString(FContextRegister.RegID, I);
-      if QuerySetList('Edit ' + FContextRegName, 'New value:', SetValues, FContextRegValue.IntValue) then
+        SetValues[I] := DbgGate.Context.RegQueryEnumString(FContextRegister.RegID, I);
+      if QuerySetList(strEdit + FContextRegName, strNewValue, SetValues, FContextRegValue.IntValue) then
         FCore.UpdateRegValue(FContextRegister.RegID, FContextRegValue);
     end;
   end;
@@ -1306,7 +1733,7 @@ end;
 
 procedure TfrmCpuView.acSBCopyScriptorValueExecute(Sender: TObject);
 begin
-  Clipboard.AsText := SBPanelValue;
+  Clipboard.AsText := '0x' + SBPanelValue;
 end;
 
 procedure TfrmCpuView.acSBShowInAsmExecute(Sender: TObject);
@@ -1318,6 +1745,7 @@ end;
 procedure TfrmCpuView.acSBShowInAsmUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInAsm(FSBPanelValueAddrVA);
 end;
@@ -1330,6 +1758,7 @@ end;
 procedure TfrmCpuView.acSBShowInDumpUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     Core.AddrInDump(FSBPanelValueAddrVA);
 end;
@@ -1351,6 +1780,7 @@ end;
 procedure TfrmCpuView.acAsmShowSourceUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     DbgGate.GetSourceLine(FAsmViewSelectedAddr, FSourcePath, FSourceLine) and
     (FSourceLine > 0);
@@ -1365,6 +1795,7 @@ end;
 procedure TfrmCpuView.acDbgRunToUserCodeUpdate(Sender: TObject);
 begin
   TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
     (DbgGate.DebugState = adsPaused) and
     DbgGate.CommandAvailable(idcRunToUserCode);
 end;
@@ -1381,7 +1812,9 @@ end;
 
 procedure TfrmCpuView.acAsmReturnToIPUpdate(Sender: TObject);
 begin
-  TAction(Sender).Enabled := (DbgGate.DebugState = adsPaused) and
+  TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
+    (DbgGate.DebugState = adsPaused) and
     (DbgGate.CurrentInstructionPoint <> FAsmViewSelectedAddr);
 end;
 
@@ -1402,7 +1835,9 @@ end;
 
 procedure TfrmCpuView.acDbgRunToUpdate(Sender: TObject);
 begin
-  TAction(Sender).Enabled := (DbgGate.DebugState = adsPaused) and
+  TAction(Sender).Enabled :=
+    (DbgGate <> nil) and
+    (DbgGate.DebugState = adsPaused) and
     (FAsmViewSelectedAddr <> 0);
 end;
 

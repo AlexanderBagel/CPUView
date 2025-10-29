@@ -24,7 +24,13 @@ unit CpuView.Common;
 interface
 
 uses
-  SysUtils;
+  SysUtils,
+  Classes,
+  Generics.Collections,
+  FWHexView.Common;
+
+const
+  InvalidAsmLine = '???';
 
 type
   TAddrValidationType = (avtExecutable, avtReadable, avtStack, avtString);
@@ -99,11 +105,21 @@ type
     Contains: array of TContains;
   end;
 
+  TImageData = record
+    ImagePath: string;
+    ImageBase, Size: Int64;
+  end;
+
+  TImageDataList = class(TListEx<TImageData>);
+
+  TReadDataEx = function(AddrVA: Pointer; var Buff; ASize: Longint): Longint of object;
+
   { TCommonAbstractUtils }
 
   TCommonAbstractUtils = class
   private
     FProcessID: Integer;
+    FReadDataEx: TReadDataEx;
     FThreadID: TThreadID;
   protected
     procedure SetProcessID(const Value: Integer); virtual;
@@ -113,6 +129,7 @@ type
     function GetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean): TThreadExtendedData; virtual; abstract;
     function GetThreadStackLimit(AThreadID: Integer; ThreadIs32: Boolean): TStackLimit; virtual; abstract;
     function NeedUpdateReadData: Boolean; virtual;
+    function QueryLoadedImages(AProcess32: Boolean): TImageDataList; virtual; abstract;
     function QueryRegion(AddrVA: Int64; out RegionData: TRegionData): Boolean; virtual; abstract;
     function QueryModuleName(AddrVA: Int64; out AModuleName: string): Boolean; virtual; abstract;
     function ReadData(AddrVA: Pointer; var Buff; ASize: Longint): Longint; virtual; abstract;
@@ -120,6 +137,7 @@ type
     function SetThreadExtendedData(AThreadID: Integer; ThreadIs32: Boolean; const AData: TThreadExtendedData): Boolean; virtual; abstract;
     procedure Update; virtual; abstract;
     property ProcessID: Integer read FProcessID write SetProcessID;
+    property ReadDataEx: TReadDataEx read FReadDataEx write FReadDataEx;
     property ThreadID: TThreadID read FThreadID write SetThreadID;
   end;
 

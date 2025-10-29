@@ -1,11 +1,12 @@
 object frmMemoryMap: TfrmMemoryMap
-  Left = 616
-  Height = 619
-  Top = 281
-  Width = 1300
+  Left = 599
+  Height = 1076
+  Top = 310
+  Width = 1851
   Caption = 'Cpu-View Memory Map'
-  ClientHeight = 619
-  ClientWidth = 1300
+  ClientHeight = 1076
+  ClientWidth = 1851
+  DesignTimePPI = 144
   KeyPreview = True
   Position = poScreenCenter
   LCLVersion = '4.99.0.0'
@@ -16,22 +17,22 @@ object frmMemoryMap: TfrmMemoryMap
   OnShow = FormShow
   object pnHint: TPanel
     Left = 0
-    Height = 23
-    Top = 596
-    Width = 1300
+    Height = 34
+    Top = 1042
+    Width = 1851
     Align = alBottom
-    ClientHeight = 23
-    ClientWidth = 1300
+    ClientHeight = 34
+    ClientWidth = 1851
     TabOrder = 0
     object lblPromt: TLabel
       AnchorSideLeft.Control = pnHint
       AnchorSideTop.Control = pnHint
       AnchorSideTop.Side = asrCenter
-      Left = 6
-      Height = 17
-      Top = 3
-      Width = 196
-      BorderSpacing.Left = 5
+      Left = 5
+      Height = 25
+      Top = 5
+      Width = 279
+      BorderSpacing.Left = 4
       Caption = 'For more detailed information, use:'
     end
     object lblUrl: TLabel
@@ -40,11 +41,11 @@ object frmMemoryMap: TfrmMemoryMap
       AnchorSideTop.Control = pnHint
       AnchorSideTop.Side = asrCenter
       Cursor = crHandPoint
-      Left = 207
-      Height = 17
-      Top = 3
-      Width = 314
-      BorderSpacing.Left = 5
+      Left = 288
+      Height = 25
+      Top = 5
+      Width = 448
+      BorderSpacing.Left = 4
       Caption = 'https://github.com/AlexanderBagel/ProcessMemoryMap'
       Font.Color = clHighlight
       ParentFont = False
@@ -54,59 +55,70 @@ object frmMemoryMap: TfrmMemoryMap
   object lvMemoryMap: TLazVirtualStringTree
     Cursor = 63
     Left = 0
-    Height = 596
+    Height = 1042
     Top = 0
-    Width = 1300
+    Width = 1851
     Align = alClient
+    DefaultNodeHeight = 38
     DefaultText = 'Node'
     Header.AutoSizeIndex = 8
     Header.Columns = <    
       item
         Position = 0
+        Spacing = 4
         Text = 'Address'
         Width = 140
       end    
       item
         Position = 1
+        Spacing = 4
         Text = 'Size'
         Width = 100
       end    
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAllowFocus]
         Position = 2
+        Spacing = 4
         Text = 'Owner'
         Width = 100
       end    
       item
         Position = 3
+        Spacing = 4
         Text = 'Section'
-        Width = 67
+        Width = 68
       end    
       item
         Position = 4
+        Spacing = 4
         Text = 'Contains'
         Width = 200
       end    
       item
         Position = 5
+        Spacing = 4
         Text = 'Type'
-        Width = 67
+        Width = 68
       end    
       item
         Position = 6
+        Spacing = 4
         Text = 'Access'
-        Width = 67
+        Width = 68
       end    
       item
         Position = 7
+        Spacing = 4
         Text = 'Initial Access'
         Width = 80
       end    
       item
         Position = 8
+        Spacing = 4
         Text = 'Mapped as'
-        Width = 477
+        Width = 1023
       end>
+    Header.DefaultHeight = 28
     Header.Height = 32
     Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoOwnerDraw, hoShowSortGlyphs, hoVisible]
     PopupMenu = pmList
