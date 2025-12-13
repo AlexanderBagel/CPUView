@@ -793,7 +793,7 @@ function TGdbAbstractDebugGate.Disassembly(AddrVA, LastKnownAddrVA: Int64;
   ): TListEx<TInstruction>;
 var
   InstList: TList<TGdbInstruction>;
-  I, SpaceIndex, MemBracketIndex: Integer;
+  I: Integer;
   Inst: TInstruction;
   GdbInst: TGdbInstruction;
   Sym: TFpSymbol;

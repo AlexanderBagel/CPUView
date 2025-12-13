@@ -436,7 +436,7 @@ end;
 
 procedure TCpuViewMainOptionsFrame.CMFontChanged(var Message: TLMessage);
 begin
-  if Assigned(ilSettings) then
+  if Assigned(ilSettings) and Assigned(tvSettings) then
     FillImageList;
 end;
 
