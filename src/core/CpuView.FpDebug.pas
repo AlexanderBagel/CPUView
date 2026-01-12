@@ -756,12 +756,17 @@ begin
         if AShowCallFuncName and (Instruction.Mnemonic[1] = 'C') then
         begin
           Instruction.JmpToPosStart := SpaceIndex;
-          SetLength(Instruction.Mnemonic, SpaceIndex);
-          Instruction.JmpToPosLength := Pos(' ', RipSimbol) - 1;
-          if Instruction.JmpToPosLength <= 0 then
-            Instruction.JmpToPosLength := Length(RipSimbol);
-          Instruction.Mnemonic := Instruction.Mnemonic +
-            Copy(RipSimbol, 1, Instruction.JmpToPosLength);
+          if RipSimbol = '' then
+            Instruction.JmpToPosLength := Length(Instruction.Mnemonic) - SpaceIndex
+          else
+          begin
+            SetLength(Instruction.Mnemonic, SpaceIndex);
+            Instruction.JmpToPosLength := Pos(' ', RipSimbol) - 1;
+            if Instruction.JmpToPosLength <= 0 then
+              Instruction.JmpToPosLength := Length(RipSimbol);
+            Instruction.Mnemonic := Instruction.Mnemonic +
+              Copy(RipSimbol, 1, Instruction.JmpToPosLength);
+          end;
           Instruction.Hint := '';
         end
         else

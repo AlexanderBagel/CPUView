@@ -1472,7 +1472,7 @@ var
 begin
   if ATokenParam.Column <> ctDescription then Exit;
   if RowStyle(ATokenParam.RowIndex) <> rsAsm then Exit;
-  if ACanvas.Font.Style <> Font.Style then Exit;
+  if ACanvas.Font.Style <> [] then Exit;
   case FTokenizer.GetToken(AToken, ATokenLen) of
     ttNumber: ACanvas.Font.Color := ColorMap.NumberColor;
     ttInstruction: ACanvas.Font.Color := ColorMap.InstructionColor;
