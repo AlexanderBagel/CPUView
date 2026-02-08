@@ -566,7 +566,7 @@ begin
             LocalSymbol.Name := Symbol.Name;
             LocalSymbol.AddrVA := Symbol.Address.Address;
           finally
-            Symbol.Free;
+            Symbol.ReleaseReference;
           end;
           LocalLib.Symbols.Add(LocalSymbol);
         end;
