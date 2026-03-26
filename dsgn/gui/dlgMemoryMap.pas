@@ -9,6 +9,7 @@ uses
   ComCtrls, StdCtrls, ExtCtrls, Menus, Clipbrd, laz.VirtualTrees,
   Generics.Collections,
 
+  FWHexView.Common,
   CpuView.Common,
   CpuView.Core,
   CpuView.Design.DpiFix,
@@ -91,6 +92,7 @@ type
     FPid: Cardinal;
     FIs64Process: Boolean;
     FDelayedHighlight: Int64;
+    FSelectColor: TColor;
     function CheckAddressCallback(ANewAddrVA: Int64): Boolean;
     procedure HighLightAddr(AAddrVA: Int64);
     function PageTypeToStr(Value: TPageType): string;
@@ -518,12 +520,28 @@ begin
   if Node = nil then Exit;
   pData := lvMemoryMap.GetNodeData(Node);
   if FPages[pData^.RootIndex].Grayed then
-    ItemColor := $EEEEEE;
+    ItemColor := FSelectColor;
 end;
 
 procedure TfrmMemoryMap.Init(ACore: TCpuViewCore; AGui: IGuiImplementation;
   APid: Cardinal; AIs64Process: Boolean; AAddrVA: Int64);
+var
+  R, G, B: Byte;
 begin
+  GetRGBValues(ColorToRGB(clWindow), R, G, B);
+  if IsColorRefDark(ColorToRGB(clWindow)) then
+  begin
+    Inc(R, 16);
+    Inc(G, 16);
+    Inc(B, 16);
+  end
+  else
+  begin
+    Dec(R, 16);
+    Dec(G, 16);
+    Dec(B, 16);
+  end;
+  FSelectColor := RGB(R, G, B);
   FCore := ACore;
   FGui := AGui;
   FPid := APid;
