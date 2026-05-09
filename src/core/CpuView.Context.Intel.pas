@@ -5,13 +5,18 @@
 //  * Unit Name : CpuView.Context.Intel.pas
 //  * Purpose   : Intel x86_64 processor context implementation.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2026.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
 //  ****************************************************************************
 //  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
 //  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//  *
+//  * SPDX-License-Identifier: MIT
+//  * See LICENSE file in the project root for full license information.
+//  *
 //  ****************************************************************************
 //
 

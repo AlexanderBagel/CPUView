@@ -5,13 +5,18 @@
 //  * Unit Name : CpuView.Design.DbgLog.pas
 //  * Purpose   : Debug log implementation.
 //  * Author    : Alexander (Rouse_) Bagel
-//  * Copyright : © Fangorn Wizards Lab 1998 - 2025.
+//  * Copyright : © Fangorn Wizards Lab 1998 - 2026.
 //  * Version   : 1.0
 //  * Home Page : http://rouse.drkb.ru
 //  * Home Blog : http://alexander-bagel.blogspot.ru
 //  ****************************************************************************
 //  * Latest Release : https://github.com/AlexanderBagel/CPUView/releases
 //  * Latest Source  : https://github.com/AlexanderBagel/CPUView
+//  ****************************************************************************
+//  *
+//  * SPDX-License-Identifier: MIT
+//  * See LICENSE file in the project root for full license information.
+//  *
 //  ****************************************************************************
 //
 
@@ -29,7 +34,7 @@ uses
   Linux, unixtype,
   {$ENDIF}
   SysUtils, Generics.Collections,
-  LazLoggerBase, LazLogger, LazIDEIntf,
+  LazLoggerBase, LazLogger, LazIDEIntf, LazConf,
 
   CpuView.Design.Common;
 
@@ -125,16 +130,17 @@ end;
 
 constructor TCpuViewDebugLog.Create;
 const
-  DefLogName: string = 'debug.log';
+  DefLogName: string = 'debug(%s).log';
 var
-  LoggerFolder, BackupPath: string;
+  LoggerFolder, BackupPath, LogFileName: string;
 begin
+  LogFileName := Format(DefLogName, [LazarusRevisionStr]);
   LoggerFolder := DebugFolder;
   ForceDirectories(LoggerFolder);
-  FLoggerPath := LoggerFolder + DefLogName;
+  FLoggerPath := LoggerFolder + LogFileName;
   if FileExists(FLoggerPath) then
   begin
-    BackupPath := LoggerFolder + 'backup' + PathDelim + DefLogName;
+    BackupPath := LoggerFolder + 'backup' + PathDelim + LogFileName;
     ForceDirectories(ExtractFilePath(BackupPath));
     if FileExists(BackupPath) then
       DeleteFile(BackupPath);
