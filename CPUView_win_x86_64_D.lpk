@@ -20,7 +20,7 @@
       </Other>
     </CompilerOptions>
     <Description Value="Advanced CPU-View for Lazarus"/>
-    <License Value="GPL v3"/>
+    <License Value="MIT"/>
     <Version Major="1"/>
     <Files>
       <Item>
@@ -50,7 +50,7 @@
       <Item>
         <Filename Value="src\core\CpuView.CommonDebug.pas"/>
         <UnitName Value="CpuView.CommonDebug"/>
-      </Item> 	  
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Context.Intel.pas"/>
         <UnitName Value="CpuView.Context.Intel"/>
@@ -58,11 +58,11 @@
       <Item>
         <Filename Value="src\core\CpuView.Context.Intel.Types.pas"/>
         <UnitName Value="CpuView.Context.Intel.Types"/>
-      </Item>  	
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Context.Params.pas"/>
         <UnitName Value="CpuView.Context.Params"/>
-      </Item>         
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Core.pas"/>
         <UnitName Value="CpuView.Core"/>
@@ -90,7 +90,7 @@
       <Item>
         <Filename Value="src\core\CpuView.GdbDebug.Intel.pas"/>
         <UnitName Value="CpuView.GdbDebug.Intel"/>
-      </Item>		  
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.ScriptExecutor.pas"/>
         <UnitName Value="CpuView.ScriptExecutor"/>
@@ -98,11 +98,11 @@
       <Item>
         <Filename Value="src\core\CpuView.ScriptExecutor.Intel.pas"/>
         <UnitName Value="CpuView.ScriptExecutor.Intel"/>
-      </Item> 
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Settings.pas"/>
         <UnitName Value="CpuView.Settings"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Stream.pas"/>
         <UnitName Value="CpuView.Stream"/>
@@ -110,15 +110,15 @@
       <Item>
         <Filename Value="src\core\CpuView.TraceLog.pas"/>
         <UnitName Value="CpuView.TraceLog"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Windows.pas"/>
         <UnitName Value="CpuView.Windows"/>
-      </Item>	 
+      </Item>
       <Item>
         <Filename Value="src\core\CpuView.Windows.MMap.pas"/>
         <UnitName Value="CpuView.Windows.MMap"/>
-      </Item>	  
+      </Item>
       <Item>
         <Filename Value="dsgn\CpuView.Reg.pas"/>
         <HasRegisterProc Value="True"/>
