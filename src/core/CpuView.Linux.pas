@@ -38,7 +38,6 @@ uses
   Generics.Collections,
   Generics.Defaults,
 
-  FpDbgLinuxClasses,
   FpDbgLinuxExtra,
   FpDebugDebuggerWorkThreads,
   FpDebugDebuggerUtils,
@@ -150,7 +149,44 @@ type
     end;
 
   puser_fpxregs_struct32 = ^user_fpxregs_struct32;
+  user_fpxregs_struct32 = record
+    cwd : word;
+    swd : word;
+    twd : word;
+    fop : word;
+    fip : longint;
+    fcs : longint;
+    foo : longint;
+    fos : longint;
+    mxcsr : longint;
+    reserved : longint;
+    st_space : array[0..31] of longint;
+    xmm_space : array[0..31] of longint;
+    padding : array[0..55] of longint;
+  end;
+
   puser_fpregs_struct64 = ^user_fpregs_struct64;
+  user_fpregs_struct64 = record
+    cwd : word;
+    swd : word;
+    ftw : word;
+    fop : word;
+    rip : qword;
+    rdp : qword;
+    mxcsr : dword;
+    mxcr_mask : dword;
+    st_space : array[0..31] of dword;
+    xmm_space : array[0..63] of dword;
+    padding : array[0..23] of dword;
+  end;
+
+  TUserRegs32 = array[0..26] of cuint32;
+  TUserRegs64 = array[0..26] of cuint64;
+  TUserRegs = record
+    case integer of
+      0: (regs32: TUserRegs32);
+      1: (regs64: TUserRegs64);
+  end;
 
   // https://github.com/STMicroelectronics/gnu-tools-for-stm32/blob/12.3.rel1/src/gdb/gdbsupport/x86-xstate.h
   PXSaveHeader = ^_XSaveHeader;
@@ -161,6 +197,60 @@ type
   end;
 
 const
+  R15      = 0;
+  R14      = 1;
+  R13      = 2;
+  R12      = 3;
+  RBP      = 4;
+  RBX      = 5;
+  R11      = 6;
+  R10      = 7;
+  R9       = 8;
+  R8       = 9;
+  RAX      = 10;
+  RCX      = 11;
+  RDX      = 12;
+  RSI      = 13;
+  RDI      = 14;
+  ORIG_RAX = 15;
+  RIP      = 16;
+  CS       = 17;
+  EFLAGS   = 18;
+  RSP      = 19;
+  SS       = 20;
+  FS_BASE  = 21;
+  GS_BASE  = 22;
+  DS       = 23;
+  ES       = 24;
+  FS       = 25;
+  GS       = 26;
+
+  EBX      = 0;
+  ECX      = 1;
+  EDX      = 2;
+  ESI      = 3;
+  EDI      = 4;
+  EBP      = 5;
+  EAX      = 6;
+  XDS      = 7;
+  XES      = 8;
+  XFS      = 9;
+  XGS      = 10;
+  ORIG_EAX = 11;
+  EIP      = 12;
+  XCS      = 13;
+  EFL      = 14;
+  UESP     = 15;
+  XSS      = 16;
+  __WALL   = $40000000;
+
+  NT_PRSTATUS    = 1;
+  NT_PRFPREG     = 2;
+  NT_PRPSINFO    = 3;
+  NT_TASKSTRUCT  = 4;
+  NT_AUXV        = 6;
+  NT_X86_XSTATE  = $202;
+
   X86_XSTATE_X87 = 1;
   X86_XSTATE_SSE = 2;
   X86_XSTATE_AVX = 4;
