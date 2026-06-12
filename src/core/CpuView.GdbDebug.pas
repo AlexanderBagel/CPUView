@@ -530,11 +530,19 @@ begin
     AResult := Default(TGDBMIExecResult);
     SetLength(Buff{%H-}, $8000);
     ResultBuff := '';
+    ATimeOut := 500;
     while True do
     begin
+      if FProcess.Output.NumBytesAvailable = 0 then
+      begin
+        Dec(ATimeOut, 10);
+        if ATimeOut = 0 then Break;
+        Sleep(10);
+        Continue;
+      end;
       ReadCount := FProcess.Output.Read(Buff[1], Length(Buff));
       ResultBuff := ResultBuff + Copy(Buff, 1, ReadCount);
-      if ReadCount < Length(Buff) then Break;
+      if TrimRight(ResultBuff).EndsWith('(gdb)') then Break;
     end;
     Result := ResultBuff.StartsWith('^done');
     if Result then
