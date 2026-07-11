@@ -1209,6 +1209,7 @@ procedure TfrmCpuView.LockZOrder;
 begin
   InterceptorOwner := Handle;
   InterceptorActive := True;
+  tmpZOrderLock.Tag := 3;
   tmpZOrderLock.Enabled := True;
 end;
 
@@ -1221,7 +1222,8 @@ end;
 
 procedure TfrmCpuView.UnlockZOrder;
 begin
-  if not Core.Debugger.IsDebuggerLocked then
+  tmpZOrderLock.Tag := tmpZOrderLock.Tag - 1;
+  if (tmpZOrderLock.Tag <= 0) or not Core.Debugger.IsDebuggerLocked then
   begin
     tmpZOrderLock.Enabled := False;
     InterceptorActive := False;
@@ -1343,6 +1345,7 @@ end;
 
 procedure TfrmCpuView.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
+  InterceptorActive := False;
   frmCpuView := nil;
   CloseAction := caFree;
 end;
