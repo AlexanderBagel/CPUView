@@ -1,0 +1,178 @@
+inherited CpuViewPdbFrame: TCpuViewPdbFrame
+  Height = 553
+  Width = 736
+  ClientHeight = 553
+  ClientWidth = 736
+  Constraints.MinWidth = 600
+  DesignLeft = 925
+  DesignTop = 395
+  object gbPdb: TGroupBox[0]
+    Left = 8
+    Height = 200
+    Top = 0
+    Width = 706
+    Anchors = [akTop, akLeft, akRight]
+    Caption = 'Program Database (PDB):'
+    ClientHeight = 170
+    ClientWidth = 702
+    TabOrder = 0
+    object cbUsePdb: TCheckBox
+      Left = 10
+      Height = 29
+      Top = 10
+      Width = 310
+      Caption = 'Use debug PDB symbols (if present)'
+      TabOrder = 0
+    end
+    object lblSymSrv: TLabel
+      Left = 10
+      Height = 25
+      Top = 42
+      Width = 157
+      Caption = 'SymSrv parameters:'
+    end
+    object memSymSrv: TMemo
+      Left = 10
+      Height = 87
+      Top = 72
+      Width = 681
+      Anchors = [akTop, akLeft, akRight]
+      Lines.Strings = (
+        'memSymSrv'
+      )
+      ScrollBars = ssAutoVertical
+      TabOrder = 1
+    end
+  end
+  object btnReset: TButton[1]
+    Left = 550
+    Height = 38
+    Top = 500
+    Width = 164
+    Anchors = [akRight, akBottom]
+    Caption = 'Reset to Default'
+    TabOrder = 1
+    OnClick = btnResetClick
+  end
+  object gbProxy: TGroupBox[2]
+    Left = 8
+    Height = 274
+    Top = 216
+    Width = 706
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    Caption = 'Proxy Settings for Download:'
+    ClientHeight = 244
+    ClientWidth = 702
+    TabOrder = 2
+    object cbProxy: TComboBox
+      Left = 10
+      Height = 33
+      Top = 10
+      Width = 526
+      Anchors = [akTop, akLeft, akRight]
+      ItemHeight = 25
+      ItemIndex = 0
+      Items.Strings = (
+        'No proxy server'
+        'Use system proxy settings'
+        'Use manual configuration'
+      )
+      Style = csDropDownList
+      TabOrder = 0
+      Text = 'No proxy server'
+      OnChange = cbProxyChange
+    end
+    object edProxyAddr: TLabeledEdit
+      Left = 10
+      Height = 33
+      Top = 72
+      Width = 526
+      Anchors = [akTop, akLeft, akRight]
+      EditLabel.Height = 25
+      EditLabel.Width = 526
+      EditLabel.Caption = 'Proxy server address or IP:'
+      TabOrder = 1
+    end
+    object edProxyPort: TLabeledEdit
+      Left = 552
+      Height = 33
+      Top = 72
+      Width = 139
+      Anchors = [akTop, akRight]
+      EditLabel.Height = 25
+      EditLabel.Width = 139
+      EditLabel.Caption = 'Port:'
+      NumbersOnly = True
+      TabOrder = 2
+      Text = '0'
+    end
+    object lblProxyAythType: TLabel
+      Left = 10
+      Height = 25
+      Top = 114
+      Width = 169
+      Caption = 'Authentification type:'
+    end
+    object cbProxyAuth: TComboBox
+      Left = 10
+      Height = 33
+      Top = 144
+      Width = 246
+      ItemHeight = 25
+      ItemIndex = 0
+      Items.Strings = (
+        'No authentication'
+        'Auto'
+        'Basic'
+        'Negotiate'
+        'NTLM'
+      )
+      Style = csDropDownList
+      TabOrder = 3
+      Text = 'No authentication'
+      OnChange = cbProxyChange
+    end
+    object edProxyUser: TLabeledEdit
+      Left = 272
+      Height = 33
+      Top = 144
+      Width = 200
+      Anchors = [akTop, akLeft, akRight]
+      EditLabel.Height = 25
+      EditLabel.Width = 200
+      EditLabel.Caption = 'User Name:'
+      TabOrder = 4
+    end
+    object edProxyPassword: TLabeledEdit
+      Left = 488
+      Height = 33
+      Top = 144
+      Width = 203
+      Anchors = [akTop, akRight]
+      EchoMode = emPassword
+      EditLabel.Height = 25
+      EditLabel.Width = 203
+      EditLabel.Caption = 'Password:'
+      PasswordChar = '*'
+      TabOrder = 5
+    end
+    object btnTestProxy: TButton
+      Left = 517
+      Height = 38
+      Top = 192
+      Width = 174
+      Anchors = [akTop, akRight]
+      Caption = 'Test Connection'
+      TabOrder = 6
+      OnClick = btnTestProxyClick
+    end
+    object cbDebugPDB: TCheckBox
+      Left = 16
+      Height = 29
+      Top = 194
+      Width = 217
+      Caption = '(DEBUG) Add PDB prefix'
+      TabOrder = 7
+    end
+  end
+end

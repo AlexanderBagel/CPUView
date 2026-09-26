@@ -4,36 +4,145 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   inherited pnDebug: TPanel
+    Height = 79
+    Top = 1225
+    Width = 2096
+    ClientHeight = 79
+    ClientWidth = 2096
     inherited edCommands: TEdit
+      Left = 5
+      Height = 33
+      Top = 5
+      Width = 2086
       TabOrder = 1
       OnKeyPress = edCommandsKeyPress
     end
+    inherited StatusBar: TStatusBar
+      Height = 36
+      Top = 42
+      Width = 2094
+    end
   end
   inherited pnAsmReg: TPanel
+    Height = 686
+    Top = 39
+    Width = 2096
+    ClientHeight = 686
+    ClientWidth = 2096
     inherited AsmView: TAsmView
+      Height = 684
+      Width = 1771
       OnSelectionChange = AsmViewSelectionChange
     end
     inherited RegView: TRegView
+      Left = 1780
+      Height = 684
       PopupMenu = pmIntelReg
+    end
+    inherited splitAsmReg: TSplitter
+      Left = 1772
+      Height = 684
     end
   end
   inherited ToolBar: TToolBar
+    Width = 2096
+    inherited tbStepIn: TToolButton
+      Left = 1
+      Top = 2
+    end
+    inherited tbStepOut: TToolButton
+      Top = 2
+    end
     inherited tbSep1: TToolButton
       Left = 71
+      Height = 33
+      Top = 2
     end
     inherited tbBreakPoint: TToolButton
       Left = 79
+      Top = 2
+    end
+    inherited tbSep2: TToolButton
+      Left = 149
+      Height = 33
+      Top = 2
     end
     inherited tbRunTillRet: TToolButton
       Left = 114
+      Top = 2
+    end
+    inherited tbRunTo: TToolButton
+      Left = 157
+      Top = 2
+    end
+    inherited tbRunToUserCode: TToolButton
+      Left = 192
+      Top = 2
+    end
+    inherited tbSep3: TToolButton
+      Left = 227
+      Height = 33
+      Top = 2
+    end
+    inherited tbTraceLog: TToolButton
+      Left = 235
+      Top = 2
+    end
+    inherited tbExports: TToolButton
+      Left = 270
+      Top = 2
+    end
+    inherited tbMemoosyMap: TToolButton
+      Left = 305
+      Top = 2
+    end
+    inherited tbPdbManager: TToolButton
+      Left = 340
+      Top = 2
+      Action = acUtilsPdb
     end
   end
   inherited pnDumps: TPanel
+    Top = 733
+    Width = 2096
+    ClientWidth = 2096
     inherited memHints: TMemo
+      Width = 2094
       Lines.Strings = (
         'Hint text display here'
       )
     end
+    inherited pnDumpStack: TPanel
+      Height = 427
+      Top = 64
+      Width = 2094
+      ClientHeight = 427
+      ClientWidth = 2094
+      inherited pcDumps: TPageControl
+        Height = 425
+        Width = 1140
+        inherited tabDump0: TTabSheet
+          ClientHeight = 387
+          ClientWidth = 1132
+          inherited DumpView: TDumpView
+            Height = 387
+            Width = 1132
+          end
+        end
+      end
+      inherited StackView: TStackView
+        Left = 1149
+        Height = 425
+      end
+      inherited splitDumpStack: TSplitter
+        Left = 1141
+        Height = 425
+      end
+    end
+  end
+  inherited splitAsmDumps: TSplitter
+    Top = 725
+    Width = 2096
   end
   inherited pmRegSelected: TPopupMenu
     Left = 1544
@@ -203,6 +312,14 @@ inherited frmCpuViewImpl: TfrmCpuViewImpl
     inherited acUtilsMM: TAction[85]
     end
     inherited acShowInMemoryMap: TAction[86]
+    end
+    object acUtilsPdb: TAction[87]
+      Category = 'Utils'
+      Caption = 'PDB Manager'
+      Hint = 'Open PDB Manager...'
+      Visible = False
+      OnExecute = acUtilsPdbExecute
+      OnUpdate = acUtilsPdbUpdate
     end
   end
   inherited pmDump: TPopupMenu

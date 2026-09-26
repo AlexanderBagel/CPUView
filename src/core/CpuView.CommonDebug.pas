@@ -85,10 +85,13 @@ uses
   CpuView.DebugerGate,
   CpuView.Design.DbgLog;
 
-{$message 'Disable when stable = 4.0'}
-{$if laz_major >= 4}
+{$message 'Disable when stable = 5.0'}
+{$if (laz_major >= 5) or ((laz_major = 4) and (laz_minor > 9))}
   {$define ExtendedFpDebug}
 {$endif}
+
+const
+  DefQueryExternal = {$IFDEF MSWINDOWS} True; {$ELSE} False; {$ENDIF}
 
 type
 
@@ -175,6 +178,11 @@ type
   TUpdateWaitingState = (uwsBreakpoint, uwsCheckUserCode);
   TUpdateWaitingStates = set of TUpdateWaitingState;
 
+  TFpSymbolWithExternal = record
+    FpSymbol: TFpSymbol;
+    External: string;
+  end;
+
   { TCommonDebugGate }
 
   TCommonDebugGate = class(TAbstractDebugger)
@@ -190,7 +198,7 @@ type
     FInPauseStateProcessing: Boolean;
     FPreviosSrcLine: Integer;
     FPreviosSrcFuncName, FPreviosSrcFileName: string;
-    FRegisterInDebugBoss, FRegisterDestroyNotification: Boolean;
+    FRegisterInDebugBoss, FRegisterDestroyNotification, FQueryExternal: Boolean;
     FReturnAddrVA: Int64;
     FSnapshotManager:  TSnapshotManager;
     FSupportStream: TRemoteStream;
@@ -211,6 +219,7 @@ type
     procedure DoCurrentThreadChange; virtual;
     procedure DoPauseProcessing(AStart: Boolean); virtual;
     function GetSymbolAtAddr(AddrVA: Int64): TFpSymbol; virtual;
+    function GetSymbolAtAddrEx(AddrVA: Int64): TFpSymbolWithExternal;
     function GetLineAddresses(const AFileName: string;
       ALine: Cardinal; var AResultList: TDBGPtrArray): Boolean; virtual;
     function IsMainThreadId: Boolean; virtual;
@@ -489,7 +498,6 @@ end;
 
 procedure TDebugSymbolsStorage.AddDbgInfo(const APath: string;
   AImageBase: TDbgPtr; ADbgInfo: TFpSymbolInfo);
-{$ifdef ExtendedFpDebug}
 var
   Symbol: TFpSymbol;
   LocalLib: TLocalLibrary;
@@ -517,13 +525,10 @@ begin
     AddLocalLib(APath, LocalLib);
   end;
 end;
-{$else}
-begin
-end;
-{$endif}
 
 procedure TDebugSymbolsStorage.AddDbgInfo(const APath: string;
   AImageBase: TDbgPtr; AImageSize: Integer);
+{$ifdef ExtendedFpDebug}
 var
   Dwarf: TDwarfData;
   Loader: TDbgImageLoader;
@@ -590,6 +595,10 @@ begin
     Loader.Free;
   end;
 end;
+{$else}
+begin
+end;
+{$endif}
 
 procedure TDebugSymbolsStorage.Clear;
 begin
@@ -950,11 +959,36 @@ begin
 end;
 
 function TCommonDebugGate.GetSymbolAtAddr(AddrVA: Int64): TFpSymbol;
+var
+  QuerySymbol: TQuerySymbolValue;
 begin
   if UseDebugInfo then
-    Result := DebugStorage.FindProcSymbol(AddrVA)
+  begin
+    if FQueryExternal and DoQueryExternalDebugInfo(AddrVA, qsName, QuerySymbol) then
+    begin
+      Result := TFpSymbolTableProc.Create(QuerySymbol.Description, QuerySymbol.AddrVA);
+      Exit;
+    end;
+    Result := DebugStorage.FindProcSymbol(AddrVA);
+  end
   else
     Result := nil;
+end;
+
+function TCommonDebugGate.GetSymbolAtAddrEx(AddrVA: Int64): TFpSymbolWithExternal;
+var
+  QuerySymbol: TQuerySymbolValue;
+begin
+  FQueryExternal := False;
+  try
+    Result.FpSymbol := GetSymbolAtAddr(AddrVA);
+    if DoQueryExternalDebugInfo(AddrVA, qsName, QuerySymbol) then
+      Result.External := QuerySymbol.Description
+    else
+      Result.External := '';
+  finally
+    FQueryExternal := DefQueryExternal;
+  end;
 end;
 
 function TCommonDebugGate.GetLineAddresses(const AFileName: string;
@@ -1390,6 +1424,7 @@ constructor TCommonDebugGate.Create(AOwner: TComponent;
   AUtils: TCommonAbstractUtils);
 begin
   inherited Create(AOwner, AUtils);
+  FQueryExternal := DefQueryExternal;
   FTemporaryIP := TDictionary<Integer, Int64>.Create;
   FSupportStream := TRemoteStream.Create(Utils);
   FSupportStream.OnUpdated := UpdateRemoteStream;

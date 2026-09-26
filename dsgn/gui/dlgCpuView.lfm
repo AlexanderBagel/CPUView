@@ -200,6 +200,13 @@ object frmCpuView: TfrmCpuView
       ParentShowHint = False
       ShowHint = True
     end
+    object tbPdbManager: TToolButton
+      Tag = 4
+      Left = 232
+      Top = 2    
+      ParentShowHint = False
+      ShowHint = True
+    end	
   end
   object pnDumps: TPanel
     Left = 0

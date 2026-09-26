@@ -1,0 +1,117 @@
+object frmPdbManager: TfrmPdbManager
+  Left = 618
+  Height = 977
+  Top = 126
+  Width = 1831
+  Caption = 'frmPdbManager'
+  ClientHeight = 977
+  ClientWidth = 1831
+  DesignTimePPI = 144
+  Position = poOwnerFormCenter
+  LCLVersion = '4.8.0.0'
+  OnCloseQuery = FormCloseQuery
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  object vstPdbData: TLazVirtualStringTree
+    Left = 0
+    Height = 941
+    Top = 0
+    Width = 1831
+    Align = alClient
+    DefaultText = 'Node'
+    Header.AutoSizeIndex = 0
+    Header.Columns = <    
+      item
+        Position = 0
+        Text = 'Binary'
+        Width = 967
+      end    
+      item
+        Position = 1
+        Text = 'Debug'
+        Width = 300
+      end    
+      item
+        Position = 2
+        Text = 'State'
+        Width = 200
+      end    
+      item
+        Position = 3
+        Text = 'Size'
+        Width = 210
+      end    
+      item
+        Position = 4
+        Text = 'SymCount'
+        Width = 150
+      end>
+    Header.Options = [hoAutoResize, hoColumnResize, hoShowSortGlyphs, hoVisible, hoHeaderClickAutoSort]
+    HintMode = hmTooltip
+    ParentShowHint = False
+    PopupMenu = pmPdb
+    ShowHint = True
+    TabOrder = 0
+    TreeOptions.PaintOptions = [toHideFocusRect, toShowButtons, toShowDropmark, toShowRoot, toShowVertGridLines, toThemeAware, toUseBlendedImages, toUseBlendedSelection, toUseExplorerTheme]
+    TreeOptions.SelectionOptions = [toFullRowSelect, toMultiSelect]
+    OnAddToSelection = vstPdbDataAddToSelection
+    OnAfterCellPaint = vstPdbDataAfterCellPaint
+    OnBeforeCellPaint = vstPdbDataBeforeCellPaint
+    OnGetText = vstPdbDataGetText
+    OnGetHint = vstPdbDataGetHint
+    OnHeaderClick = vstPdbDataHeaderClick
+  end
+  object StatusBar: TStatusBar
+    Left = 0
+    Height = 36
+    Top = 941
+    Width = 1831
+    Panels = <    
+      item
+        Width = 300
+      end    
+      item
+        Width = 300
+      end    
+      item
+        Width = 50
+      end>
+    SimplePanel = False
+  end
+  object pmPdb: TPopupMenu
+    OnPopup = pmPdbPopup
+    Left = 712
+    Top = 216
+    object mnuDownloadSel: TMenuItem
+      Caption = 'Download Selected'
+      OnClick = mnuDownloadSelClick
+    end
+    object mnuDownloadAll: TMenuItem
+      Caption = 'Download All Available'
+      OnClick = mnuDownloadAllClick
+    end
+    object mnuPause: TMenuItem
+      Caption = 'Pause'
+      OnClick = mnuPauseClick
+    end
+    object mnuResume: TMenuItem
+      Caption = 'Resume'
+      OnClick = mnuResumeClick
+    end
+    object mnuStop: TMenuItem
+      Caption = 'Stop'
+      OnClick = mnuStopClick
+    end
+    object Separator1: TMenuItem
+      Caption = '-'
+    end
+    object mnuOpenPDB: TMenuItem
+      Caption = 'Open PDB In Explorer...'
+      OnClick = mnuOpenPDBClick
+    end
+    object mnuOpenBinary: TMenuItem
+      Caption = 'Open Binary in Explorer...'
+      OnClick = mnuOpenBinaryClick
+    end
+  end
+end

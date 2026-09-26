@@ -340,6 +340,7 @@ type
     tbTraceLog: TToolButton;
     tbExports: TToolButton;
     tbMemoosyMap: TToolButton;
+    tbPdbManager: TToolButton;
     procedure acAsmReturnToIPExecute(Sender: TObject);
     procedure acAsmReturnToIPUpdate(Sender: TObject);
     procedure acAsmSetNewIPExecute(Sender: TObject);
@@ -454,8 +455,6 @@ type
     function CheckAddressCallback(ANewAddrVA: Int64): Boolean;
     function CheckRegCallback({%H-}ANewAddrVA: Int64): Boolean;
     procedure InternalShowInDump(AddrVA: Int64);
-    procedure OnCoreStateChange(Sender: TObject);
-    procedure OnState(ADebugger: TDebuggerIntf; {%H-}AOldState: TDBGState);
   protected
     { IGuiImplementation }
     procedure OpenInDisassembler(AAddrVA: Int64);
@@ -475,13 +474,15 @@ type
     function MeasureCanvas: TBitmap;
     procedure UnlockZOrder;
     function UpdateContextRegData: Boolean;
-    procedure UpdateDebugGateSettings;
+    procedure UpdateDebugGateSettings; virtual;
     procedure UpdateDebugger(ADebugger: TDebuggerIntf);
     procedure UpdateStatusBar;
     procedure UpdateTraceLog;
     property SBPanelText: string read FSBPanelText write FSBPanelText;
     property SBPanelValue: string read FSBPanelValue write FSBPanelValue;
   protected
+    procedure OnCoreStateChange(Sender: TObject); virtual;
+    procedure OnState(ADebugger: TDebuggerIntf; {%H-}AOldState: TDBGState); virtual;
     procedure OnHintMenuClick(Sender: TObject);
     procedure OnReset(Sender: TObject);
   public
@@ -508,7 +509,7 @@ procedure TToolButton.GetCurrentIcon(var ImageList: TCustomImageList;
 begin
   inherited GetCurrentIcon(ImageList, TheIndex, TheEffect);
   case Tag of
-    1, 2, 3:
+    1, 2, 3, 4:
     begin;
       ImageList := frmCpuView.ilToolBarChars;
       TheIndex := Tag - 1;
@@ -1166,6 +1167,7 @@ begin
   AddCharToIL('T'); // TraceLog
   AddCharToIL('E'); // Exports
   AddCharToIL('M'); // MemoryMap
+  AddCharToIL('P'); // PDB
 end;
 
 procedure TfrmCpuView.InitStatusBarValues(APanelIndex: Integer);

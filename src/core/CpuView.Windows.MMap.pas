@@ -882,7 +882,7 @@ begin
     DirAddr := ImageDirectoryEntryToData(ImageInfo.MappedAddress, True, I, dwDirSize);
     if DirAddr <> nil then
     begin
-      AAddrVA := NativeInt(DirAddr) - NativeInt(ImageInfo.MappedAddress);
+      AAddrVA := {%H-}NativeInt(DirAddr) - {%H-}NativeInt(ImageInfo.MappedAddress);
       if (AAddrVA >= SectionAddr) and (AAddrVA < SectionAddr + SectionSize) then
       begin
         if Result = '' then

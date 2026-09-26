@@ -54,6 +54,9 @@ uses
   CpuView.Viewers,
   CpuView.CPUContext,
   CpuView.XML,
+  {$IFDEF MSWINDOWS}
+  CpuView.Windows.Pdb,
+  {$ENDIF}
   CpuView.ExtendedHint;
 
   {$I CpuViewCfg.inc}
@@ -76,6 +79,7 @@ const
   xmlColor = 'colors';
   xmlAsmView = 'asmview';
   xmlDumpView = 'dumpview';
+  xmlPdb = 'pdb';
   xmlRegView = 'regview';
   xmlStackView = 'stackview';
   xmlShortCuts = 'shortcuts';
@@ -186,6 +190,16 @@ const
   xmlDisplayStrings = 'useStr';
   xmlMinimumStringLength = 'minStrLen';
 
+  xmlUsePdb = 'usePdb';
+  xmlUsePdbPfx = 'usePdbPfx';
+  xmlSymConfig = 'symConfig';
+  xmlProxyKind = 'proxyKind';
+  xmlProxyAuthKind = 'proxyAuthKind';
+  xmlProxyHost = 'proxyHost';
+  xmlProxyPort = 'proxyPort';
+  xmlProxyLogin = 'proxyLogin';
+  xmlProxyPassword = 'proxyPassword';
+
   // not used
   xmlContext = 'ctx';
   xmlContextName = 'name';
@@ -248,7 +262,11 @@ type
 
   TShortCutMode = (scmDefault, scmMSVC, scmCustom);
 
-  TSettingPart = (spAll, spSession, spColors, spShortCuts);
+  TSettingPart = (spAll, spSession, spColors, spShortCuts, spPdb);
+
+  {$IFNDEF MSWINDOWS}
+  TProxySettings = record end;
+  {$ENDIF}
 
   { TCpuViewSettins }
 
@@ -272,12 +290,17 @@ type
     FShotCutMode: TShortCutMode;
     FShortCuts: array [TShortCutType] of TCpuViewShortCut;
     FStackSettings: TStackSettings;
+    FSymConfig: string;
+    FSymSrvProxy: TProxySettings;
     FRegSettings: TContextAbstractSettings;
+    FUseAddrValidation: Boolean;
+    FUseCrashDump: Boolean;
     FUseDebugInfo: Boolean;
     FUseDebugLog: Boolean;
-    FUseCrashDump: Boolean;
-    FUseAddrValidation: Boolean;
+    FUsePdb: Boolean;
+    FUsePdbPfx: Boolean;
     function GetColor(const Index: string): TColor;
+    function GetDefSymConfig: string;
     function GetDumpValidation(Index: TAddrValidationType): Boolean;
     function GetHintInRegForFlag: Boolean;
     function GetHintInRegForReg: Boolean;
@@ -306,6 +329,7 @@ type
     procedure LoadFromXML_Colors(Root: IXMLNode);
     procedure LoadFromXML_DumpSettings(Root: IXMLNode);
     procedure LoadFromXML_Full(Root: IXMLNode);
+    procedure LoadFromXML_Pdb(Root: IXMLNode);
     procedure LoadFromXML_RegSettings(Root: IXMLNode);
     procedure LoadFromXML_ShortCuts(Root: IXMLNode);
     procedure LoadFromXML_StackSettings(Root: IXMLNode);
@@ -323,6 +347,7 @@ type
     procedure SaveToXML_Colors(Root: IXMLNode);
     procedure SaveToXML_DumpSettings(Root: IXMLNode);
     procedure SaveToXML_Full(Root: IXMLNode);
+    procedure SaveToXML_Pdb(Root: IXMLNode);
     procedure SaveToXML_RegSettings(Root: IXMLNode);
     procedure SaveToXML_ShortCuts(Root: IXMLNode);
     procedure SaveToXML_StackSettings(Root: IXMLNode);
@@ -331,6 +356,7 @@ type
     procedure InitDefaultColors;
     procedure InitDefaultSession;
     procedure InitDefaultShortCuts;
+    procedure InitDefaultPdb;
     function GetRegisterContextName: string; virtual; abstract;
     procedure LoadRegisterContext(Root: IXMLNode); virtual; abstract;
     procedure SaveRegisterContext(Root: IXMLNode); virtual; abstract;
@@ -385,10 +411,14 @@ type
     property ShowJumps: Boolean read FAsmSettings.ShowJumps write FAsmSettings.ShowJumps;
     property ShowOpcodes: Boolean read FAsmSettings.ShowOpcodes write FAsmSettings.ShowOpcodes;
     property ShowSourceLines: Boolean read FAsmSettings.ShowSourceLines write FAsmSettings.ShowSourceLines;
+    property SymConfig: string read FSymConfig write FSymConfig;
+    property SymSrvProxy: TProxySettings read FSymSrvProxy write FSymSrvProxy;
+    property UseAddrValidation: Boolean read FUseAddrValidation write FUseAddrValidation;
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property UseDebugLog: Boolean read FUseDebugLog write FUseDebugLog;
     property UseCrashDump: Boolean read FUseCrashDump write FUseCrashDump;
-    property UseAddrValidation: Boolean read FUseAddrValidation write FUseAddrValidation;
+    property UsePdb: Boolean read FUsePdb write FUsePdb;
+    property UsePdbPfx: Boolean read FUsePdbPfx write FUsePdbPfx;
     property ValidationDump[Index: TAddrValidationType]: Boolean read GetDumpValidation write SetDumpValidation;
     property ValidationReg[Index: TAddrValidationType]: Boolean read GetValidationReg write SetValidationReg;
     property ValidationStack[Index: TAddrValidationType]: Boolean read GetStackValidation write SeStackValidation;
@@ -581,6 +611,17 @@ begin
     Result := clDefault;
 end;
 
+function TCpuViewSettins.GetDefSymConfig: string;
+begin
+  {$IFDEF MSWINDOWS}
+  Result := GetEnvironmentVariable('_NT_SYMBOL_PATH');
+  if Result = '' then
+    Result := 'srv*c:\symbols*https://msdl.microsoft.com/download/symbols';
+  {$ELSE}
+  Result := '';
+  {$ENDIF}
+end;
+
 procedure TCpuViewSettins.GetSessionFromAsmView(AAsmView: TAsmView);
 var
   I: TColumnType;
@@ -731,6 +772,14 @@ end;
 procedure TCpuViewSettins.InitDefaultShortCuts;
 begin
   FShotCutMode := scmDefault;
+end;
+
+procedure TCpuViewSettins.InitDefaultPdb;
+begin
+  FUsePdb := False;
+  FUsePdbPfx := True;
+  FSymConfig := GetDefSymConfig;
+  FSymSrvProxy := Default(TProxySettings);
 end;
 
 procedure TCpuViewSettins.Load(const FilePath: string);
@@ -960,6 +1009,24 @@ begin
   Node := FindNode(Root, xmlShortCuts);
   if Node = nil then Exit;
   LoadFromXML_ShortCuts(Node);
+  Node := FindNode(Root, xmlPdb);
+  if Node = nil then Exit;
+  LoadFromXML_Pdb(Node);
+end;
+
+procedure TCpuViewSettins.LoadFromXML_Pdb(Root: IXMLNode);
+begin
+  {$IFDEF MSWINDOWS}
+  FUsePdb := GetNodeAttrBoolean(Root, xmlUsePdb);
+  FUsePdbPfx := GetNodeAttrBoolean(Root, xmlUsePdbPfx);
+  FSymConfig := GetNodeAttrString(Root, xmlSymConfig, GetDefSymConfig);
+  FSymSrvProxy.Kind := TProxyKind(GetNodeAttr(Root, xmlProxyKind));
+  FSymSrvProxy.AuthKind := TProxyAuthKind(GetNodeAttr(Root, xmlProxyAuthKind));
+  FSymSrvProxy.Host := GetNodeAttrString(Root, xmlProxyHost);
+  FSymSrvProxy.Port := GetNodeAttr(Root, xmlProxyPort);
+  FSymSrvProxy.Login := GetNodeAttrString(Root, xmlProxyLogin);
+  FSymSrvProxy.Password := GetNodeAttrString(Root, xmlProxyPassword);
+  {$ENDIF}
 end;
 
 procedure TCpuViewSettins.LoadFromXML_RegSettings(Root: IXMLNode);
@@ -1011,10 +1078,12 @@ begin
       InitDefaultSession;
       InitDefaultColors;
       InitDefaultShortCuts;
+      InitDefaultPdb;
     end;
     spSession: InitDefaultSession;
     spColors: InitDefaultColors;
     spShortCuts: InitDefaultShortCuts;
+    spPdb: InitDefaultPdb;
   end;
 end;
 
@@ -1260,6 +1329,7 @@ begin
   SaveToXML_Colors(NewChild(Root, xmlColor));
   SaveToXML_AsmSettings(NewChild(Root, xmlAsmView));
   SaveToXML_DumpSettings(NewChild(Root, xmlDumpView));
+  SaveToXML_Pdb(NewChild(Root, xmlPdb));
   SaveToXML_RegSettings(NewChild(Root, xmlRegView));
   SaveToXML_ShortCuts(NewChild(Root, xmlShortCuts));
   SaveToXML_StackSettings(NewChild(Root, xmlStackView));
@@ -1268,9 +1338,25 @@ begin
   SaveToXML_Colors(Root.AddChild(xmlColor));
   SaveToXML_AsmSettings(Root.AddChild(xmlAsmView));
   SaveToXML_DumpSettings(Root.AddChild(xmlDumpView));
+  SaveToXML_Pdb(Root.AddChild(xmlPdb));
   SaveToXML_RegSettings(Root.AddChild(xmlRegView));
   SaveToXML_ShortCuts(Root.AddChild(xmlShortCuts));
   SaveToXML_StackSettings(Root.AddChild(xmlStackView));
+  {$ENDIF}
+end;
+
+procedure TCpuViewSettins.SaveToXML_Pdb(Root: IXMLNode);
+begin
+  {$IFDEF MSWINDOWS}
+  SetNodeAttr(Root, xmlUsePdb, FUsePdb);
+  SetNodeAttr(Root, xmlUsePdbPfx, FUsePdbPfx);
+  SetNodeAttr(Root, xmlSymConfig, FSymConfig);
+  SetNodeAttr(Root, xmlProxyKind, Integer(FSymSrvProxy.Kind));
+  SetNodeAttr(Root, xmlProxyAuthKind, Integer(FSymSrvProxy.AuthKind));
+  SetNodeAttr(Root, xmlProxyHost, FSymSrvProxy.Host);
+  SetNodeAttr(Root, xmlProxyPort, FSymSrvProxy.Port);
+  SetNodeAttr(Root, xmlProxyLogin, FSymSrvProxy.Login);
+  SetNodeAttr(Root, xmlProxyPassword, FSymSrvProxy.Password);
   {$ENDIF}
 end;
 

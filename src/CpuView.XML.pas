@@ -51,7 +51,8 @@ type
 
   function FindNode(ANode: IXMLNode; const ANodeName: string): IXMLNode;
   function GetNodeAttr(Node: IXMLNode; const Attr: string): OleVariant;
-  function GetNodeAttrString(Node: IXMLNode; const Attr: string): string;
+  function GetNodeAttrString(Node: IXMLNode; const Attr: string; const Def: string = ''): string;
+  function GetNodeAttrBoolean(Node: IXMLNode; const Attr: string): Boolean;
   procedure SetNodeAttr(Node: IXMLNode; const Attr: string; Value: OleVariant);
   function GetChildNode(Node: IXMLNode; Index: Integer): IXMLNode;
   procedure XMLWriteDouble(Node: IXMLNode; const Attr: string; Value: Double);
@@ -99,13 +100,25 @@ begin
   {$ENDIF}
 end;
 
-function GetNodeAttrString(Node: IXMLNode; const Attr: string): string;
+function GetNodeAttrString(Node: IXMLNode; const Attr: string; const Def: string
+  ): string;
 var
   AttrValue: OleVariant;
 begin
   AttrValue := GetNodeAttr(Node, Attr);
   if AttrValue = null then
-    Result := ''
+    Result := Def
+  else
+    Result := AttrValue;
+end;
+
+function GetNodeAttrBoolean(Node: IXMLNode; const Attr: string): Boolean;
+var
+  AttrValue: OleVariant;
+begin
+  AttrValue := GetNodeAttr(Node, Attr);
+  if AttrValue = null then
+    Result := False
   else
     Result := AttrValue;
 end;

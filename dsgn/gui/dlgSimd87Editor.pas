@@ -50,6 +50,7 @@ type
     rbSigned: TRadioButton;
     rbUnsigned: TRadioButton;
     procedure btnCancelClick(Sender: TObject);
+    procedure EditViewAfterAutoSizeColumns(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormShow(Sender: TObject);
     procedure mbOkClick(Sender: TObject);
@@ -111,6 +112,12 @@ begin
   ModalResult := mrCancel;
 end;
 
+procedure TfrmSimd87Editor.EditViewAfterAutoSizeColumns(Sender: TObject);
+begin
+  // just hide the right separator
+  EditView.Header.ColumnWidth[ctOpcode] := EditView.Header.ColumnWidth[ctOpcode] + 100;
+end;
+
 procedure TfrmSimd87Editor.FormKeyDown(Sender: TObject; var Key: Word;
   Shift: TShiftState);
 begin
@@ -146,8 +153,6 @@ begin
   end;
   ClientWidth := EditView.PrefferededSize.X + pnEditViewMargins.Width - EditView.Width;
   ClientHeight := EditView.PrefferededSize.Y + pnBottom.Height + pnEditViewMargins.Height - EditView.Height;
-  // just hide the right separator
-  EditView.Header.ColumnWidth[ctOpcode] := EditView.Header.ColumnWidth[ctOpcode] + 100;
 end;
 
 end.

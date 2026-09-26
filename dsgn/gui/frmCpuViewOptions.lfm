@@ -1,12 +1,12 @@
 inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
-  Height = 733
+  Height = 735
   Width = 600
-  ClientHeight = 733
+  ClientHeight = 735
   ClientWidth = 600
   Constraints.MinHeight = 700
   Constraints.MinWidth = 600
-  DesignLeft = 609
-  DesignTop = 221
+  DesignLeft = 929
+  DesignTop = 225
   object cbFont: TComboBox[0]
     Left = 67
     Height = 33
@@ -25,7 +25,7 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Caption = 'Font:'
   end
   object btnFontBrowse: TButton[2]
-    Left = 544
+    Left = 547
     Height = 33
     Top = 8
     Width = 33
@@ -38,11 +38,11 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
     Left = 10
     Height = 224
     Top = 48
-    Width = 567
+    Width = 570
     Anchors = [akTop, akLeft, akRight]
     Caption = 'Performance settings:'
     ClientHeight = 194
-    ClientWidth = 563
+    ClientWidth = 566
     TabOrder = 2
     object cbSymbols: TCheckBox
       Left = 10
@@ -121,12 +121,12 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
   object gbSessions: TGroupBox[4]
     Left = 10
     Height = 104
-    Top = 545
-    Width = 567
+    Top = 568
+    Width = 570
     Anchors = [akLeft, akRight, akBottom]
     Caption = 'Session settings:'
     ClientHeight = 74
-    ClientWidth = 563
+    ClientWidth = 566
     TabOrder = 3
     object cbForm: TCheckBox
       Left = 10
@@ -145,50 +145,41 @@ inherited CpuViewMainOptionsFrame: TCpuViewMainOptionsFrame
       TabOrder = 1
     end
   end
-  object cbDbgLog: TCheckBox[5]
-    Left = 10
+  object cbDbgCrash: TCheckBox[5]
+    Left = 16
     Height = 29
-    Top = 657
-    Width = 213
-    Anchors = [akLeft, akBottom]
-    Caption = '(DEBUG) Use debug log'
-    TabOrder = 4
-  end
-  object cbDbgCrash: TCheckBox[6]
-    Left = 10
-    Height = 29
-    Top = 689
+    Top = 688
     Width = 265
     Anchors = [akLeft, akBottom]
     Caption = '(DEBUG) Generate crash dump'
-    TabOrder = 5
+    TabOrder = 4
   end
-  object btnReset: TButton[7]
-    Left = 410
+  object btnReset: TButton[6]
+    Left = 414
     Height = 38
-    Top = 657
+    Top = 682
     Width = 164
     Anchors = [akRight, akBottom]
     Caption = 'Reset to Default'
-    TabOrder = 6
+    TabOrder = 5
     OnClick = btnResetClick
   end
-  object gbViewersSetting: TGroupBox[8]
+  object gbViewersSetting: TGroupBox[7]
     Left = 8
-    Height = 257
+    Height = 280
     Top = 280
-    Width = 567
+    Width = 570
     Anchors = [akTop, akLeft, akRight, akBottom]
     Caption = 'Viewers customization:'
-    TabOrder = 7
+    TabOrder = 6
   end
-  object FontDialog: TFontDialog[9]
+  object FontDialog: TFontDialog[8]
     MinFontSize = 0
     MaxFontSize = 0
     Left = 664
     Top = 56
   end
-  object ilSettings: TImageList[10]
+  object ilSettings: TImageList[9]
     Left = 664
     Top = 136
   end

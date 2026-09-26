@@ -14,12 +14,13 @@ uses
   CpuView.DBase, CpuView.DebugerGate, CpuView.ExtendedHint, CpuView.FpDebug, 
   CpuView.GdbDebug, CpuView.GdbDebug.Intel, CpuView.ScriptExecutor, 
   CpuView.ScriptExecutor.Intel, CpuView.Settings, CpuView.Stream, 
-  CpuView.TraceLog, CpuView.Windows, CpuView.Windows.MMap, CpuView.Reg, 
-  CpuView.Design.Common, CpuView.Design.CrashDump, CpuView.Design.DbgLog, 
-  dlgCpuView, frmCpuViewBaseOptions, frmCpuViewColors, frmCpuViewOptions, 
+  CpuView.TraceLog, CpuView.Windows, CpuView.Windows.MMap, 
+  CpuView.Windows.Pdb, CpuView.Reg, CpuView.Design.Common, 
+  CpuView.Design.CrashDump, CpuView.Design.DbgLog, dlgCpuView, 
+  frmCpuViewBaseOptions, frmCpuViewColors, frmCpuViewOptions, frmCpuViewPdb, 
   frmCpuViewShortCuts, dlgCpuViewImplementation, dlgCpuView.TemporaryLocker, 
   dlgInputBox, dlgTraceLog, dlgSimd87Editor, dlgProcExports, dlgMemoryMap, 
-  dlgPageAccess, CpuView.Design.DpiFix, LazarusPackageIntf;
+  dlgPageAccess, CpuView.Design.DpiFix, dlgPDBManager, LazarusPackageIntf;
 
 implementation
 

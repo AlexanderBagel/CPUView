@@ -44,6 +44,9 @@ uses
   frmCpuViewOptions,
   frmCpuViewColors,
   frmCpuViewShortCuts,
+  {$IFDEF MSWINDOWS}
+  frmCpuViewPdb,
+  {$ENDIF}
 {$ELSE}
   Actions,
   DesignIntf,
@@ -90,6 +93,7 @@ const
   MainEditorID = 14041979;
   ColorsEditorID = MainEditorID + 1;
   ShortCutsEditorID = MainEditorID + 2;
+  PdbEditorID = MainEditorID + 3;
 var
   Key: TIDEShortCut;
   ViewCategory: TIDECommandCategory;
@@ -107,6 +111,9 @@ begin
   RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewMainOptionsFrame, MainEditorID);
   RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewColorsFrame, ColorsEditorID, MainEditorID);
   RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewShortCutsFrame, ShortCutsEditorID, MainEditorID);
+  {$IFDEF MSWINDOWS}
+  RegisterIDEOptionsEditor(GroupEnvironment, TCpuViewPdbFrame, PdbEditorID, MainEditorID);
+  {$ENDIF}
 end;
 {$ENDIF}
 

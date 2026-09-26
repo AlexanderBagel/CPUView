@@ -107,6 +107,7 @@ object frmSimd87Editor: TfrmSimd87Editor
       PopupMenu = pmEditView
       ScrollBars = ssNone
       TabOrder = 0
+      OnAfterAutoSizeColumns = EditViewAfterAutoSizeColumns
     end
   end
   object pmEditView: TPopupMenu

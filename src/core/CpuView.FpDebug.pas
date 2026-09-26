@@ -96,11 +96,6 @@ uses
   CpuView.DebugerGate,
   CpuView.Design.DbgLog;
 
-{$message 'Disable when stable = 4.0'}
-{$if laz_major >= 4}
-  {$define ExtendedFpDebug}
-{$endif}
-
 type
 
   TFpDebugGate = class;
@@ -400,7 +395,6 @@ begin
 
   inherited;
 
-  {$message 'Bad approach, utilitarianism should stand alone'}
   {$IFDEF LINUX}
   LinuxDebugger := nil;
   {$ENDIF}
@@ -584,7 +578,6 @@ begin
       Iterator.GetData(Lib);
       if Lib.ModuleHandle = AModule.hInstance then
       begin
-        {$ifdef ExtendedFpDebug}
         for I := 0 to Lib.SymbolTableInfo.SymbolCount - 1 do
         begin
           Sym := Lib.SymbolTableInfo.Symbols[I];
@@ -592,7 +585,6 @@ begin
           RemProc.AddrVA := Sym.Address.Address;
           Result.Add(RemProc);
         end;
-        {$endif}
         Break;
       end;
       Iterator.Next;
@@ -656,7 +648,7 @@ var
   SpaceIndex, MemBracketIndex: Integer;
   HasMem, IsCallJmp: Boolean;
   PrevSymAddrVA, MissCount: TDBGPtr;
-  Sym: TFpSymbol;
+  Sym: TFpSymbolWithExternal;
 begin
   CpuViewDebugLog.Log(Format('FpDebugGate: Disassembly(AddrVA: 0x%x, nSize: %d)', [AddrVA, nSize]), True);
 
@@ -670,17 +662,17 @@ begin
   SrcLine := Default(TInstruction);
   while nSize > 0 do
   begin
-    Sym := GetSymbolAtAddr(AddrVA);
+    Sym := GetSymbolAtAddrEx(AddrVA);
     try
-      if Sym <> nil then
+      if Sym.FpSymbol <> nil then
       begin
         if PrevSymAddrVA = 0 then
-          PrevSymAddrVA := Sym.Address.Address
+          PrevSymAddrVA := Sym.FpSymbol.Address.Address
         else
         begin
-          if PrevSymAddrVA <> Sym.Address.Address then
+          if PrevSymAddrVA <> Sym.FpSymbol.Address.Address then
           begin
-            PrevSymAddrVA := Sym.Address.Address;
+            PrevSymAddrVA := Sym.FpSymbol.Address.Address;
             if (AddrVA > PrevSymAddrVA) and (Result.Count > 0) then
             begin
               MissCount := AddrVA - PrevSymAddrVA;
@@ -703,11 +695,15 @@ begin
       if AShowSourceLines then
       begin
         SrcLine.AddrVA := AddrVA;
-        SrcLine.Mnemonic := FormatSymbol(AddrVA, Sym, qsSourceLine);
+        // FormatSymbol must be called in order to cache the function name
+        // without external debugging information.
+        SrcLine.Mnemonic := FormatSymbol(AddrVA, Sym.FpSymbol, qsSourceLine);
+        if Sym.External <> '' then
+          SrcLine.Mnemonic := Sym.External;
       end;
     finally
-      if Sym <> nil then
-        Sym.ReleaseReference;
+      if Sym.FpSymbol <> nil then
+        Sym.FpSymbol.ReleaseReference;
     end;
 
     PrevVA := {%H-}Int64(pBuff);

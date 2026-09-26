@@ -89,6 +89,9 @@ type
     FuncName: string;
   end;
 
+  TQueryExternalDebugInfoEvent = function(Sender: TObject; AddrVA: Int64;
+    AParam: TQuerySymbol; out AValue: TQuerySymbolValue): Boolean of object;
+
   { TAbstractDebugger }
 
   TAbstractDebugger = class(TComponent)
@@ -99,11 +102,14 @@ type
     FErrorMessage: string;
     FShowFullAddress, FShowSourceLines, FUseDebugInfo: Boolean;
     FBreakPointsChange, FCtxChange, FStateChange, FThreadChange: TNotifyEvent;
+    FExternalDebugInfo: TQueryExternalDebugInfoEvent;
     procedure SetCtx(AValue: TCommonCpuContext);
   protected
     procedure ContextUpdate(Sender: TObject; AChangeType: TContextChangeType);
     procedure DoBreakPointsChange;
     procedure DoError(const AMessage: string);
+    function DoQueryExternalDebugInfo(AddrVA: Int64; AParam: TQuerySymbol;
+      out AValue: TQuerySymbolValue): Boolean; virtual;
     procedure DoStateChange;
     procedure DoThreadChange;
     procedure InitContext(AValue: TCommonCpuContext); virtual; abstract;
@@ -167,6 +173,7 @@ type
     property UseDebugInfo: Boolean read FUseDebugInfo write FUseDebugInfo;
     property Utils: TCommonAbstractUtils read FUtils;
     property OnContextChange: TNotifyEvent read FCtxChange write FCtxChange;
+    property OnQueryExternalDebugInfo: TQueryExternalDebugInfoEvent read FExternalDebugInfo write FExternalDebugInfo;
     property OnStateChange: TNotifyEvent read FStateChange write FStateChange;
     property OnThreadChange: TNotifyEvent read FThreadChange write FThreadChange;
     property OnBreakPointsChange: TNotifyEvent read FBreakPointsChange write FBreakPointsChange;
@@ -247,6 +254,18 @@ end;
 procedure TAbstractDebugger.DoError(const AMessage: string);
 begin
   FErrorMessage := AMessage;
+end;
+
+function TAbstractDebugger.DoQueryExternalDebugInfo(AddrVA: Int64;
+  AParam: TQuerySymbol; out AValue: TQuerySymbolValue): Boolean;
+begin
+  if Assigned(FExternalDebugInfo) then
+    Result := FExternalDebugInfo(Self, AddrVA, AParam, AValue)
+  else
+  begin
+    AValue := Default(TQuerySymbolValue);
+    Result := False;
+  end;
 end;
 
 procedure TAbstractDebugger.DoStateChange;

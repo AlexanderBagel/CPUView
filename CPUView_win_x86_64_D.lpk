@@ -120,6 +120,10 @@
         <UnitName Value="CpuView.Windows.MMap"/>
       </Item>
       <Item>
+        <Filename Value="src\core\CpuView.Windows.Pdb.pas"/>
+        <UnitName Value="CpuView.Windows.Pdb"/>
+      </Item>
+      <Item>
         <Filename Value="dsgn\CpuView.Reg.pas"/>
         <HasRegisterProc Value="True"/>
         <UnitName Value="CpuView.Reg"/>
@@ -169,6 +173,14 @@
         <UnitName Value="frmCpuViewOptions"/>
       </Item>
       <Item>
+        <Filename Value="dsgn\gui\frmCpuViewPdb.lfm"/>
+        <Type Value="LFM"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\frmCpuViewPdb.pas"/>
+        <UnitName Value="frmCpuViewPdb"/>
+      </Item>
+      <Item>
         <Filename Value="dsgn\gui\frmCpuViewShortCuts.lfm"/>
         <Type Value="LFM"/>
       </Item>
@@ -211,6 +223,10 @@
       <Item>
         <Filename Value="dsgn\CpuView.Design.DpiFix.pas"/>
         <UnitName Value="CpuView.Design.DpiFix"/>
+      </Item>
+      <Item>
+        <Filename Value="dsgn\gui\dlgPDBManager.pas"/>
+        <UnitName Value="dlgPDBManager"/>
       </Item>
     </Files>
     <RequiredPkgs>

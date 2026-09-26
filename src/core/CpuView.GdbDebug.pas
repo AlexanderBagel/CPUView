@@ -809,7 +809,7 @@ var
   I: Integer;
   Inst: TInstruction;
   GdbInst: TGdbInstruction;
-  Sym: TFpSymbol;
+  Sym: TFpSymbolWithExternal;
 begin
   Assert(gdb <> nil, 'TGdbAbstractDebugGate.Disassembly: gdb = nil');
   gdb.LockCommandProcessing;
@@ -827,14 +827,18 @@ begin
       Inst.AddrVA := GdbInst.AddrVA;
       if AShowSourceLines then
       begin
-        Sym := GetSymbolAtAddr(GdbInst.AddrVA);
-        if Sym <> nil then
+        Sym := GetSymbolAtAddrEx(GdbInst.AddrVA);
+        if Sym.FpSymbol <> nil then
         try
-          Inst.Mnemonic := FormatSymbol(Inst.AddrVA, Sym, qsSourceLine);
+          // FormatSymbol must be called in order to cache the function name
+          // without external debugging information.
+          Inst.Mnemonic := FormatSymbol(Inst.AddrVA, Sym.FpSymbol, qsSourceLine);
+          if Sym.External <> '' then
+            Inst.Mnemonic := Sym.External;
           if Inst.Mnemonic <> '' then
             Result.Add(Inst);
         finally
-          Sym.ReleaseReference;
+          Sym.FpSymbol.ReleaseReference;
         end;
       end;
       Inst.Len := GdbInst.Len;

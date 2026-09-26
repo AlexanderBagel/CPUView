@@ -55,7 +55,6 @@ type
     cbSymbols: TCheckBox;
     cbForm: TCheckBox;
     cbViewers: TCheckBox;
-    cbDbgLog: TCheckBox;
     cbDbgCrash: TCheckBox;
     cbAddrValidation: TCheckBox;
     cbForceFindSymbols: TCheckBox;
@@ -349,7 +348,6 @@ begin
   cbAddrValidation.Checked := Settings.UseAddrValidation;
   cbForm.Checked := Settings.SaveFormSession;
   cbViewers.Checked := Settings.SaveViewersSession;
-  cbDbgLog.Checked := Settings.UseDebugLog;
   cbDbgCrash.Checked := Settings.UseCrashDump;
   cbForceFindSymbols.Checked := Settings.ForceFindSymbols;
   cbExtendedHints.Checked := Settings.ExtendedHints;
@@ -378,7 +376,6 @@ begin
   Settings.UseDebugInfo := cbSymbols.Checked;
   Settings.SaveFormSession := cbForm.Checked;
   Settings.SaveViewersSession := cbViewers.Checked;
-  Settings.UseDebugLog := cbDbgLog.Checked;
   Settings.UseCrashDump := cbDbgCrash.Checked;
   Settings.ForceFindSymbols := cbForceFindSymbols.Checked;
   Settings.ExtendedHints := cbExtendedHints.Checked;

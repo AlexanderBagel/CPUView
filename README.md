@@ -1,5 +1,9 @@
+**English** | [Русский](README.RU.md)
+
 Advanced CPU-View for Lazarus.
 ================
+
+[![Boosty](https://img.shields.io/badge/Boosty-Support-orange?logo=boosty)](https://boosty.to/processmemorymap)
 
 Attention - BETA, version!!!
 
@@ -12,7 +16,7 @@ posted so as not to break the current CPU-View behavior.
 
 1. SIMD register editor. (DONE)
 2. Support for ARM architecture via GDB. (DONE)
-3. Carbon/Cocoa widget support under macOS + LLDB.
+3. Carbon/Cocoa widget support under macOS + LLDB. (Temporarily suspended)
 ```
 
 ### Setup and use: 
@@ -53,7 +57,7 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Active tooltips for each editor
 
 ### The disassembler window supports:
-* Output debugging information
+* Output debugging information (including PDB for Windows)
 * Jump direction display
 * Active jump highlighting
 * Highlighting of the selected register
@@ -97,11 +101,11 @@ You can disable logging or crash dump collection in the settings "Tools->Options
 * Address recognition and highlighting
 
 ### Utils
-Started development of a set of built-in utilities.
 
 1. TraceLog - displays all instructions on which a stop occurred during debugging in CpuView.
 2. Exports - displays a list of exported functions by libraries loaded into the address space of the process being debugged.
 3. Memory Map - displays the memory map of the process being debugged.
+4. PDB Manager - displays available debug PDB files and allows you to download them from external symbol servers.
 
 ### Commands:
 
@@ -165,4 +169,27 @@ Hints:
 
 https://github.com/user-attachments/assets/65bea692-c68c-4264-b4c6-74bf9d3f8c99
 
+PDB Information (Windows only!):
 
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/pdb_asm.png"/>
+
+Debug PDB Symbol Download Manager:
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/pdb_manager.png"/>
+
+Support for debug PDB symbols can be enabled on the specified settings tab:
+
+<img src="https://raw.githubusercontent.com/AlexanderBagel/CPUView/main/img/pdb_settings.png"/>
+
+### Support the Project
+
+If you found this project useful, you can support its development on the author's main project page:
+
+[![Boosty](https://img.shields.io/badge/Boosty-Support-orange?logo=boosty)](https://boosty.to/processmemorymap)
+
+### Changelog:
+
+#### 1.0 Beta (September 26, 2026)
+- Added support for debug PDB symbols to the debug information and the ability to update them via the download manager.
+- Restored compatibility with the Stable version of Lazarus.
+- Fixed a DPI issue in the SIMD register editor.

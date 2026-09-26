@@ -961,6 +961,7 @@ type
     property TabStop;
     property Visible;
     property WheelMultiplier;
+    property OnAfterAutoSizeColumns;
     property OnClick;
     property OnContextPopup;
     property OnDblClick;
